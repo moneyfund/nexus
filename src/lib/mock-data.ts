@@ -13,7 +13,7 @@ export const initialProjects: Project[] = [
     deadline: "28 SEP",
     value: 800,
     paid: 400,
-    accent: "#6d7cff",
+    accent: "#8b5cf6",
     nextAction: "Corregir estructura de escalera y losa del segundo piso",
     hours: 18.4,
     milestones: [
@@ -38,7 +38,7 @@ export const initialProjects: Project[] = [
     status: "active",
     priority: "high",
     deadline: "15 OCT",
-    accent: "#33d6ff",
+    accent: "#a78bfa",
     nextAction: "Cerrar metodología y preparar instrumentos de campo",
     hours: 46.2,
     milestones: [
@@ -63,7 +63,7 @@ export const initialProjects: Project[] = [
     status: "active",
     priority: "medium",
     deadline: "09 OCT",
-    accent: "#ff8fb3",
+    accent: "#c084fc",
     nextAction: "Depurar presentación final y conclusiones",
     hours: 27.6,
     milestones: [
@@ -84,7 +84,7 @@ export const initialProjects: Project[] = [
     status: "active",
     priority: "high",
     deadline: "02 OCT",
-    accent: "#4ee3a1",
+    accent: "#7c3aed",
     nextAction: "Implementar puntuación de precisión en trazos",
     hours: 31.8,
     milestones: [
@@ -106,7 +106,7 @@ export const initialProjects: Project[] = [
     status: "active",
     priority: "medium",
     deadline: "31 OCT",
-    accent: "#9b6cff",
+    accent: "#9333ea",
     nextAction: "Organizar portfolio y casos de estudio",
     hours: 22.1,
     milestones: [
@@ -127,7 +127,7 @@ export const initialProjects: Project[] = [
     status: "backlog",
     priority: "low",
     deadline: "SIN FECHA",
-    accent: "#ffbf69",
+    accent: "#6d28d9",
     nextAction: "Resolver escritura de documentos en Firestore",
     hours: 14.8,
     milestones: [{ id: "n1", title: "MVP", weight: 100, progress: 32 }],
