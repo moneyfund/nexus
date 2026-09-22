@@ -46,7 +46,7 @@ export function ProjectDetail({ id }: { id: string }) {
         </div>
 
         <div className="space-y-4">
-          <div className="relative overflow-hidden rounded-[26px] border border-[#7380ff]/20 bg-gradient-to-br from-[#131a34] to-[#0b101d] p-5">
+          <div className="relative overflow-hidden rounded-[26px] border border-[#8b5cf6]/20 bg-gradient-to-br from-[#131a34] to-[#0b101d] p-5">
             <div className="absolute -right-12 -top-16 h-44 w-44 rounded-full bg-[#7280ff]/20 blur-[55px]" />
             <div className="relative">
               <div className="text-[10px] font-semibold uppercase tracking-[.18em] text-[#7783a1]">Next action</div>
@@ -57,8 +57,8 @@ export function ProjectDetail({ id }: { id: string }) {
 
           <div className="glass rounded-[26px] p-5">
             <div className="grid grid-cols-2 gap-3">
-              <div className="glass-soft rounded-2xl p-3.5"><Clock3 size={15} className="text-[#7884ff]" /><div className="mt-3 text-xl font-light">{project.hours.toFixed(1)}h</div><div className="mt-1 text-[10px] text-[#657087]">Tiempo real</div></div>
-              <div className="glass-soft rounded-2xl p-3.5"><Wallet size={15} className="text-[#4ee3a1]" /><div className="mt-3 text-xl font-light">{project.value ? "$" + project.value : "—"}</div><div className="mt-1 text-[10px] text-[#657087]">Valor proyecto</div></div>
+              <div className="glass-soft rounded-2xl p-3.5"><Clock3 size={15} className="text-[#a78bfa]" /><div className="mt-3 text-xl font-light">{project.hours.toFixed(1)}h</div><div className="mt-1 text-[10px] text-[#657087]">Tiempo real</div></div>
+              <div className="glass-soft rounded-2xl p-3.5"><Wallet size={15} className="text-[#a78bfa]" /><div className="mt-3 text-xl font-light">{project.value ? "$" + project.value : "—"}</div><div className="mt-1 text-[10px] text-[#657087]">Valor proyecto</div></div>
             </div>
             {project.value && <div className="mt-3 rounded-2xl border border-white/[.055] bg-white/[.022] p-3.5 text-xs text-[#808ba1]">Cobrado <span className="float-right font-medium text-white">{"$" + (project.paid ?? 0) + " / $" + project.value}</span></div>}
           </div>
@@ -70,7 +70,7 @@ export function ProjectDetail({ id }: { id: string }) {
         <div className="mt-4 divide-y divide-white/[.055]">
           {project.tasks.map((task) => (
             <div key={task.id} className="flex items-center gap-3 py-4">
-              <button onClick={() => toggleTask(project.id, task.id)} className={"grid h-6 w-6 shrink-0 place-items-center rounded-full border " + (task.completed ? "border-[#4ee3a1]/40 bg-[#4ee3a1]/10 text-[#4ee3a1]" : "border-white/15 text-[#59647a]")}>{task.completed ? <Check size={13} /> : <Circle size={10} />}</button>
+              <button onClick={() => toggleTask(project.id, task.id)} className={"grid h-6 w-6 shrink-0 place-items-center rounded-full border " + (task.completed ? "border-[#a78bfa]/40 bg-[#a78bfa]/10 text-[#a78bfa]" : "border-white/15 text-[#59647a]")}>{task.completed ? <Check size={13} /> : <Circle size={10} />}</button>
               <div className="min-w-0 flex-1"><div className={"text-sm " + (task.completed ? "text-[#687388] line-through" : "text-[#d6dae4]")}>{task.title}</div><div className="mt-1 text-[10px] uppercase tracking-[.12em] text-[#525d70]">{task.milestone} · {task.estimatedMinutes} min</div></div>
               {!task.completed && <button onClick={() => startFlow(project.id, task.id)} className="rounded-xl border border-white/[.07] bg-white/[.025] p-2 text-[#778198] hover:text-white"><Play size={14} /></button>}
             </div>
