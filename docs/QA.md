@@ -13,4 +13,6 @@
 
 El preview del commit `157ecfcedb537eed898f8a6edafc5fa9a1d0dfa7` terminó correctamente en Vercel. Los dos jobs de GitHub CI también finalizaron con éxito. El preview exige autenticación de Vercel y la conexión disponible no pudo conceder acceso; no se considera una revisión visual completada. Se retiró la ruta temporal de QA antes de integrar.
 
-La verificación visual e interactiva se realizará en la URL pública declarada por el repositorio, tras el despliegue final. No se modificó la protección del preview.
+La versión se integró mediante PR #1 y se publicó en https://nexus-rust-eight-76.vercel.app. Se inspeccionaron Today y el formulario Capture en escritorio. Esa inspección detectó un desajuste de hidratación en los portales de diálogo: se corrigió conservando la misma salida inicial en servidor y cliente. Se añadió ocultación de etiquetas coincidentes en la galaxia, con nombre completo accesible por foco/hover.
+
+El registro final de despliegue y comprobaciones está en https://github.com/moneyfund/nexus/pull/1. No se modificó la protección del preview. La revisión móvil sigue limitada a código responsive; no se afirma haberla verificado en un dispositivo real.

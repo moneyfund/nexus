@@ -81,28 +81,24 @@ export function NexusGalaxy({ compact = false }: { compact?: boolean }) {
     );
     const projects = n.projects.filter((p) => p.status === "active");
     return [
-      ...ideas
-        .slice(0, 28)
-        .map((i, index) => ({
-          id: i.id,
-          label: i.title,
-          category: i.category,
-          kind: "idea" as const,
-          angle: index * 2.399 + 0.2,
-          radius: 3.8 + Math.max(0, CATEGORIES.indexOf(i.category)) * 0.16,
-          fresh: false,
-        })),
-      ...projects
-        .slice(0, 10)
-        .map((p, index) => ({
-          id: p.id,
-          label: p.name,
-          category: "Projects",
-          kind: "project" as const,
-          angle: (index / Math.max(projects.length, 1)) * Math.PI * 2 + 1.3,
-          radius: 2.4,
-          fresh: false,
-        })),
+      ...ideas.slice(0, 28).map((i, index) => ({
+        id: i.id,
+        label: i.title,
+        category: i.category,
+        kind: "idea" as const,
+        angle: index * 2.399 + 0.2,
+        radius: 3.8 + Math.max(0, CATEGORIES.indexOf(i.category)) * 0.16,
+        fresh: false,
+      })),
+      ...projects.slice(0, 10).map((p, index) => ({
+        id: p.id,
+        label: p.name,
+        category: "Projects",
+        kind: "project" as const,
+        angle: (index / Math.max(projects.length, 1)) * Math.PI * 2 + 1.3,
+        radius: 2.4,
+        fresh: false,
+      })),
     ];
   }, [n.data.ideas, n.projects]);
   const filtered = useMemo(
@@ -216,6 +212,7 @@ export function NexusGalaxy({ compact = false }: { compact?: boolean }) {
       ctx!.arc(cx, cy, coreSize * 2.1, 0, Math.PI * 2);
       ctx!.fill();
       ctx!.globalCompositeOperation = "source-over";
+      const labelPositions: { x: number; y: number }[] = [];
       for (const node of filtered) {
         const p = project({
           x: Math.cos(node.angle) * node.radius,
@@ -229,6 +226,11 @@ export function NexusGalaxy({ compact = false }: { compact?: boolean }) {
           button.style.opacity = String(
             Math.max(0.6, Math.min(1, 1 - p.depth * 0.045)),
           );
+          const overlaps = labelPositions.some(
+            (q) => Math.abs(q.x - p.x) < 128 && Math.abs(q.y - p.y) < 66,
+          );
+          button.style.setProperty("--label-opacity", overlaps ? "0" : "1");
+          if (!overlaps) labelPositions.push(p);
         }
       }
       frames++;
@@ -382,6 +384,7 @@ export function NexusGalaxy({ compact = false }: { compact?: boolean }) {
             onClick={() => select(node)}
             className={"galaxy-node " + node.kind}
             aria-label={`${node.kind === "idea" ? "Abrir idea" : "Abrir proyecto"}: ${node.label}`}
+            title={node.label}
           >
             <span className="node-dot" />
             <span className="node-label">

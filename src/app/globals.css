@@ -1357,6 +1357,7 @@ html[data-motion="reduced"] *:after {
   border-color: #af85dd50;
 }
 .node-label {
+  opacity: var(--label-opacity, 1);
   position: absolute;
   top: 25px;
   left: 50%;
@@ -1387,6 +1388,7 @@ html[data-motion="reduced"] *:after {
 }
 .galaxy-node:hover .node-label,
 .galaxy-node:focus .node-label {
+  opacity: 1;
   color: white;
 }
 .galaxy-node:focus-visible {
@@ -1744,10 +1746,9 @@ html[data-motion="reduced"] *:after {
 }
 .ledger-row {
   display: grid;
-  grid-template-columns: 28px minmax(180px, 1.4fr) minmax(
-      80px,
-      1fr
-    ) 60px 90px 20px;
+  grid-template-columns:
+    28px minmax(180px, 1.4fr) minmax(80px, 1fr)
+    60px 90px 20px;
   gap: 22px;
   align-items: center;
   padding: 22px 4px;
@@ -2082,10 +2083,9 @@ html[data-motion="reduced"] *:after {
   }
   .ledger-row {
     gap: 16px;
-    grid-template-columns: 22px minmax(150px, 1fr) minmax(
-        60px,
-        0.7fr
-      ) 45px 65px 16px;
+    grid-template-columns:
+      22px minmax(150px, 1fr) minmax(60px, 0.7fr)
+      45px 65px 16px;
   }
 }
 @media (max-width: 1000px) {

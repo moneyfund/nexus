@@ -3,11 +3,13 @@ import {
   useEffect,
   useId,
   useRef,
+  useSyncExternalStore,
   type ReactNode,
   type ButtonHTMLAttributes,
 } from "react";
 import { createPortal } from "react-dom";
 import { ArrowUpRight, X, Orbit, Plus } from "lucide-react";
+const subscribeToClient = () => () => {};
 export function Button({
   children,
   variant = "primary",
@@ -216,6 +218,11 @@ export function Modal({
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
+  const mounted = useSyncExternalStore(
+    subscribeToClient,
+    () => true,
+    () => false,
+  );
   useEffect(() => {
     const dialog = ref.current;
     if (!dialog) return;
@@ -224,8 +231,8 @@ export function Modal({
     return () => {
       if (dialog.open) dialog.close();
     };
-  }, [open]);
-  if (typeof document === "undefined") return null;
+  }, [open, mounted]);
+  if (!mounted) return null;
   return createPortal(
     <dialog
       ref={ref}
