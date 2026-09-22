@@ -38,9 +38,9 @@ export function CaptureModal() {
             initial={{ opacity: 0, y: 28, scale: .98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: .98 }}
-            className="glass w-full max-w-2xl rounded-[30px] p-5 sm:p-7"
+            className="glass purple-glow relative w-full max-w-2xl overflow-hidden rounded-[32px] p-5 sm:p-7"
           >
-            <div className="flex items-start justify-between gap-6">
+            <div className="absolute inset-x-0 top-0 h-px neon-line opacity-70" /><div className="absolute right-[-90px] top-[-90px] h-56 w-56 rounded-full bg-[#7c3aed]/15 blur-[70px]" /><div className="relative flex items-start justify-between gap-6">
               <div>
                 <div className="text-xs font-semibold uppercase tracking-[.22em] text-[#8b96ad]">Universal inbox</div>
                 <h2 className="mt-2 text-2xl font-semibold">Captura sin romper el flujo.</h2>
@@ -57,7 +57,7 @@ export function CaptureModal() {
                   <button
                     key={option.type}
                     onClick={() => setType(option.type)}
-                    className={"flex flex-col items-center gap-2 rounded-2xl border px-2 py-3 text-xs transition " + (active ? "border-[#7380ff]/60 bg-[#7380ff]/12 text-white" : "border-white/7 bg-white/[.025] text-[#8b96ad] hover:bg-white/[.05]")}
+                    className={"flex flex-col items-center gap-2 rounded-2xl border px-2 py-3 text-xs transition " + (active ? "border-[#8b5cf6]/50 bg-[#8b5cf6]/10 text-white" : "border-white/7 bg-white/[.025] text-[#8b96ad] hover:bg-white/[.05]")}
                   >
                     <Icon size={18} />{option.label}
                   </button>
@@ -73,7 +73,7 @@ export function CaptureModal() {
                 if ((event.metaKey || event.ctrlKey) && event.key === "Enter") submit();
               }}
               placeholder={type === "idea" ? "¿Qué se te acaba de ocurrir?" : "Escribe aquí..."}
-              className="mt-5 min-h-36 w-full resize-none rounded-2xl border border-white/8 bg-black/20 p-4 text-[15px] leading-7 text-white outline-none placeholder:text-[#596276] focus:border-[#7380ff]/60"
+              className="mt-5 min-h-36 w-full resize-none rounded-2xl border border-white/8 bg-black/20 p-4 text-[15px] leading-7 text-white outline-none placeholder:text-[#596276] focus:border-[#8b5cf6]/55"
             />
 
             <div className="mt-4 flex items-center justify-between">
