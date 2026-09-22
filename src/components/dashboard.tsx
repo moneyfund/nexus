@@ -11,7 +11,7 @@ import { todayBlocks } from "@/lib/mock-data";
 import { useNexus } from "@/components/nexus-provider";
 import { ProjectCard } from "@/components/project-card";
 import { DepthCard } from "@/components/depth-card";
-import { NexusCore } from "@/components/nexus-core";
+import { NexusGalaxy } from "@/components/nexus-galaxy";
 
 const reveal = {
   hidden: { opacity: 0, y: 34 },
@@ -55,8 +55,8 @@ export function Dashboard() {
           <div className="flex flex-col justify-between">
             <div>
               <div className="flex flex-wrap items-center gap-3">
-                <span className="flex items-center gap-2 rounded-full border border-[#8b5cf6]/20 bg-[#8b5cf6]/[.07] px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[.18em] text-[#c3adff]">
-                  <span className="pulse-dot h-1.5 w-1.5 rounded-full bg-[#a78bfa]" />
+                <span className="flex items-center gap-2 rounded-full border border-fuchsia-300/20 bg-fuchsia-400/[.07] px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[.18em] text-fuchsia-100">
+                  <span className="pulse-dot h-1.5 w-1.5 rounded-full bg-fuchsia-300" />
                   Execution system online
                 </span>
                 <span suppressHydrationWarning className="text-[10px] font-semibold uppercase tracking-[.2em] text-[#6f687a]">{dateLabel}</span>
@@ -70,7 +70,7 @@ export function Dashboard() {
                 className="mt-12 max-w-3xl"
               >
                 <div className="mb-4 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[.22em] text-[#776a8b]">
-                  <ScanLine size={14} className="text-[#9f7aea]" /> Current directive
+                  <ScanLine size={14} className="text-fuchsia-300" /> Current directive
                 </div>
                 <h1 className="text-4xl font-semibold leading-[.98] tracking-[-.055em] sm:text-6xl xl:text-7xl">
                   Menos ruido.<br />
@@ -103,13 +103,13 @@ export function Dashboard() {
             initial={{ opacity: 0, scale: .88, rotate: -7 }}
             animate={{ opacity: 1, scale: 1, rotate: 0 }}
             transition={{ duration: 1.05, delay: .12, ease: [0.22, 1, 0.36, 1] }}
-            className="relative flex items-center justify-center"
+            className="relative flex items-center justify-center lg:min-h-[540px]"
           >
-            <div className="absolute h-[70%] w-[70%] rounded-full bg-[#6d28d9]/10 blur-[90px]" />
-            <NexusCore />
-            <div className="absolute bottom-[13%] left-1/2 w-[76%] -translate-x-1/2 rounded-2xl border border-white/[.065] bg-black/45 px-4 py-3 backdrop-blur-xl sm:w-[68%]">
+            <div className="absolute h-[78%] w-[78%] rounded-full bg-fuchsia-500/10 blur-[110px]" />
+            <NexusGalaxy />
+            <div className="pointer-events-none absolute bottom-[5%] left-1/2 z-40 w-[78%] -translate-x-1/2 rounded-2xl border border-fuchsia-300/10 bg-black/55 px-4 py-3 backdrop-blur-xl sm:w-[68%]">
               <div className="flex items-center justify-between text-[10px] uppercase tracking-[.17em] text-[#756d80]">
-                <span>Nexus signal</span><BrainCircuit size={14} className="text-[#aa8cff]" />
+                <span>Nexus signal</span><BrainCircuit size={14} className="text-fuchsia-300" />
               </div>
               <div className="mt-2 text-xs leading-5 text-[#b9b2c1]">
                 5 proyectos activos. CRISCASA concentra el mayor riesgo inmediato.
@@ -134,7 +134,7 @@ export function Dashboard() {
               <motion.div initial={{ opacity: 0, y: 12 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: index * .06 }}>
                 <div className="flex items-center justify-between text-[#746c80]">
                   <span className="text-[10px] font-semibold uppercase tracking-[.17em]">{metric.label}</span>
-                  <div className="grid h-8 w-8 place-items-center rounded-xl border border-[#8b5cf6]/15 bg-[#8b5cf6]/[.06]"><Icon size={14} className="text-[#a98cff]" /></div>
+                  <div className="grid h-8 w-8 place-items-center rounded-xl border border-[#8b5cf6]/15 bg-[#8b5cf6]/[.06]"><Icon size={14} className="text-fuchsia-300" /></div>
                 </div>
                 <div className="mt-6 flex items-end gap-1.5">
                   <span className="text-3xl font-light tracking-[-.055em] text-white">{metric.value}</span>
@@ -254,7 +254,7 @@ export function Dashboard() {
               </div>
             ))}
           </div>
-          <Link href="/ideas" className="mt-5 flex items-center gap-2 text-xs font-medium text-[#ad92ff]">Procesar inbox <ArrowRight size={13} /></Link>
+          <Link href="/ideas" className="mt-5 flex items-center gap-2 text-xs font-medium text-fuchsia-200">Procesar inbox <ArrowRight size={13} /></Link>
         </div>
 
         <div className="relative overflow-hidden rounded-[30px] border border-white/[.07] bg-black/35 p-6 backdrop-blur-xl">
@@ -268,7 +268,7 @@ export function Dashboard() {
               <p className="mt-4 max-w-xl text-sm leading-7 text-[#89818f]">
                 CRISCASA concentra el riesgo inmediato. La tesis necesita un bloque largo después. Todo lo demás puede esperar sin desaparecer.
               </p>
-              <div className="mt-5 flex items-center gap-2 text-[10px] uppercase tracking-[.15em] text-[#9d83ed]"><CheckCircle2 size={13} /> Basado en prioridades actuales</div>
+              <div className="mt-5 flex items-center gap-2 text-[10px] uppercase tracking-[.15em] text-fuchsia-300"><CheckCircle2 size={13} /> Basado en prioridades actuales</div>
             </div>
             <div className="rounded-[24px] border border-white/[.06] bg-white/[.018] p-5">
               <div className="flex items-end justify-between">
