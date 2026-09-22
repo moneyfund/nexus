@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { AnimatePresence, motion } from "motion/react";
 import {
   BarChart3, Bell, BrainCircuit, Briefcase, CalendarDays, Command,
   LayoutDashboard, Lightbulb, Plus, Search, Target, Wallet
@@ -84,7 +85,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <button onClick={() => setCaptureOpen(true)} className="flex items-center gap-2 rounded-xl bg-white px-3.5 py-2.5 text-xs font-semibold text-[#070910] transition hover:scale-[1.015]"><Plus size={15} /><span className="hidden sm:inline">Capture</span></button>
           </div>
         </header>
-        <main className="px-4 pb-24 pt-6 sm:px-7 lg:px-9 lg:pb-10">{children}</main>
+        <main className="px-4 pb-24 pt-6 sm:px-7 lg:px-9 lg:pb-10">
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.div
+              key={pathname}
+              initial={{ opacity: 0, y: 18, filter: "blur(8px)" }}
+              animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+              exit={{ opacity: 0, y: -10, filter: "blur(5px)" }}
+              transition={{ duration: .38, ease: [0.22, 1, 0.36, 1] }}
+            >
+              {children}
+            </motion.div>
+          </AnimatePresence>
+        </main>
       </div>
 
       <nav className="fixed inset-x-3 bottom-3 z-40 flex items-center justify-around rounded-2xl border border-white/10 bg-[#060608]/92 p-2 backdrop-blur-xl lg:hidden">
