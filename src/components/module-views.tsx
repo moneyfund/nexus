@@ -14,7 +14,7 @@ export function CalendarView() {
         {days.map((day, index) => {
           const blocks = index === 1 ? todayBlocks : todayBlocks.slice(index % 2, 2 + (index % 3));
           return (
-            <div key={day} className={"glass min-h-[420px] rounded-[24px] p-4 " + (index === 1 ? "border-[#7380ff]/25" : "")}>
+            <div key={day} className={"glass min-h-[420px] rounded-[24px] p-4 " + (index === 1 ? "border-[#8b5cf6]/25" : "")}>
               <div className="text-[10px] font-semibold tracking-[.15em] text-[#69758c]">{day}</div>
               <div className="mt-5 space-y-3">
                 {blocks.map((block) => {
@@ -50,7 +50,7 @@ export function FinanceView() {
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {metrics.map((item) => (
           <div key={item.label} className="glass rounded-[24px] p-5">
-            <Wallet size={16} className="text-[#6f7cff]" />
+            <Wallet size={16} className="text-[#8b5cf6]" />
             <div className="mt-6 text-[10px] font-semibold uppercase tracking-[.16em] text-[#657087]">{item.label}</div>
             <div className="mt-2 text-3xl font-light">{item.value}</div>
             <div className="mt-2 text-[11px] text-[#69758c]">{item.meta}</div>
@@ -61,13 +61,13 @@ export function FinanceView() {
         <div className="glass rounded-[26px] p-6">
           <div className="text-sm font-semibold">Cashflow · Septiembre</div>
           <div className="mt-8 flex h-52 items-end gap-3">
-            {bars.map((height, index) => <div key={index} className="flex-1 rounded-t-lg bg-gradient-to-t from-[#5967ee]/45 to-[#37d7ff]/80" style={{ height: height + "%" }} />)}
+            {bars.map((height, index) => <div key={index} className="flex-1 rounded-t-lg bg-gradient-to-t from-[#6d28d9]/45 to-[#c4b5fd]/80" style={{ height: height + "%" }} />)}
           </div>
         </div>
         <div className="glass rounded-[26px] p-6">
           <div className="text-sm font-semibold">Meta mensual</div>
           <div className="mt-7 text-5xl font-light tracking-[-.06em]">62%</div>
-          <div className="mt-4 h-2 rounded-full bg-white/[.055]"><div className="h-full w-[62%] rounded-full bg-gradient-to-r from-[#6f7cff] to-[#4ee3a1]" /></div>
+          <div className="mt-4 h-2 rounded-full bg-white/[.055]"><div className="h-full w-[62%] rounded-full bg-gradient-to-r from-[#8b5cf6] to-[#a78bfa]" /></div>
           <p className="mt-5 text-xs leading-5 text-[#707b90]">$1,250 de una meta provisional de $2,000.</p>
         </div>
       </div>
@@ -87,7 +87,7 @@ export function GoalsView() {
       <div className="grid gap-4 lg:grid-cols-3">
         {goals.map((goal) => (
           <div key={goal.title} className="glass rounded-[26px] p-6">
-            <Target size={18} className="text-[#7c87ff]" />
+            <Target size={18} className="text-[#a78bfa]" />
             <div className="mt-5 text-[10px] uppercase tracking-[.16em] text-[#667187]">{goal.date}</div>
             <h3 className="mt-2 text-xl font-semibold">{goal.title}</h3>
             <p className="mt-2 text-xs leading-5 text-[#727d92]">{goal.meta}</p>
@@ -111,7 +111,7 @@ export function IdeasView() {
         <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {inbox.map((item) => (
             <div key={item.id} className="rounded-2xl border border-white/[.06] bg-white/[.025] p-4">
-              <Lightbulb size={15} className="text-[#ffbf69]" />
+              <Lightbulb size={15} className="text-[#c084fc]" />
               <div className="mt-4 text-[9px] uppercase tracking-[.17em] text-[#667187]">{item.type}</div>
               <div className="mt-2 text-sm leading-6 text-[#ccd1dc]">{item.content}</div>
             </div>
@@ -134,8 +134,8 @@ export function AnalyticsView() {
     <ModuleFrame eyebrow="Personal intelligence" title="Analytics" description="Datos de ejecución para entender cómo trabajas realmente, no cómo crees que trabajas.">
       <div className="grid gap-4 xl:grid-cols-[1.2fr_.8fr]">
         <div className="glass rounded-[28px] p-6">
-          <div className="flex items-center justify-between"><h3 className="text-sm font-semibold">Execution rate · 14 días</h3><TrendingUp size={17} className="text-[#4ee3a1]" /></div>
-          <div className="mt-9 flex h-64 items-end gap-2">{values.map((value, index) => <div key={index} className="flex-1 rounded-t-md bg-gradient-to-t from-[#5967ee]/35 to-[#7885ff]" style={{ height: value + "%" }} />)}</div>
+          <div className="flex items-center justify-between"><h3 className="text-sm font-semibold">Execution rate · 14 días</h3><TrendingUp size={17} className="text-[#a78bfa]" /></div>
+          <div className="mt-9 flex h-64 items-end gap-2">{values.map((value, index) => <div key={index} className="flex-1 rounded-t-md bg-gradient-to-t from-[#6d28d9]/35 to-[#7885ff]" style={{ height: value + "%" }} />)}</div>
           <div className="mt-4 flex justify-between text-[10px] text-[#576174]"><span>09 SEP</span><span>22 SEP</span></div>
         </div>
         <div className="space-y-4">
@@ -143,7 +143,7 @@ export function AnalyticsView() {
             const Icon = card.icon;
             return (
               <div key={card.label} className="glass rounded-[24px] p-5">
-                <Icon size={16} className="text-[#7b87ff]" />
+                <Icon size={16} className="text-[#a78bfa]" />
                 <div className="mt-5 text-[10px] uppercase tracking-[.16em] text-[#657087]">{card.label}</div>
                 <div className="mt-1 text-3xl font-light">{card.value}</div>
                 <div className="mt-2 text-[11px] text-[#69758c]">{card.meta}</div>
