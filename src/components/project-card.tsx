@@ -3,10 +3,12 @@
 import Link from "next/link";
 import { ArrowUpRight, Clock3 } from "lucide-react";
 import type { Project } from "@/lib/types";
+import { DepthCard } from "@/components/depth-card";
 
 export function ProjectCard({ project }: { project: Project }) {
   return (
-    <Link href={"/projects/" + project.id} className="group glass block rounded-[24px] p-5 transition duration-300 hover:-translate-y-1 hover:border-white/[.13]">
+    <Link href={"/projects/" + project.id} className="group block">
+      <DepthCard className="glass purple-glow rounded-[26px] p-5 transition duration-300 hover:border-[#8b5cf6]/25">
       <div className="flex items-start justify-between gap-4">
         <div>
           <div className="text-[10px] font-semibold uppercase tracking-[.18em] text-[#667187]">{project.area}</div>
@@ -21,7 +23,7 @@ export function ProjectCard({ project }: { project: Project }) {
           <span className="text-[10px] uppercase tracking-[.16em] text-[#687388]">{project.deadline}</span>
         </div>
         <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/[.055]">
-          <div className="h-full rounded-full" style={{ width: project.progress + "%", background: "linear-gradient(90deg, " + project.accent + ", #b9c0ff)" }} />
+          <div className="h-full rounded-full" style={{ width: project.progress + "%", background: "linear-gradient(90deg, " + project.accent + ", #b794ff)" }} />
         </div>
       </div>
 
@@ -30,6 +32,7 @@ export function ProjectCard({ project }: { project: Project }) {
         <div className="mt-1.5 line-clamp-2 text-sm leading-5 text-[#c2c8d6]">{project.nextAction}</div>
         <div className="mt-4 flex items-center gap-1.5 text-[10px] text-[#697489]"><Clock3 size={12} /> {project.hours.toFixed(1)} h acumuladas</div>
       </div>
+          </DepthCard>
     </Link>
   );
 }
