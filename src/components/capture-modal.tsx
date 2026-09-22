@@ -1,88 +1,213 @@
 "use client";
-
 import { useState } from "react";
-import { AnimatePresence, motion } from "motion/react";
-import { ArrowDownLeft, ArrowUpRight, Lightbulb, ListTodo, NotebookPen, X } from "lucide-react";
-import { useNexus } from "@/components/nexus-provider";
-import type { InboxItem } from "@/lib/types";
-
-const options: { type: InboxItem["type"]; label: string; icon: typeof Lightbulb }[] = [
+import {
+  ArrowDownLeft,
+  ArrowUpRight,
+  Lightbulb,
+  ListTodo,
+  NotebookPen,
+  Layers3,
+  UserRound,
+  Paperclip,
+  Link2,
+} from "lucide-react";
+import { useNexus } from "./nexus-provider";
+import type { CaptureType } from "@/domain/models";
+import { CATEGORIES } from "@/config/system";
+import { Button, Modal } from "./ui/primitives";
+import { interfaceSound } from "@/services/sound";
+const options = [
   { type: "idea", label: "Idea", icon: Lightbulb },
   { type: "task", label: "Tarea", icon: ListTodo },
   { type: "note", label: "Nota", icon: NotebookPen },
+  { type: "project", label: "Proyecto", icon: Layers3 },
   { type: "income", label: "Ingreso", icon: ArrowDownLeft },
-  { type: "expense", label: "Gasto", icon: ArrowUpRight }
-];
-
-export function CaptureModal() {
-  const { captureOpen, setCaptureOpen, capture } = useNexus();
-  const [type, setType] = useState<InboxItem["type"]>("idea");
+  { type: "expense", label: "Gasto", icon: ArrowUpRight },
+  { type: "contact", label: "Contacto", icon: UserRound },
+  { type: "file", label: "Archivo", icon: Paperclip },
+  { type: "link", label: "Enlace", icon: Link2 },
+] as const;
+function CaptureForm() {
+  const n = useNexus();
+  const [type, setType] = useState<CaptureType>(n.captureType);
   const [content, setContent] = useState("");
-
+  const [projectId, setProjectId] = useState(n.captureProject);
+  const [category, setCategory] = useState("Ideas");
+  const [amount, setAmount] = useState("");
+  const [url, setUrl] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const [error, setError] = useState("");
   function submit() {
-    capture(type, content);
-    setContent("");
+    try {
+      n.actions.capture({
+        type,
+        content,
+        projectId: projectId || undefined,
+        category,
+        amount: Number(amount),
+        url,
+        file: file
+          ? { name: file.name, type: file.type, size: file.size }
+          : undefined,
+      });
+      interfaceSound(n.data.user.preferences.sounds, "capture");
+      n.setCaptureOpen(false);
+      n.notify(
+        type === "idea"
+          ? "Una nueva idea se incorporó a tu universo."
+          : "Captura guardada.",
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo guardar.");
+    }
   }
-
   return (
-    <AnimatePresence>
-      {captureOpen && (
-        <motion.div
-          className="fixed inset-0 z-[80] flex items-end justify-center bg-black/65 p-4 backdrop-blur-sm sm:items-center"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          onMouseDown={(event) => event.target === event.currentTarget && setCaptureOpen(false)}
-        >
-          <motion.div
-            initial={{ opacity: 0, y: 28, scale: .98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 20, scale: .98 }}
-            className="glass purple-glow relative w-full max-w-2xl overflow-hidden rounded-[32px] p-5 sm:p-7"
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        submit();
+      }}
+      onKeyDown={(e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+          e.preventDefault();
+          submit();
+        }
+      }}
+    >
+      <div className="capture-types">
+        {options.map((o) => (
+          <button
+            type="button"
+            aria-pressed={type === o.type}
+            key={o.type}
+            onClick={() => {
+              setType(o.type);
+              setError("");
+            }}
+            className={type === o.type ? "active" : ""}
           >
-            <div className="absolute inset-x-0 top-0 h-px neon-line opacity-70" /><div className="absolute right-[-90px] top-[-90px] h-56 w-56 rounded-full bg-[#7c3aed]/15 blur-[70px]" /><div className="relative flex items-start justify-between gap-6">
-              <div>
-                <div className="text-xs font-semibold uppercase tracking-[.22em] text-[#8b96ad]">Universal inbox</div>
-                <h2 className="mt-2 text-2xl font-semibold">Captura sin romper el flujo.</h2>
-                <p className="mt-2 text-sm text-[#8b96ad]">Guárdalo ahora. Decide qué hacer con ello durante la revisión.</p>
-              </div>
-              <button onClick={() => setCaptureOpen(false)} className="rounded-full border border-white/10 p-2 text-[#8b96ad] hover:bg-white/5 hover:text-white"><X size={18} /></button>
-            </div>
-
-            <div className="mt-6 grid grid-cols-5 gap-2">
-              {options.map((option) => {
-                const Icon = option.icon;
-                const active = type === option.type;
-                return (
-                  <button
-                    key={option.type}
-                    onClick={() => setType(option.type)}
-                    className={"flex flex-col items-center gap-2 rounded-2xl border px-2 py-3 text-xs transition " + (active ? "border-[#8b5cf6]/50 bg-[#8b5cf6]/10 text-white" : "border-white/7 bg-white/[.025] text-[#8b96ad] hover:bg-white/[.05]")}
-                  >
-                    <Icon size={18} />{option.label}
-                  </button>
-                );
-              })}
-            </div>
-
-            <textarea
-              autoFocus
-              value={content}
-              onChange={(event) => setContent(event.target.value)}
-              onKeyDown={(event) => {
-                if ((event.metaKey || event.ctrlKey) && event.key === "Enter") submit();
-              }}
-              placeholder={type === "idea" ? "¿Qué se te acaba de ocurrir?" : "Escribe aquí..."}
-              className="mt-5 min-h-36 w-full resize-none rounded-2xl border border-white/8 bg-black/20 p-4 text-[15px] leading-7 text-white outline-none placeholder:text-[#596276] focus:border-[#8b5cf6]/55"
+            <o.icon size={18} />
+            {o.label}
+          </button>
+        ))}
+      </div>
+      <div className="stack">
+        <label className="field">
+          {type === "idea"
+            ? "¿Qué acaba de cruzar tu mente?"
+            : "Nombre o descripción"}
+          <textarea
+            autoFocus
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
+            placeholder="Dale un lugar en NEXUS…"
+            required
+            maxLength={5000}
+          />
+        </label>
+        <div className="form-grid">
+          <label className="field">
+            Proyecto {type === "task" ? "" : "(opcional)"}
+            <select
+              value={projectId}
+              onChange={(e) => setProjectId(e.target.value)}
+              required={type === "task"}
+            >
+              <option value="">Sin proyecto</option>
+              {n.projects.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="field">
+            Órbita / categoría
+            <select
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+            >
+              {CATEGORIES.map((c) => (
+                <option key={c}>{c}</option>
+              ))}
+            </select>
+          </label>
+        </div>
+        {(type === "income" || type === "expense") && (
+          <label className="field">
+            Importe en USD
+            <input
+              type="number"
+              min="0.01"
+              step="0.01"
+              required
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
             />
-
-            <div className="mt-4 flex items-center justify-between">
-              <span className="text-xs text-[#657087]">Ctrl/⌘ + Enter para guardar</span>
-              <button onClick={submit} className="rounded-xl bg-white px-5 py-2.5 text-sm font-semibold text-[#090c13] transition hover:scale-[1.02]">Guardar en Inbox</button>
-            </div>
-          </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>
+          </label>
+        )}
+        {type === "link" && (
+          <label className="field">
+            URL
+            <input
+              type="url"
+              required
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              placeholder="https://…"
+            />
+          </label>
+        )}
+        {type === "file" && (
+          <>
+            <label className="field">
+              Archivo
+              <input
+                type="file"
+                required
+                onChange={(e) => {
+                  const f = e.target.files?.[0] ?? null;
+                  setFile(f);
+                  if (f && !content) setContent(f.name);
+                }}
+              />
+            </label>
+            <p className="form-note">
+              Por ahora se registra el nombre y los metadatos. El archivo no se
+              sube ni queda disponible para descargar; Storage está pendiente de
+              conexión.
+            </p>
+          </>
+        )}
+        {error && (
+          <p className="accent" role="alert">
+            {error}
+          </p>
+        )}
+      </div>
+      <div className="form-actions">
+        <span className="form-note">
+          Ctrl / ⌘ + Enter
+          <br />
+          Guardado en este navegador
+        </span>
+        <Button type="submit" disabled={!content.trim()}>
+          Capturar {type === "idea" ? "idea" : ""}
+          <ArrowUpRight size={16} />
+        </Button>
+      </div>
+    </form>
+  );
+}
+export function CaptureModal() {
+  const n = useNexus();
+  return (
+    <Modal
+      open={n.captureOpen}
+      onClose={() => n.setCaptureOpen(false)}
+      title="Que no se pierda."
+    >
+      {n.captureOpen && <CaptureForm />}
+    </Modal>
   );
 }

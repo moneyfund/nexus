@@ -23,7 +23,10 @@ export function AmbientScene() {
         <div className="absolute inset-[27%] rounded-full bg-[#a855f7]/10 blur-3xl" />
       </motion.div>
       <div className="absolute left-[18%] top-[34%] h-[320px] w-[320px] rounded-full bg-[#86198f]/10 blur-[140px]" />
-      <motion.div style={{ y: gridY }} className="absolute inset-x-[-20%] top-[18%] h-[120vh] opacity-60">
+      <motion.div
+        style={{ y: gridY }}
+        className="absolute inset-x-[-20%] top-[18%] h-[120vh] opacity-60"
+      >
         <div className="nexus-perspective-grid h-full w-full" />
       </motion.div>
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,rgba(3,3,6,.16)_45%,#030306_86%)]" />

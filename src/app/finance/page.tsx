@@ -1,2 +1,4 @@
-import { FinanceView } from "@/components/module-views";
-export default function FinancePage() { return <FinanceView />; }
+import { FinanceView } from "@/components/modules/finance";
+export default function FinancePage() {
+  return <FinanceView />;
+}
