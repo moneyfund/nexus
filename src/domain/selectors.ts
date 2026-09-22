@@ -45,6 +45,32 @@ export function projectFinance(w: Workspace, p: Project) {
     contractedHour: p.hours ? (p.value ?? 0) / p.hours : 0,
   };
 }
+export function financialScope(w: Workspace, scope: "all" | "user") {
+  if (scope === "all") return w;
+  const incomes = w.incomes.filter((i) => i.source === "user");
+  const expenses = w.expenses.filter((e) => e.source === "user");
+  const linked = new Set([...incomes, ...expenses].map((r) => r.projectId));
+  return {
+    ...w,
+    incomes,
+    expenses,
+    financialGoals: w.financialGoals.filter((g) => g.source === "user"),
+    projects: w.projects
+      .filter((p) => p.source === "user" || linked.has(p.id))
+      .map((p) =>
+        p.source === "user"
+          ? p
+          : {
+              ...p,
+              value: undefined,
+              hours:
+                w.flows
+                  .filter((f) => f.source === "user" && f.projectId === p.id)
+                  .reduce((sum, f) => sum + (f.elapsedSeconds ?? 0), 0) / 3600,
+            },
+      ),
+  };
+}
 export function analytics(w: Workspace) {
   const tasks = w.projects.flatMap((p) => p.tasks);
   const completed = tasks.filter((t) => t.completed).length;

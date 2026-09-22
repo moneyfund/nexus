@@ -133,7 +133,11 @@ function useSystem() {
       run(() => actions.toggleTask(projectId, taskId)),
     capture: (type: CaptureType, content: string) =>
       run(() => actions.capture({ type, content })),
-    update: (fn: (draft: Workspace) => void) => run(() => store.update(fn)),
+    update: (fn: (draft: Workspace) => void) =>
+      run(() => {
+        store.update(fn);
+        return true;
+      }) === true,
   };
 }
 const NexusContext = createContext<ReturnType<typeof useSystem> | null>(null);

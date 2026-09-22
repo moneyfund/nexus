@@ -137,7 +137,7 @@ function KnowledgeEditor({
         <Button
           onClick={() => {
             if (!draft.title.trim()) return;
-            n.update((w) => {
+            const saved = n.update((w) => {
               const i = w.knowledge.findIndex((k) => k.id === item.id);
               w.knowledge[i] = {
                 ...draft,
@@ -146,6 +146,7 @@ function KnowledgeEditor({
                 updatedAt: Date.now(),
               };
             });
+            if (!saved) return;
             n.notify("Conocimiento actualizado.");
             close();
           }}
@@ -157,14 +158,14 @@ function KnowledgeEditor({
           onClick={() => {
             if (!deleting) setDeleting(true);
             else {
-              n.update((w) => {
+              const deleted = n.update((w) => {
                 w.knowledge = w.knowledge.filter((k) => k.id !== item.id);
                 w.inbox = w.inbox.filter((i) => i.targetId !== item.id);
                 w.attachments = w.attachments.filter(
                   (a) => a.id !== item.attachmentId,
                 );
               });
-              close();
+              if (deleted) close();
             }
           }}
         >

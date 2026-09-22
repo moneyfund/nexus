@@ -241,14 +241,14 @@ export function AIView() {
             onSubmit={(e) => {
               e.preventDefault();
               if (!memory.trim()) return;
-              n.update((w) => {
+              const saved = n.update((w) => {
                 w.memories.push({
                   ...entity(crypto.randomUUID(), "user", w.user.id),
                   content: memory.trim(),
                   projectIds: [],
                 });
               });
-              setMemory("");
+              if (saved) setMemory("");
             }}
           >
             <input

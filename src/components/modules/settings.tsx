@@ -33,8 +33,12 @@ const sections = [
 export function SettingsView() {
   const n = useNexus();
   const [section, setSection] = useState("profile");
-  const [name, setName] = useState(n.data.user.name);
-  const [email, setEmail] = useState(n.data.user.email);
+  const [profileDraft, setProfileDraft] = useState<{
+    name: string;
+    email: string;
+  } | null>(null);
+  const name = profileDraft?.name ?? n.data.user.name;
+  const email = profileDraft?.email ?? n.data.user.email;
   const [pendingImport, setPendingImport] = useState<unknown>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const prefs = n.data.user.preferences;
@@ -78,10 +82,10 @@ export function SettingsView() {
                 className="stack"
                 onSubmit={(e) => {
                   e.preventDefault();
-                  n.run(
-                    () => n.actions.updateProfile(name, email),
-                    "Perfil actualizado.",
-                  );
+                  n.run(() => {
+                    n.actions.updateProfile(name, email);
+                    setProfileDraft(null);
+                  }, "Perfil actualizado.");
                 }}
               >
                 <label className="field">
@@ -89,7 +93,9 @@ export function SettingsView() {
                   <input
                     value={name}
                     required
-                    onChange={(e) => setName(e.target.value)}
+                    onChange={(e) =>
+                      setProfileDraft({ name: e.target.value, email })
+                    }
                   />
                 </label>
                 <label className="field">
@@ -97,7 +103,9 @@ export function SettingsView() {
                   <input
                     type="email"
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    onChange={(e) =>
+                      setProfileDraft({ name, email: e.target.value })
+                    }
                   />
                 </label>
                 <label className="field">
@@ -350,6 +358,7 @@ export function SettingsView() {
                       onClick={() =>
                         n.run(() => {
                           n.store.import(pendingImport);
+                          setProfileDraft(null);
                           setPendingImport(null);
                         }, "Respaldo importado.")
                       }

@@ -102,7 +102,7 @@ export function GoalsView() {
           className="stack"
           onSubmit={(e) => {
             e.preventDefault();
-            n.update((w) => {
+            const saved = n.update((w) => {
               const goalId = crypto.randomUUID();
               w.goals.push({
                 ...entity(goalId, "user", w.user.id),
@@ -121,6 +121,7 @@ export function GoalsView() {
                   })),
               });
             });
+            if (!saved) return;
             setOpen(false);
             setTitle("");
             setMilestones("");

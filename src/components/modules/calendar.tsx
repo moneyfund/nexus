@@ -233,7 +233,10 @@ export function CalendarView() {
     events.filter(
       (e) =>
         dateKey(new Date(e.start), n.data.user.preferences.timezone) <= date &&
-        dateKey(new Date(e.end), n.data.user.preferences.timezone) >= date,
+        dateKey(
+          new Date(+new Date(e.end) - 1),
+          n.data.user.preferences.timezone,
+        ) >= date,
     );
   const open = (date: string) => {
     setSelectedDate(date);

@@ -7,7 +7,11 @@ import {
 } from "../src/repositories/workspace";
 import { NexusActions } from "../src/services/actions";
 import { seedWorkspace } from "../src/domain/seed";
-import { flowElapsed, projectFinance } from "../src/domain/selectors";
+import {
+  financialScope,
+  flowElapsed,
+  projectFinance,
+} from "../src/domain/selectors";
 import { createRepositories } from "../src/repositories/contracts";
 import {
   MockCalendarProvider,
@@ -146,6 +150,31 @@ test("repositories reject access to another owner", async () => {
   const { store } = setup();
   const repos = createRepositories(store);
   await assert.rejects(repos.projects.list("another-owner"), /autorizado/);
+});
+test("own financial records remain visible on demo projects without inheriting demo amounts", () => {
+  const { store, actions } = setup();
+  actions.capture({
+    type: "income",
+    content: "Cobro real",
+    amount: 125,
+    projectId: "criscasa",
+  });
+  actions.capture({
+    type: "expense",
+    content: "Gasto real",
+    amount: 25,
+    projectId: "criscasa",
+  });
+  const scoped = financialScope(store.getSnapshot(), "user");
+  const project = scoped.projects.find((p) => p.id === "criscasa")!;
+  assert.ok(project);
+  assert.equal(scoped.incomes.length, 1);
+  assert.equal(project.value, undefined);
+  assert.equal(project.hours, 0);
+  assert.equal(projectFinance(scoped, project).paid, 125);
+  assert.equal(projectFinance(scoped, project).profit, 100);
+  assert.equal(projectFinance(scoped, project).receivable, 0);
+  assert.equal(store.getSnapshot().projects[0].value, 800);
 });
 test("failed persistence preserves last good state; invalid backups are rejected", () => {
   const store = new WorkspaceStore({

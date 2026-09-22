@@ -20,31 +20,29 @@ import {
   Empty,
 } from "../ui/primitives";
 import { CashflowChart } from "../ui/charts";
-import { dateKey, money, projectFinance } from "@/domain/selectors";
+import {
+  dateKey,
+  financialScope,
+  money,
+  projectFinance,
+} from "@/domain/selectors";
 import { entity } from "@/domain/seed";
 export function FinanceView() {
   const n = useNexus();
-  const [scope, setScope] = useState("all");
+  const [scope, setScope] = useState<"all" | "user">("all");
   const [goalOpen, setGoalOpen] = useState(false);
   const [goalName, setGoalName] = useState("");
   const [goalTarget, setGoalTarget] = useState("");
   const [goalKind, setGoalKind] = useState<"savings" | "investment">("savings");
-  const incomes = n.data.incomes.filter(
-    (i) => scope === "all" || i.source === "user",
-  );
-  const expenses = n.data.expenses.filter(
-    (i) => scope === "all" || i.source === "user",
-  );
+  const scoped = financialScope(n.data, scope);
+  const { incomes, expenses, projects, financialGoals } = scoped;
   const income = incomes.reduce((s, i) => s + i.amount, 0);
   const expense = expenses.reduce((s, i) => s + i.amount, 0);
-  const projects = n.projects.filter(
-    (p) => scope === "all" || p.source === "user",
-  );
   const receivable = projects.reduce(
-    (s, p) => s + projectFinance(n.data, p).receivable,
+    (s, p) => s + projectFinance(scoped, p).receivable,
     0,
   );
-  const savings = n.data.financialGoals.reduce((s, g) => s + g.saved, 0);
+  const savings = financialGoals.reduce((s, g) => s + g.saved, 0);
   const currentMonth = dateKey().slice(0, 7);
   const [baseMonth] = useState(() => currentMonth);
   const values = Array.from({ length: 6 }, (_, i) => {
@@ -95,7 +93,10 @@ export function FinanceView() {
         </div>
         <label className="field">
           Origen de datos
-          <select value={scope} onChange={(e) => setScope(e.target.value)}>
+          <select
+            value={scope}
+            onChange={(e) => setScope(e.target.value as "all" | "user")}
+          >
             <option value="all">Todo · incluye demostración</option>
             <option value="user">Solo mis registros</option>
           </select>
@@ -152,11 +153,10 @@ export function FinanceView() {
             <tbody>
               {projects
                 .filter(
-                  (p) =>
-                    p.value || n.data.incomes.some((i) => i.projectId === p.id),
+                  (p) => p.value || records.some((i) => i.projectId === p.id),
                 )
                 .map((p) => {
-                  const f = projectFinance(n.data, p);
+                  const f = projectFinance(scoped, p);
                   return (
                     <tr key={p.id}>
                       <td>
@@ -166,9 +166,13 @@ export function FinanceView() {
                         </Link>
                         {p.source === "demo" && <small>DEMO</small>}
                       </td>
-                      <td>{money(p.value ?? 0)}</td>
+                      <td>{p.value == null ? "—" : money(p.value)}</td>
                       <td>{p.hours.toFixed(1)}</td>
-                      <td>{money(f.contractedHour)}</td>
+                      <td>
+                        {p.value == null || !p.hours
+                          ? "—"
+                          : money(f.contractedHour)}
+                      </td>
                       <td>{money(f.paid)}</td>
                       <td className="accent">{money(f.receivable)}</td>
                       <td>{money(f.profit)}</td>
@@ -181,6 +185,8 @@ export function FinanceView() {
         <p className="form-note" style={{ marginTop: 14 }}>
           Valor / h = valor acordado ÷ horas acumuladas. El margen usa lo
           cobrado menos los gastos del proyecto; no es una previsión fiscal.
+          {scope === "user" &&
+            " Los valores y horas de demostración se excluyen; tus movimientos vinculados a esos proyectos se conservan."}
         </p>
       </section>
       <div className="split section">
@@ -195,7 +201,7 @@ export function FinanceView() {
               </Button>
             }
           />
-          {n.data.financialGoals.map((g) => (
+          {financialGoals.map((g) => (
             <div key={g.id} className="financial-goal">
               <div className="row between">
                 <h3>{g.title}</h3>
@@ -238,7 +244,7 @@ export function FinanceView() {
               </div>
             </div>
           ))}
-          {!n.data.financialGoals.length && (
+          {!financialGoals.length && (
             <Empty
               title="Dale una dirección al capital."
               text="Define una reserva de ahorro o una meta de inversión."
@@ -307,7 +313,7 @@ export function FinanceView() {
             e.preventDefault();
             const target = Number(goalTarget);
             if (!(target > 0) || !goalName.trim()) return;
-            n.update((w) => {
+            const saved = n.update((w) => {
               w.financialGoals.push({
                 ...entity(crypto.randomUUID(), "user", w.user.id),
                 title: goalName.trim(),
@@ -316,6 +322,7 @@ export function FinanceView() {
                 kind: goalKind,
               });
             });
+            if (!saved) return;
             setGoalOpen(false);
             setGoalName("");
             setGoalTarget("");
