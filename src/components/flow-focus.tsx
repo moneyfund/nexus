@@ -34,18 +34,18 @@ export function FlowFocus() {
       {activeFlow && (
         <motion.div className="fixed inset-0 z-[70] overflow-hidden bg-[#05070c]" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
           <div className="nexus-grid absolute inset-0 opacity-70" />
-          <div className="absolute left-1/2 top-[-180px] h-[430px] w-[430px] -translate-x-1/2 rounded-full bg-[#6878ff]/20 blur-[110px]" />
+          <div className="absolute left-1/2 top-[-180px] h-[430px] w-[430px] -translate-x-1/2 rounded-full bg-[#7c3aed]/20 blur-[110px]" />
           <div className="relative mx-auto flex min-h-screen max-w-5xl flex-col px-6 py-6 sm:px-10">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3 text-xs font-semibold uppercase tracking-[.25em] text-[#758097]">
-                <span className="pulse-dot h-2 w-2 rounded-full bg-[#4ee3a1]" /> Nexus Flow
+                <span className="pulse-dot h-2 w-2 rounded-full bg-[#a78bfa]" /> Nexus Flow
               </div>
               <button onClick={() => endFlow(false)} className="rounded-full border border-white/10 p-2 text-[#7d879a] hover:bg-white/5 hover:text-white"><X size={18} /></button>
             </div>
 
             <div className="flex flex-1 flex-col items-center justify-center py-14 text-center">
               <motion.div initial={{ y: 16, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="max-w-3xl">
-                <div className="text-sm font-medium text-[#7783ff]">{activeFlow.projectName}</div>
+                <div className="text-sm font-medium text-[#a78bfa]">{activeFlow.projectName}</div>
                 <h2 className="mt-4 text-3xl font-semibold tracking-[-.03em] sm:text-5xl">{activeFlow.title}</h2>
                 <div className="mt-10 font-mono text-5xl font-light tracking-[-.05em] text-gradient sm:text-7xl">{formatTime(remaining)}</div>
                 <p className="mx-auto mt-5 max-w-xl text-sm leading-6 text-[#778198]">Una tarea. Un resultado. Cualquier idea nueva va al Inbox; no cambia la prioridad actual.</p>
