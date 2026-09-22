@@ -1,0 +1,41 @@
+import {
+  Orbit,
+  Layers3,
+  CalendarDays,
+  AudioLines,
+  Lightbulb,
+  Target,
+  Wallet,
+  ChartNoAxesCombined,
+  Library,
+  BrainCircuit,
+  Settings2,
+} from "lucide-react";
+export const navigation = [
+  { href: "/", label: "Today", icon: Orbit, group: "workspace" },
+  { href: "/projects", label: "Projects", icon: Layers3, group: "workspace" },
+  {
+    href: "/calendar",
+    label: "Calendar",
+    icon: CalendarDays,
+    group: "workspace",
+  },
+  { href: "/flow", label: "Flow", icon: AudioLines, group: "workspace" },
+  { href: "/ideas", label: "Ideas", icon: Lightbulb, group: "workspace" },
+  { href: "/goals", label: "Goals", icon: Target, group: "workspace" },
+  { href: "/finance", label: "Finance", icon: Wallet, group: "intelligence" },
+  {
+    href: "/analytics",
+    label: "Analytics",
+    icon: ChartNoAxesCombined,
+    group: "intelligence",
+  },
+  {
+    href: "/knowledge",
+    label: "Knowledge",
+    icon: Library,
+    group: "intelligence",
+  },
+  { href: "/ai", label: "Nexus AI", icon: BrainCircuit, group: "intelligence" },
+  { href: "/settings", label: "System", icon: Settings2, group: "system" },
+];

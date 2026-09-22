@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="theme-color" content="#020203" />
+    <title>NEXUS · Sin conexión</title>
+    <style>
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        background: #020203;
+        color: #f7f4fa;
+        font-family: system-ui;
+        text-align: center;
+        padding: 24px;
+        box-sizing: border-box;
+      }
+      main {
+        max-width: 430px;
+      }
+      img {
+        width: 90px;
+      }
+      small {
+        color: #dcb1ec;
+        letter-spacing: 0.18em;
+      }
+      h1 {
+        font-size: 36px;
+        font-weight: 400;
+        letter-spacing: -0.04em;
+      }
+      p {
+        color: #aa9eb5;
+        line-height: 1.8;
+      }
+      button {
+        background: #f0d3fa;
+        border: 0;
+        border-radius: 8px;
+        padding: 13px 24px;
+        margin-top: 20px;
+        font: inherit;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <img src="/icon.svg" alt="NEXUS" />
+      <p><small>NEXUS / OFFLINE</small></p>
+      <h1>Tu espacio sigue aquí.</h1>
+      <p>
+        Los datos guardados permanecen en este navegador. Reconecta para cargar
+        los módulos; esta versión conserva una pantalla offline básica.
+      </p>
+      <button onclick="location.reload()">Volver a conectar</button>
+    </main>
+  </body>
+</html>

@@ -1,106 +1,156 @@
 "use client";
-
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import { initialProjects } from "@/lib/mock-data";
-import type { FlowSession, InboxItem, Project } from "@/lib/types";
-
-type CaptureType = InboxItem["type"];
-
-interface NexusContextValue {
-  projects: Project[];
-  inbox: InboxItem[];
-  activeFlow: FlowSession | null;
-  captureOpen: boolean;
-  setCaptureOpen: (value: boolean) => void;
-  capture: (type: CaptureType, content: string) => void;
-  toggleTask: (projectId: string, taskId: string) => void;
-  startFlow: (projectId: string, taskId: string, duration?: number) => void;
-  endFlow: (completeTask?: boolean) => void;
-}
-
-const NexusContext = createContext<NexusContextValue | null>(null);
-const STORAGE_KEY = "nexus-os-v01";
-
-export function NexusProvider({ children }: { children: ReactNode }) {
-  const [projects, setProjects] = useState<Project[]>(initialProjects);
-  const [inbox, setInbox] = useState<InboxItem[]>([
-    { id: "seed-1", type: "idea", content: "Sistema automático de presupuestos de construcción", createdAt: Date.now() - 5400000 }
-  ]);
-  const [activeFlow, setActiveFlow] = useState<FlowSession | null>(null);
-  const [captureOpen, setCaptureOpen] = useState(false);
-  const [hydrated, setHydrated] = useState(false);
-
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw) as { projects?: Project[]; inbox?: InboxItem[] };
-        if (parsed.projects) setProjects(parsed.projects);
-        if (parsed.inbox) setInbox(parsed.inbox);
-      }
-    } catch {
-      // Fallback to seeded state.
-    } finally {
-      setHydrated(true);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!hydrated) return;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ projects, inbox }));
-  }, [projects, inbox, hydrated]);
-
-  const capture = (type: CaptureType, content: string) => {
-    const trimmed = content.trim();
-    if (!trimmed) return;
-    setInbox((current) => [
-      { id: crypto.randomUUID(), type, content: trimmed, createdAt: Date.now() },
-      ...current
-    ]);
-    setCaptureOpen(false);
-  };
-
-  const toggleTask = (projectId: string, taskId: string) => {
-    setProjects((current) =>
-      current.map((project) => {
-        if (project.id !== projectId) return project;
-        const tasks = project.tasks.map((task) =>
-          task.id === taskId ? { ...task, completed: !task.completed } : task
-        );
-        const completed = tasks.filter((task) => task.completed).length;
-        const taskProgress = tasks.length ? Math.round((completed / tasks.length) * 100) : project.progress;
-        return { ...project, tasks, progress: Math.max(project.progress, taskProgress) };
-      })
-    );
-  };
-
-  const startFlow = (projectId: string, taskId: string, duration?: number) => {
-    const project = projects.find((item) => item.id === projectId);
-    const task = project?.tasks.find((item) => item.id === taskId);
-    if (!project || !task) return;
-    setActiveFlow({
-      projectId,
-      taskId,
-      title: task.title,
-      projectName: project.name,
-      durationMinutes: duration ?? task.estimatedMinutes,
-      startedAt: Date.now()
-    });
-  };
-
-  const endFlow = (completeTask = false) => {
-    if (completeTask && activeFlow) toggleTask(activeFlow.projectId, activeFlow.taskId);
-    setActiveFlow(null);
-  };
-
-  const value = useMemo(
-    () => ({ projects, inbox, activeFlow, captureOpen, setCaptureOpen, capture, toggleTask, startFlow, endFlow }),
-    [projects, inbox, activeFlow, captureOpen]
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  useSyncExternalStore,
+  type ReactNode,
+} from "react";
+import { MotionConfig, useReducedMotion } from "motion/react";
+import {
+  BrowserWorkspaceStorage,
+  WorkspaceStore,
+} from "@/repositories/workspace";
+import { createRepositories } from "@/repositories/contracts";
+import { NexusActions } from "@/services/actions";
+import {
+  MockAIProvider,
+  MockCalendarProvider,
+  MockStorageProvider,
+  NexusContextBuilder,
+  LocalNotificationService,
+} from "@/services/providers";
+import { interfaceSound } from "@/services/sound";
+import type { CaptureType, FlowSession, Workspace } from "@/domain/models";
+function useSystem() {
+  const [store] = useState(
+    () => new WorkspaceStore(new BrowserWorkspaceStorage()),
   );
-
-  return <NexusContext.Provider value={value}>{children}</NexusContext.Provider>;
+  useSyncExternalStore(store.subscribe, store.getRevision, () => 0);
+  const data = store.getSnapshot();
+  const actions = useMemo(() => new NexusActions(store), [store]);
+  const repositories = useMemo(() => createRepositories(store), [store]);
+  const services = useMemo(
+    () => ({
+      ai: new MockAIProvider(),
+      context: new NexusContextBuilder(),
+      calendar: new MockCalendarProvider(repositories.calendar),
+      storage: new MockStorageProvider(),
+      notifications: new LocalNotificationService(repositories.notifications),
+    }),
+    [repositories],
+  );
+  const [captureOpen, setCaptureOpen] = useState(false);
+  const [captureType, setCaptureType] = useState<CaptureType>("idea");
+  const [captureProject, setCaptureProject] = useState("");
+  const [commandOpen, setCommandOpen] = useState(false);
+  const [notificationOpen, setNotificationOpen] = useState(false);
+  const [selectedIdeaId, setSelectedIdeaId] = useState<string | null>(null);
+  const [flowResult, setFlowResult] = useState<FlowSession | null>(null);
+  const [toast, setToast] = useState<{
+    message: string;
+    error: boolean;
+  } | null>(null);
+  const osReduced = useReducedMotion();
+  const reduceMotion = !!osReduced || data.user.preferences.motion !== "full";
+  useEffect(() => {
+    store.load();
+  }, [store]);
+  useEffect(() => {
+    document.documentElement.dataset.motion = reduceMotion ? "reduced" : "full";
+    document.documentElement.dataset.accent = data.user.preferences.accent;
+  }, [reduceMotion, data.user.preferences.accent]);
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), toast.error ? 7000 : 3500);
+    return () => clearTimeout(t);
+  }, [toast]);
+  const notify = (message: string, error = false) =>
+    setToast({ message, error });
+  const run = <T,>(action: () => T, message?: string): T | undefined => {
+    try {
+      const result = action();
+      if (message) notify(message);
+      return result;
+    } catch (e) {
+      notify(
+        e instanceof Error ? e.message : "No se pudo completar la acción.",
+        true,
+      );
+      return undefined;
+    }
+  };
+  const openCapture = (type: CaptureType = "idea", projectId = "") => {
+    setCaptureType(type);
+    setCaptureProject(projectId);
+    setCaptureOpen(true);
+  };
+  const startFlow = (projectId: string, taskId: string, duration?: number) =>
+    run(() => {
+      actions.startFlow(projectId, taskId, duration);
+      interfaceSound(data.user.preferences.sounds, "flow");
+    });
+  const endFlow = (completeTask = false) =>
+    run(() => {
+      const result = actions.endFlow(completeTask);
+      setFlowResult(result);
+      interfaceSound(data.user.preferences.sounds, "complete");
+    });
+  return {
+    data,
+    store,
+    repositories,
+    services,
+    actions,
+    ready: store.ready,
+    storageError: store.error,
+    reduceMotion,
+    projects: data.projects,
+    inbox: data.inbox,
+    activeFlow: data.activeFlow,
+    captureOpen,
+    setCaptureOpen,
+    captureType,
+    captureProject,
+    openCapture,
+    commandOpen,
+    setCommandOpen,
+    notificationOpen,
+    setNotificationOpen,
+    selectedIdeaId,
+    setSelectedIdeaId,
+    flowResult,
+    setFlowResult,
+    toast,
+    setToast,
+    notify,
+    run,
+    startFlow,
+    endFlow,
+    toggleTask: (projectId: string, taskId: string) =>
+      run(() => actions.toggleTask(projectId, taskId)),
+    capture: (type: CaptureType, content: string) =>
+      run(() => actions.capture({ type, content })),
+    update: (fn: (draft: Workspace) => void) =>
+      run(() => {
+        store.update(fn);
+        return true;
+      }) === true,
+  };
 }
-
+const NexusContext = createContext<ReturnType<typeof useSystem> | null>(null);
+export function NexusProvider({ children }: { children: ReactNode }) {
+  const system = useSystem();
+  return (
+    <NexusContext.Provider value={system}>
+      <MotionConfig reducedMotion={system.reduceMotion ? "always" : "user"}>
+        {children}
+      </MotionConfig>
+    </NexusContext.Provider>
+  );
+}
 export function useNexus() {
   const value = useContext(NexusContext);
   if (!value) throw new Error("useNexus must be used inside NexusProvider");

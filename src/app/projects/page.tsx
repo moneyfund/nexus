@@ -1,2 +1,4 @@
 import { ProjectsView } from "@/components/projects-view";
-export default function ProjectsPage() { return <ProjectsView />; }
+export default function ProjectsPage() {
+  return <ProjectsView />;
+}

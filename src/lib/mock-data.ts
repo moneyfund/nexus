@@ -1,12 +1,25 @@
-import type { DailyBlock, Project } from "@/lib/types";
+import type { DailyBlock, Project, Task, Milestone } from "@/lib/types";
 
-export const initialProjects: Project[] = [
+type SeedTask = Omit<
+  Task,
+  "userId" | "createdAt" | "updatedAt" | "source" | "projectId"
+>;
+type SeedMilestone = Omit<
+  Milestone,
+  "userId" | "createdAt" | "updatedAt" | "source" | "projectId"
+>;
+type SeedProject = Omit<
+  Project,
+  "userId" | "createdAt" | "updatedAt" | "source" | "tasks" | "milestones"
+> & { tasks: SeedTask[]; milestones: SeedMilestone[] };
+const projectSeeds: SeedProject[] = [
   {
     id: "criscasa",
     name: "CRISCASA",
     area: "Cliente · Ingeniería",
     client: "Luis Alfredo Castillo",
-    description: "Diseño arquitectónico, fachada y desarrollo técnico del edificio comercial de cuatro niveles.",
+    description:
+      "Diseño arquitectónico, fachada y desarrollo técnico del edificio comercial de cuatro niveles.",
     progress: 72,
     status: "active",
     priority: "critical",
@@ -21,19 +34,41 @@ export const initialProjects: Project[] = [
       { id: "c2", title: "Fachada", weight: 20, progress: 95 },
       { id: "c3", title: "Distribución", weight: 20, progress: 80 },
       { id: "c4", title: "Estructura", weight: 25, progress: 58 },
-      { id: "c5", title: "Entrega", weight: 20, progress: 20 }
+      { id: "c5", title: "Entrega", weight: 20, progress: 20 },
     ],
     tasks: [
-      { id: "ct1", title: "Corregir estructura de escalera", completed: false, estimatedMinutes: 90, priority: "critical", milestone: "Estructura" },
-      { id: "ct2", title: "Ajustar losa segundo piso", completed: false, estimatedMinutes: 55, priority: "high", milestone: "Estructura" },
-      { id: "ct3", title: "Exportar revisión final", completed: false, estimatedMinutes: 30, priority: "medium", milestone: "Entrega" }
-    ]
+      {
+        id: "ct1",
+        title: "Corregir estructura de escalera",
+        completed: false,
+        estimatedMinutes: 90,
+        priority: "critical",
+        milestone: "Estructura",
+      },
+      {
+        id: "ct2",
+        title: "Ajustar losa segundo piso",
+        completed: false,
+        estimatedMinutes: 55,
+        priority: "high",
+        milestone: "Estructura",
+      },
+      {
+        id: "ct3",
+        title: "Exportar revisión final",
+        completed: false,
+        estimatedMinutes: 30,
+        priority: "medium",
+        milestone: "Entrega",
+      },
+    ],
   },
   {
     id: "tesis-civil",
     name: "Tesis Ingeniería Civil",
     area: "Académico",
-    description: "Estudio de seguridad vial, km 284–288, tramo El Jícaro–Jalapa.",
+    description:
+      "Estudio de seguridad vial, km 284–288, tramo El Jícaro–Jalapa.",
     progress: 63,
     status: "active",
     priority: "high",
@@ -47,18 +82,33 @@ export const initialProjects: Project[] = [
       { id: "t3", title: "Trabajo de campo", weight: 20, progress: 60 },
       { id: "t4", title: "Análisis", weight: 25, progress: 45 },
       { id: "t5", title: "Documento final", weight: 15, progress: 40 },
-      { id: "t6", title: "Defensa", weight: 10, progress: 0 }
+      { id: "t6", title: "Defensa", weight: 10, progress: 0 },
     ],
     tasks: [
-      { id: "tt1", title: "Completar metodología", completed: false, estimatedMinutes: 60, priority: "high", milestone: "Documento final" },
-      { id: "tt2", title: "Revisar marco legal", completed: false, estimatedMinutes: 45, priority: "medium", milestone: "Marco teórico" }
-    ]
+      {
+        id: "tt1",
+        title: "Completar metodología",
+        completed: false,
+        estimatedMinutes: 60,
+        priority: "high",
+        milestone: "Documento final",
+      },
+      {
+        id: "tt2",
+        title: "Revisar marco legal",
+        completed: false,
+        estimatedMinutes: 45,
+        priority: "medium",
+        milestone: "Marco teórico",
+      },
+    ],
   },
   {
     id: "dolce",
     name: "Tesis Mercadeo · DOLCE",
     area: "Académico",
-    description: "Análisis del marketing en el posicionamiento comercial de Repostería DOLCE.",
+    description:
+      "Análisis del marketing en el posicionamiento comercial de Repostería DOLCE.",
     progress: 78,
     status: "active",
     priority: "medium",
@@ -69,17 +119,25 @@ export const initialProjects: Project[] = [
     milestones: [
       { id: "d1", title: "Investigación", weight: 40, progress: 100 },
       { id: "d2", title: "Análisis", weight: 30, progress: 82 },
-      { id: "d3", title: "Presentación", weight: 30, progress: 45 }
+      { id: "d3", title: "Presentación", weight: 30, progress: 45 },
     ],
     tasks: [
-      { id: "dt1", title: "Revisar conclusiones", completed: false, estimatedMinutes: 40, priority: "medium", milestone: "Análisis" }
-    ]
+      {
+        id: "dt1",
+        title: "Revisar conclusiones",
+        completed: false,
+        estimatedMinutes: 40,
+        priority: "medium",
+        milestone: "Análisis",
+      },
+    ],
   },
   {
     id: "pequenos-escritores",
     name: "Pequeños Escritores",
     area: "Software · Cliente",
-    description: "Plataforma educativa infantil con retos, trazos, grupos y progreso.",
+    description:
+      "Plataforma educativa infantil con retos, trazos, grupos y progreso.",
     progress: 58,
     status: "active",
     priority: "high",
@@ -90,18 +148,33 @@ export const initialProjects: Project[] = [
     milestones: [
       { id: "p1", title: "Core", weight: 35, progress: 90 },
       { id: "p2", title: "Retos", weight: 35, progress: 55 },
-      { id: "p3", title: "Pulido", weight: 30, progress: 25 }
+      { id: "p3", title: "Pulido", weight: 30, progress: 25 },
     ],
     tasks: [
-      { id: "pt1", title: "Scoring de trazos", completed: false, estimatedMinutes: 90, priority: "high", milestone: "Retos" },
-      { id: "pt2", title: "Guía de mano animada", completed: false, estimatedMinutes: 55, priority: "medium", milestone: "Retos" }
-    ]
+      {
+        id: "pt1",
+        title: "Scoring de trazos",
+        completed: false,
+        estimatedMinutes: 90,
+        priority: "high",
+        milestone: "Retos",
+      },
+      {
+        id: "pt2",
+        title: "Guía de mano animada",
+        completed: false,
+        estimatedMinutes: 55,
+        priority: "medium",
+        milestone: "Retos",
+      },
+    ],
   },
   {
     id: "xarcon-creative",
     name: "XARCON Creative",
     area: "Empresa",
-    description: "Consolidación de marca, portafolio y sistema comercial de la agencia.",
+    description:
+      "Consolidación de marca, portafolio y sistema comercial de la agencia.",
     progress: 44,
     status: "active",
     priority: "medium",
@@ -112,11 +185,18 @@ export const initialProjects: Project[] = [
     milestones: [
       { id: "x1", title: "Brand", weight: 25, progress: 85 },
       { id: "x2", title: "Web", weight: 35, progress: 65 },
-      { id: "x3", title: "Ventas", weight: 40, progress: 10 }
+      { id: "x3", title: "Ventas", weight: 40, progress: 10 },
     ],
     tasks: [
-      { id: "xt1", title: "Curar casos de estudio", completed: false, estimatedMinutes: 60, priority: "medium", milestone: "Web" }
-    ]
+      {
+        id: "xt1",
+        title: "Curar casos de estudio",
+        completed: false,
+        estimatedMinutes: 60,
+        priority: "medium",
+        milestone: "Web",
+      },
+    ],
   },
   {
     id: "nicasa",
@@ -131,13 +211,68 @@ export const initialProjects: Project[] = [
     nextAction: "Resolver escritura de documentos en Firestore",
     hours: 14.8,
     milestones: [{ id: "n1", title: "MVP", weight: 100, progress: 32 }],
-    tasks: [{ id: "nt1", title: "Revisar publicación Firestore", completed: false, estimatedMinutes: 60, priority: "low", milestone: "MVP" }]
-  }
+    tasks: [
+      {
+        id: "nt1",
+        title: "Revisar publicación Firestore",
+        completed: false,
+        estimatedMinutes: 60,
+        priority: "low",
+        milestone: "MVP",
+      },
+    ],
+  },
 ];
 
 export const todayBlocks: DailyBlock[] = [
-  { time: "12:30", end: "14:00", projectId: "criscasa", title: "Correcciones estructurales", type: "focus" },
-  { time: "14:30", end: "15:30", projectId: "tesis-civil", title: "Metodología", type: "focus" },
-  { time: "16:00", end: "17:30", projectId: "pequenos-escritores", title: "Scoring de trazos", type: "focus" },
-  { time: "18:00", end: "18:30", projectId: "xarcon-creative", title: "Revisión administrativa", type: "admin" }
+  {
+    time: "12:30",
+    end: "14:00",
+    projectId: "criscasa",
+    title: "Correcciones estructurales",
+    type: "focus",
+  },
+  {
+    time: "14:30",
+    end: "15:30",
+    projectId: "tesis-civil",
+    title: "Metodología",
+    type: "focus",
+  },
+  {
+    time: "16:00",
+    end: "17:30",
+    projectId: "pequenos-escritores",
+    title: "Scoring de trazos",
+    type: "focus",
+  },
+  {
+    time: "18:00",
+    end: "18:30",
+    projectId: "xarcon-creative",
+    title: "Revisión administrativa",
+    type: "admin",
+  },
 ];
+
+const stamp = {
+  userId: "local-norvin",
+  createdAt: Date.UTC(2026, 8, 22, 12),
+  updatedAt: Date.UTC(2026, 8, 22, 12),
+  source: "demo" as const,
+};
+const dates: Record<string, string> = {
+  criscasa: "2026-09-28",
+  "tesis-civil": "2026-10-15",
+  dolce: "2026-10-09",
+  "pequenos-escritores": "2026-10-02",
+  "xarcon-creative": "2026-10-31",
+};
+export const initialProjects: Project[] = projectSeeds.map((p) => ({
+  ...p,
+  ...stamp,
+  dueDate: dates[p.id],
+  stage: "execution",
+  tasks: p.tasks.map((t) => ({ ...t, ...stamp, projectId: p.id })),
+  milestones: p.milestones.map((m) => ({ ...m, ...stamp, projectId: p.id })),
+}));

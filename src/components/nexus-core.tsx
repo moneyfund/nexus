@@ -29,7 +29,7 @@ export function NexusCore() {
       />
 
       <motion.div
-        animate={{ scale: [1, 1.08, 1], opacity: [.82, 1, .82] }}
+        animate={{ scale: [1, 1.08, 1], opacity: [0.82, 1, 0.82] }}
         transition={{ duration: 3.4, repeat: Infinity, ease: "easeInOut" }}
         className="absolute inset-[31%] rounded-full border border-[#a78bfa]/40 bg-[radial-gradient(circle_at_38%_34%,rgba(255,255,255,.36),rgba(139,92,246,.28)_16%,rgba(42,16,75,.86)_45%,rgba(4,4,7,.96)_72%)] shadow-[0_0_65px_rgba(124,58,237,.32),inset_0_0_25px_rgba(255,255,255,.08)]"
       >

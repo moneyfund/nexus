@@ -1,2 +1,4 @@
-import { AnalyticsView } from "@/components/module-views";
-export default function AnalyticsPage() { return <AnalyticsView />; }
+import { AnalyticsView } from "@/components/modules/analytics";
+export default function AnalyticsPage() {
+  return <AnalyticsView />;
+}

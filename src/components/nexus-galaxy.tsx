@@ -1,353 +1,475 @@
 "use client";
-
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AnimatePresence, motion } from "motion/react";
-import { BrainCircuit, Lightbulb, Maximize2, Sparkles, X } from "lucide-react";
-import { useNexus } from "@/components/nexus-provider";
-
-type Star = {
+import { useRouter } from "next/navigation";
+import {
+  Minus,
+  Plus,
+  Pause,
+  Play,
+  RotateCcw,
+  Move,
+  Maximize2,
+} from "lucide-react";
+import { useNexus } from "./nexus-provider";
+import { IconButton } from "./ui/primitives";
+import { CATEGORIES } from "@/config/system";
+type Point = {
   x: number;
   y: number;
   z: number;
   size: number;
+  tint: number;
   alpha: number;
-  hue: number;
 };
-
-function seededStars(count: number): Star[] {
-  let seed = 918273;
-  const rand = () => {
-    seed = (seed * 9301 + 49297) % 233280;
-    return seed / 233280;
+type Node = {
+  id: string;
+  label: string;
+  category: string;
+  kind: "idea" | "project";
+  angle: number;
+  radius: number;
+  fresh: boolean;
+};
+function stars(count: number) {
+  let seed = 67391;
+  const random = () => {
+    seed = (seed * 16807) % 2147483647;
+    return (seed - 1) / 2147483646;
   };
-
   return Array.from({ length: count }, () => {
-    const arm = Math.floor(rand() * 5);
-    const radius = Math.pow(rand(), 0.62);
-    const angle = arm * ((Math.PI * 2) / 5) + radius * 5.6 + (rand() - 0.5) * 0.85;
+    const r = Math.pow(random(), 0.68) * 6.8;
+    const arm = Math.floor(random() * 4);
+    const a = (arm * Math.PI) / 2 + r * 0.68 + (random() - 0.5) * 0.48;
     return {
-      x: Math.cos(angle) * radius * 6.8 + (rand() - 0.5) * 0.6,
-      y: (rand() - 0.5) * (0.42 + radius * 0.8),
-      z: Math.sin(angle) * radius * 6.8 + (rand() - 0.5) * 0.6,
-      size: 0.55 + rand() * 1.8,
-      alpha: 0.24 + rand() * 0.76,
-      hue: rand() > 0.7 ? 322 : rand() > 0.45 ? 292 : 270,
+      x: Math.cos(a) * r,
+      y: (random() - 0.5) * (0.18 + r * 0.1),
+      z: Math.sin(a) * r,
+      size: 0.35 + random() * 1.35,
+      tint: random(),
+      alpha: 0.3 + random() * 0.7,
     };
   });
 }
-
-const fallbackIdeas = [
-  "Sistema automático de presupuestos",
-  "Automatizar seguimiento de clientes",
-  "Mapa inteligente de oportunidades",
-  "Asistente de inversión personal",
-];
-
-export function NexusGalaxy() {
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const shellRef = useRef<HTMLDivElement | null>(null);
-  const pointer = useRef({ x: 0, y: 0, tx: 0, ty: 0 });
+const particles = stars(1600);
+export function NexusGalaxy({ compact = false }: { compact?: boolean }) {
+  const n = useNexus();
+  const router = useRouter();
+  const canvas = useRef<HTMLCanvasElement>(null);
+  const shell = useRef<HTMLDivElement>(null);
+  const nodeRefs = useRef(new Map<string, HTMLButtonElement>());
+  const view = useRef({
+    yaw: 0.25,
+    targetYaw: 0.25,
+    pitch: 0.6,
+    targetPitch: 0.6,
+    zoom: 1,
+    targetZoom: 1,
+    px: 0,
+    py: 0,
+    tx: 0,
+    ty: 0,
+  });
   const drag = useRef({ active: false, x: 0, y: 0 });
-  const rotation = useRef({ x: -0.18, y: 0.4, targetX: -0.18, targetY: 0.4 });
-  const [selectedIdea, setSelectedIdea] = useState<{ id: string; content: string; type: string; createdAt?: number } | null>(null);
-  const [isDragging, setIsDragging] = useState(false);
-  const { inbox } = useNexus();
-
-  const stars = useMemo(() => seededStars(920), []);
-  const ideas = useMemo(() => {
-    const real = inbox
-      .filter((item) => item.type === "idea")
-      .slice(0, 7)
-      .map((item) => ({ id: item.id, content: item.content, type: item.type, createdAt: item.createdAt }));
-
-    if (real.length >= 4) return real;
-
+  const renderRef = useRef<() => void>(() => {});
+  const [paused, setPaused] = useState(false);
+  const [orbit, setOrbit] = useState("all");
+  const quality = n.data.user.preferences.quality;
+  const reduce = n.reduceMotion;
+  const nodes = useMemo<Node[]>(() => {
+    const ideas = n.data.ideas.filter(
+      (i) => i.status !== "archived" && i.status !== "converted",
+    );
+    const projects = n.projects.filter((p) => p.status === "active");
     return [
-      ...real,
-      ...fallbackIdeas.slice(0, 4 - real.length).map((content, index) => ({
-        id: "fallback-" + index,
-        content,
-        type: "idea",
-      })),
+      ...ideas
+        .slice(0, 28)
+        .map((i, index) => ({
+          id: i.id,
+          label: i.title,
+          category: i.category,
+          kind: "idea" as const,
+          angle: index * 2.399 + 0.2,
+          radius: 3.8 + Math.max(0, CATEGORIES.indexOf(i.category)) * 0.16,
+          fresh: false,
+        })),
+      ...projects
+        .slice(0, 10)
+        .map((p, index) => ({
+          id: p.id,
+          label: p.name,
+          category: "Projects",
+          kind: "project" as const,
+          angle: (index / Math.max(projects.length, 1)) * Math.PI * 2 + 1.3,
+          radius: 2.4,
+          fresh: false,
+        })),
     ];
-  }, [inbox]);
-
+  }, [n.data.ideas, n.projects]);
+  const filtered = useMemo(
+    () => nodes.filter((p) => orbit === "all" || p.category === orbit),
+    [nodes, orbit],
+  );
   useEffect(() => {
-    const canvas = canvasRef.current;
-    const shell = shellRef.current;
-    if (!canvas || !shell) return;
-
-    const ctx = canvas.getContext("2d");
+    const el = canvas.current;
+    const container = shell.current;
+    if (!el || !container) return;
+    const ctx = el.getContext("2d");
     if (!ctx) return;
-
-    let frame = 0;
-    let animationFrame = 0;
-    let width = 1;
-    let height = 1;
-    let dpr = 1;
-
-    const resize = () => {
-      const rect = shell.getBoundingClientRect();
-      dpr = Math.min(window.devicePixelRatio || 1, 1.7);
-      width = Math.max(1, rect.width);
-      height = Math.max(1, rect.height);
-      canvas.width = Math.floor(width * dpr);
-      canvas.height = Math.floor(height * dpr);
-      canvas.style.width = width + "px";
-      canvas.style.height = height + "px";
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    let width = 1,
+      height = 1,
+      raf = 0,
+      visible = true,
+      last = 0,
+      frameCost = 0,
+      frames = 0;
+    let count = quality === "low" ? 380 : 1400;
+    const sprite = document.createElement("canvas");
+    sprite.width = sprite.height = 32;
+    const sc = sprite.getContext("2d")!;
+    const g = sc.createRadialGradient(16, 16, 0, 16, 16, 16);
+    g.addColorStop(0, "#fff");
+    g.addColorStop(0.13, "#f4c1ff");
+    g.addColorStop(0.35, "#d64aec70");
+    g.addColorStop(1, "#ad40e000");
+    sc.fillStyle = g;
+    sc.fillRect(0, 0, 32, 32);
+    const project = (p: { x: number; y: number; z: number }) => {
+      const v = view.current;
+      const cy = Math.cos(v.yaw),
+        sy = Math.sin(v.yaw);
+      const x = p.x * cy - p.z * sy;
+      const z = p.x * sy + p.z * cy;
+      const y = p.y * Math.cos(v.pitch) - z * Math.sin(v.pitch);
+      const depth = p.y * Math.sin(v.pitch) + z * Math.cos(v.pitch);
+      const perspective = 18 / (18 + depth);
+      const scale = Math.min(width * 0.071, height * 0.125) * v.zoom;
+      return {
+        x: width / 2 + (x + v.px * 0.12) * scale * perspective,
+        y: height * 0.48 + (y + v.py * 0.12) * scale * perspective,
+        depth,
+        perspective,
+      };
     };
-
-    const observer = new ResizeObserver(resize);
-    observer.observe(shell);
-    resize();
-
-    const render = () => {
-      frame += 0.0048;
-      pointer.current.x += (pointer.current.tx - pointer.current.x) * 0.055;
-      pointer.current.y += (pointer.current.ty - pointer.current.y) * 0.055;
-      rotation.current.x += (rotation.current.targetX - rotation.current.x) * 0.05;
-      rotation.current.y += (rotation.current.targetY - rotation.current.y) * 0.05;
-
-      ctx.clearRect(0, 0, width, height);
-
-      const centerX = width * 0.5;
-      const centerY = height * 0.5;
-      const scale = Math.min(width, height) * 0.082;
-
-      const bg = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, Math.max(width, height) * 0.52);
-      bg.addColorStop(0, "rgba(255, 57, 214, .11)");
-      bg.addColorStop(0.24, "rgba(183, 64, 255, .075)");
-      bg.addColorStop(0.58, "rgba(104, 32, 205, .026)");
-      bg.addColorStop(1, "rgba(0,0,0,0)");
-      ctx.fillStyle = bg;
-      ctx.fillRect(0, 0, width, height);
-
-      const rx = rotation.current.x + pointer.current.y * 0.22;
-      const ry = rotation.current.y + pointer.current.x * 0.32 + frame;
-      const cosX = Math.cos(rx);
-      const sinX = Math.sin(rx);
-      const cosY = Math.cos(ry);
-      const sinY = Math.sin(ry);
-
-      const projected: Array<{ sx: number; sy: number; z: number; star: Star }> = [];
-      for (const star of stars) {
-        let x = star.x;
-        let y = star.y;
-        let z = star.z;
-
-        const x1 = x * cosY - z * sinY;
-        const z1 = x * sinY + z * cosY;
-        const y1 = y * cosX - z1 * sinX;
-        const z2 = y * sinX + z1 * cosX;
-
-        const perspective = 13 / (13 + z2);
-        projected.push({
-          sx: centerX + x1 * scale * perspective,
-          sy: centerY + y1 * scale * perspective,
-          z: z2,
-          star,
+    function draw(now = performance.now()) {
+      raf = 0;
+      if (!visible || document.hidden) return;
+      const started = performance.now();
+      const delta = Math.min(32, now - (last || now));
+      last = now;
+      const v = view.current;
+      if (!reduce && !paused && !drag.current.active)
+        v.targetYaw += delta * 0.000021;
+      const smoothing = reduce ? 1 : 0.09;
+      v.yaw += (v.targetYaw - v.yaw) * smoothing;
+      v.pitch += (v.targetPitch - v.pitch) * smoothing;
+      v.zoom += (v.targetZoom - v.zoom) * smoothing;
+      v.px += (v.tx - v.px) * smoothing;
+      v.py += (v.ty - v.py) * smoothing;
+      ctx!.clearRect(0, 0, width, height);
+      // Deep, stationary star field; the knowledge disk moves through its own 3D coordinates.
+      for (let i = 0; i < 70; i++) {
+        const x = (((i * 277.3) % 1000) / 1000) * width;
+        const y = (((i * 137.7) % 1000) / 1000) * height;
+        ctx!.fillStyle = `rgba(222,199,244,${0.1 + (i % 4) * 0.055})`;
+        ctx!.fillRect(x, y, i % 11 === 0 ? 1.8 : 1, 1);
+      }
+      const cx = width / 2,
+        cy = height * 0.48;
+      const radius = Math.min(width, height) * 0.4;
+      const nebula = ctx!.createRadialGradient(cx, cy, 0, cx, cy, radius);
+      nebula.addColorStop(0, "#d83fcc20");
+      nebula.addColorStop(0.35, "#901dab12");
+      nebula.addColorStop(1, "#00000000");
+      ctx!.fillStyle = nebula;
+      ctx!.fillRect(0, 0, width, height);
+      // Orbit tracks share the same perspective as nodes and particles.
+      for (const r of [2.4, 4.1, 5.6]) {
+        ctx!.beginPath();
+        for (let i = 0; i <= 120; i++) {
+          const a = (i / 120) * Math.PI * 2;
+          const p = project({ x: Math.cos(a) * r, y: 0, z: Math.sin(a) * r });
+          if (!i) ctx!.moveTo(p.x, p.y);
+          else ctx!.lineTo(p.x, p.y);
+        }
+        ctx!.strokeStyle = r === 2.4 ? "#e580ec23" : "#c677f019";
+        ctx!.lineWidth = 0.8;
+        ctx!.stroke();
+      }
+      ctx!.globalCompositeOperation = "screen";
+      for (let i = 0; i < count; i++) {
+        const star = particles[i];
+        const p = project(star);
+        const size = star.size * 3.7 * p.perspective;
+        ctx!.globalAlpha = star.alpha * 0.65;
+        ctx!.drawImage(sprite, p.x - size / 2, p.y - size / 2, size, size);
+      }
+      ctx!.globalAlpha = 1;
+      const coreSize = Math.min(width, height) * 0.09 * v.zoom;
+      const core = ctx!.createRadialGradient(cx, cy, 0, cx, cy, coreSize * 2.1);
+      core.addColorStop(0, "#fff6ff");
+      core.addColorStop(0.08, "#f8cbfc");
+      core.addColorStop(0.2, "#f18dea99");
+      core.addColorStop(0.5, "#a631c737");
+      core.addColorStop(1, "#7625b000");
+      ctx!.fillStyle = core;
+      ctx!.beginPath();
+      ctx!.arc(cx, cy, coreSize * 2.1, 0, Math.PI * 2);
+      ctx!.fill();
+      ctx!.globalCompositeOperation = "source-over";
+      for (const node of filtered) {
+        const p = project({
+          x: Math.cos(node.angle) * node.radius,
+          y: node.kind === "idea" ? 0.3 : 0,
+          z: Math.sin(node.angle) * node.radius,
         });
+        const button = nodeRefs.current.get(node.id);
+        if (button) {
+          button.style.transform = `translate3d(${p.x}px,${p.y}px,0) translate(-50%,-50%) scale(${Math.max(0.8, Math.min(1.05, p.perspective))})`;
+          button.style.zIndex = String(Math.round(30 - p.depth));
+          button.style.opacity = String(
+            Math.max(0.6, Math.min(1, 1 - p.depth * 0.045)),
+          );
+        }
       }
-
-      projected.sort((a, b) => a.z - b.z);
-
-      for (const point of projected) {
-        const depth = Math.max(0.2, Math.min(1.4, (point.z + 7) / 10));
-        const alpha = point.star.alpha * (0.35 + depth * 0.65);
-        const size = point.star.size * (0.55 + depth * 0.75);
-
-        ctx.beginPath();
-        ctx.arc(point.sx, point.sy, size, 0, Math.PI * 2);
-        ctx.fillStyle = `hsla(${point.star.hue}, 95%, ${point.star.hue > 310 ? 72 : 78}%, ${alpha})`;
-        ctx.shadowBlur = size > 1.4 ? 10 : 4;
-        ctx.shadowColor = point.star.hue > 310 ? "rgba(255,63,210,.68)" : "rgba(177,94,255,.62)";
-        ctx.fill();
-      }
-
-      ctx.shadowBlur = 0;
-
-      const coreRadius = Math.min(width, height) * 0.105;
-      const core = ctx.createRadialGradient(centerX - coreRadius * 0.22, centerY - coreRadius * 0.28, 0, centerX, centerY, coreRadius * 1.45);
-      core.addColorStop(0, "rgba(255,255,255,.96)");
-      core.addColorStop(0.08, "rgba(255,184,246,.92)");
-      core.addColorStop(0.24, "rgba(255,55,205,.68)");
-      core.addColorStop(0.48, "rgba(174,54,255,.36)");
-      core.addColorStop(0.72, "rgba(86,19,160,.14)");
-      core.addColorStop(1, "rgba(0,0,0,0)");
-
-      ctx.fillStyle = core;
-      ctx.beginPath();
-      ctx.arc(centerX, centerY, coreRadius * 1.45, 0, Math.PI * 2);
-      ctx.fill();
-
-      for (let ring = 0; ring < 3; ring++) {
-        ctx.save();
-        ctx.translate(centerX, centerY);
-        ctx.rotate(frame * (ring % 2 ? -1.6 : 1.15) + ring);
-        ctx.scale(1, 0.28 + ring * 0.09);
-        ctx.strokeStyle = ring === 0 ? "rgba(255,91,214,.34)" : "rgba(181,92,255,.2)";
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.ellipse(0, 0, coreRadius * (1.55 + ring * 0.55), coreRadius * (1.55 + ring * 0.55), 0, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.restore();
-      }
-
-      animationFrame = requestAnimationFrame(render);
+      frames++;
+      frameCost += performance.now() - started;
+      if (quality === "auto" && frames === 90 && frameCost / frames > 15)
+        count = Math.max(300, Math.floor(count * 0.55));
+      if (!reduce && visible && !document.hidden)
+        raf = requestAnimationFrame(draw);
+    }
+    const schedule = () => {
+      if (!raf) raf = requestAnimationFrame(draw);
     };
-
-    animationFrame = requestAnimationFrame(render);
+    renderRef.current = schedule;
+    const resize = () => {
+      const rect = container.getBoundingClientRect();
+      width = rect.width;
+      height = rect.height;
+      const dpr = Math.min(devicePixelRatio || 1, quality === "high" ? 2 : 1.5);
+      count = quality === "low" || width < 500 ? 380 : 1400;
+      el.width = width * dpr;
+      el.height = height * dpr;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      schedule();
+    };
+    const ro = new ResizeObserver(resize);
+    ro.observe(container);
+    resize();
+    const io = new IntersectionObserver(([entry]) => {
+      visible = entry.isIntersecting;
+      if (visible) {
+        last = 0;
+        schedule();
+      } else {
+        cancelAnimationFrame(raf);
+        raf = 0;
+      }
+    });
+    io.observe(container);
+    const visibility = () => {
+      if (document.hidden) {
+        cancelAnimationFrame(raf);
+        raf = 0;
+      } else {
+        last = 0;
+        schedule();
+      }
+    };
+    document.addEventListener("visibilitychange", visibility);
     return () => {
-      cancelAnimationFrame(animationFrame);
-      observer.disconnect();
+      cancelAnimationFrame(raf);
+      ro.disconnect();
+      io.disconnect();
+      document.removeEventListener("visibilitychange", visibility);
     };
-  }, [stars]);
-
-  function onPointerMove(event: React.PointerEvent<HTMLDivElement>) {
-    const rect = event.currentTarget.getBoundingClientRect();
-    const nx = ((event.clientX - rect.left) / rect.width - 0.5) * 2;
-    const ny = ((event.clientY - rect.top) / rect.height - 0.5) * 2;
-
-    pointer.current.tx = nx;
-    pointer.current.ty = ny;
-
-    if (drag.current.active) {
-      const dx = event.clientX - drag.current.x;
-      const dy = event.clientY - drag.current.y;
-      drag.current.x = event.clientX;
-      drag.current.y = event.clientY;
-      rotation.current.targetY += dx * 0.007;
-      rotation.current.targetX += dy * 0.005;
-      rotation.current.targetX = Math.max(-0.75, Math.min(0.5, rotation.current.targetX));
-    }
+  }, [filtered, quality, reduce, paused]);
+  function select(node: Node) {
+    view.current.targetYaw = -node.angle + 0.7;
+    view.current.targetZoom = 1.12;
+    renderRef.current();
+    if (node.kind === "idea") n.setSelectedIdeaId(node.id);
+    else router.push("/projects/" + node.id);
   }
-
-  function onPointerDown(event: React.PointerEvent<HTMLDivElement>) {
-    drag.current = { active: true, x: event.clientX, y: event.clientY };
-    setIsDragging(true);
-    event.currentTarget.setPointerCapture(event.pointerId);
-  }
-
-  function endDrag(event: React.PointerEvent<HTMLDivElement>) {
-    drag.current.active = false;
-    setIsDragging(false);
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId);
-    }
-  }
-
   return (
-    <>
+    <div className={"galaxy-wrapper " + (compact ? "galaxy-compact" : "")}>
+      <div className="galaxy-category">
+        <span className="status-tick" />
+        <span>KNOWLEDGE GALAXY</span>
+        <select
+          value={orbit}
+          aria-label="Filtrar órbita"
+          onChange={(e) => setOrbit(e.target.value)}
+        >
+          <option value="all">Todas las órbitas</option>
+          <option value="Projects">Proyectos</option>
+          {CATEGORIES.filter((c) => nodes.some((p) => p.category === c)).map(
+            (c) => (
+              <option key={c}>{c}</option>
+            ),
+          )}
+        </select>
+      </div>
       <div
-        ref={shellRef}
-        onPointerMove={onPointerMove}
-        onPointerDown={onPointerDown}
-        onPointerUp={endDrag}
-        onPointerCancel={endDrag}
-        className={"relative h-[430px] w-full select-none overflow-hidden rounded-[32px] border border-fuchsia-300/10 bg-black/20 [touch-action:none] sm:h-[520px] " + (isDragging ? "cursor-grabbing" : "cursor-grab")}
-      >
-        <canvas ref={canvasRef} className="absolute inset-0" />
-
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,transparent_43%,rgba(3,3,6,.18)_67%,rgba(3,3,6,.78)_100%)]" />
-        <div className="pointer-events-none absolute left-5 top-5 z-20 flex items-center gap-2 rounded-full border border-white/[.07] bg-black/40 px-3 py-2 text-[9px] font-semibold uppercase tracking-[.18em] text-[#a99dad] backdrop-blur-xl">
-          <Maximize2 size={12} className="text-fuchsia-300" />
-          Arrastra para orbitar
-        </div>
-
-        <div className="pointer-events-none absolute inset-0">
-          <div className="absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2 text-center">
-            <motion.div
-              animate={{ scale: [1, 1.05, 1], opacity: [.88, 1, .88] }}
-              transition={{ repeat: Infinity, duration: 3.6, ease: "easeInOut" }}
-              className="mx-auto grid h-16 w-16 place-items-center rounded-full border border-fuchsia-200/25 bg-black/25 shadow-[0_0_55px_rgba(255,63,210,.32)] backdrop-blur-sm"
-            >
-              <BrainCircuit size={25} className="text-white" />
-            </motion.div>
-            <div className="mt-4 text-[10px] font-semibold uppercase tracking-[.26em] text-fuchsia-100/60">Nexus Core</div>
-          </div>
-        </div>
-
-        <div className="absolute inset-0 z-30">
-          {ideas.map((idea, index) => {
-            const angle = (index / Math.max(ideas.length, 1)) * Math.PI * 2;
-            const radiusX = 35 + (index % 2) * 8;
-            const radiusY = 25 + ((index + 1) % 2) * 7;
-            const left = 50 + Math.cos(angle) * radiusX;
-            const top = 50 + Math.sin(angle) * radiusY;
-
-            return (
-              <motion.button
-                key={idea.id}
-                type="button"
-                onPointerDown={(event) => event.stopPropagation()}
-                onClick={() => setSelectedIdea(idea)}
-                animate={{ y: [0, -8 - (index % 3) * 2, 0], rotate: [0, index % 2 ? 2 : -2, 0] }}
-                transition={{ duration: 4.8 + index * .55, repeat: Infinity, ease: "easeInOut", delay: index * .18 }}
-                whileHover={{ scale: 1.08, zIndex: 50 }}
-                className="absolute max-w-[150px] -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-fuchsia-300/20 bg-[#100813]/70 px-3 py-2.5 text-left shadow-[0_12px_34px_rgba(0,0,0,.35),0_0_24px_rgba(232,67,255,.08)] backdrop-blur-xl"
-                style={{ left: left + "%", top: top + "%" }}
-              >
-                <div className="flex items-center gap-2">
-                  <span className="grid h-7 w-7 shrink-0 place-items-center rounded-xl border border-fuchsia-200/15 bg-fuchsia-400/[.08]">
-                    <Lightbulb size={13} className="text-fuchsia-200" />
-                  </span>
-                  <span className="line-clamp-2 text-[10px] font-medium leading-4 text-white/90">{idea.content}</span>
-                </div>
-              </motion.button>
+        className="galaxy-canvas"
+        ref={shell}
+        role="group"
+        aria-label="Galaxia interactiva. Arrastra o usa las flechas para rotar. Tab para explorar nodos."
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.target !== e.currentTarget) return;
+          if (e.key.startsWith("Arrow")) {
+            e.preventDefault();
+            if (e.key === "ArrowLeft") view.current.targetYaw -= 0.15;
+            if (e.key === "ArrowRight") view.current.targetYaw += 0.15;
+            if (e.key === "ArrowUp")
+              view.current.targetPitch = Math.min(
+                1.3,
+                view.current.targetPitch + 0.1,
+              );
+            if (e.key === "ArrowDown")
+              view.current.targetPitch = Math.max(
+                0.2,
+                view.current.targetPitch - 0.1,
+              );
+            renderRef.current();
+          }
+        }}
+        onPointerDown={(e) => {
+          if ((e.target as HTMLElement).closest("button")) return;
+          drag.current = { active: true, x: e.clientX, y: e.clientY };
+          e.currentTarget.setPointerCapture(e.pointerId);
+        }}
+        onPointerMove={(e) => {
+          const r = e.currentTarget.getBoundingClientRect();
+          view.current.tx = (e.clientX - r.left) / r.width - 0.5;
+          view.current.ty = (e.clientY - r.top) / r.height - 0.5;
+          if (drag.current.active) {
+            view.current.targetYaw += (e.clientX - drag.current.x) * 0.007;
+            view.current.targetPitch = Math.max(
+              0.2,
+              Math.min(
+                1.3,
+                view.current.targetPitch + (e.clientY - drag.current.y) * 0.004,
+              ),
             );
-          })}
+            drag.current.x = e.clientX;
+            drag.current.y = e.clientY;
+          }
+          renderRef.current();
+        }}
+        onPointerUp={(e) => {
+          drag.current.active = false;
+          if (e.currentTarget.hasPointerCapture(e.pointerId))
+            e.currentTarget.releasePointerCapture(e.pointerId);
+        }}
+        onPointerCancel={() => {
+          drag.current.active = false;
+        }}
+      >
+        <canvas ref={canvas} aria-hidden="true" />
+        <div className="galaxy-core-label" aria-hidden="true">
+          <span>N</span>
+          <small>NEXUS CORE</small>
         </div>
-
-        <div className="pointer-events-none absolute bottom-5 left-1/2 z-20 -translate-x-1/2 rounded-full border border-white/[.06] bg-black/35 px-4 py-2 text-[9px] uppercase tracking-[.16em] text-[#817583] backdrop-blur-xl">
-          Tus ideas orbitan fuera de la prioridad actual
+        {filtered.map((node) => (
+          <button
+            key={node.id}
+            ref={(el) => {
+              if (el) nodeRefs.current.set(node.id, el);
+              else nodeRefs.current.delete(node.id);
+            }}
+            onClick={() => select(node)}
+            className={"galaxy-node " + node.kind}
+            aria-label={`${node.kind === "idea" ? "Abrir idea" : "Abrir proyecto"}: ${node.label}`}
+          >
+            <span className="node-dot" />
+            <span className="node-label">
+              {node.label}
+              <small>
+                {node.kind === "idea" ? node.category : "ACTIVE PROJECT"}
+              </small>
+            </span>
+          </button>
+        ))}
+        {!nodes.length && (
+          <div className="galaxy-empty">
+            <p>Tu universo todavía está en silencio.</p>
+            <button
+              className="button button-secondary"
+              onClick={() => n.openCapture()}
+            >
+              Captura tu primera idea
+            </button>
+          </div>
+        )}
+        <span className="galaxy-coordinate galaxy-coordinate-left">
+          α 00.24
+          <br />N / {String(nodes.length).padStart(2, "0")}
+        </span>
+        <span className="galaxy-coordinate galaxy-coordinate-right">
+          MEMORY
+          <br />
+          {orbit === "all" ? "ALL ORBITS" : orbit.toUpperCase()}
+        </span>
+      </div>
+      <div className="galaxy-controls">
+        <span>
+          <Move size={12} />
+          Arrastra para explorar
+        </span>
+        <div className="row" style={{ gap: 5 }}>
+          <IconButton
+            label="Alejar galaxia"
+            onClick={() => {
+              view.current.targetZoom = Math.max(
+                0.65,
+                view.current.targetZoom - 0.15,
+              );
+              renderRef.current();
+            }}
+          >
+            <Minus size={14} />
+          </IconButton>
+          <IconButton
+            label="Acercar galaxia"
+            onClick={() => {
+              view.current.targetZoom = Math.min(
+                1.5,
+                view.current.targetZoom + 0.15,
+              );
+              renderRef.current();
+            }}
+          >
+            <Plus size={14} />
+          </IconButton>
+          <IconButton
+            label={paused ? "Animar galaxia" : "Pausar galaxia"}
+            onClick={() => setPaused(!paused)}
+          >
+            {paused ? <Play size={13} /> : <Pause size={13} />}
+          </IconButton>
+          <IconButton
+            label="Restablecer vista"
+            onClick={() => {
+              view.current.targetZoom = 1;
+              view.current.targetPitch = 0.6;
+              view.current.targetYaw = 0.25;
+              renderRef.current();
+            }}
+          >
+            <RotateCcw size={13} />
+          </IconButton>
+          {!compact && (
+            <IconButton
+              label="Abrir universo de ideas"
+              onClick={() => router.push("/ideas")}
+            >
+              <Maximize2 size={13} />
+            </IconButton>
+          )}
         </div>
       </div>
-
-      <AnimatePresence>
-        {selectedIdea && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[110] flex items-center justify-center bg-black/70 p-4 backdrop-blur-md"
-            onMouseDown={(event) => event.target === event.currentTarget && setSelectedIdea(null)}
-          >
-            <motion.div
-              initial={{ opacity: 0, scale: .94, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: .96, y: 10 }}
-              className="relative w-full max-w-lg overflow-hidden rounded-[30px] border border-fuchsia-300/20 bg-[#09050d]/95 p-6 shadow-[0_30px_100px_rgba(0,0,0,.65),0_0_70px_rgba(219,39,119,.12)]"
-            >
-              <div className="absolute right-[-80px] top-[-100px] h-56 w-56 rounded-full bg-fuchsia-500/15 blur-[75px]" />
-              <div className="relative">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[.2em] text-fuchsia-200/70">
-                      <Sparkles size={13} /> Idea node
-                    </div>
-                    <h3 className="mt-4 text-2xl font-semibold tracking-[-.03em] text-white">{selectedIdea.content}</h3>
-                  </div>
-                  <button onClick={() => setSelectedIdea(null)} className="rounded-full border border-white/10 p-2 text-white/50 hover:text-white"><X size={16} /></button>
-                </div>
-                <div className="mt-6 grid grid-cols-2 gap-3">
-                  <div className="rounded-2xl border border-white/[.06] bg-white/[.025] p-4">
-                    <div className="text-[9px] uppercase tracking-[.16em] text-white/40">Estado</div>
-                    <div className="mt-2 text-sm text-white/85">En Idea Vault</div>
-                  </div>
-                  <div className="rounded-2xl border border-white/[.06] bg-white/[.025] p-4">
-                    <div className="text-[9px] uppercase tracking-[.16em] text-white/40">Prioridad</div>
-                    <div className="mt-2 text-sm text-white/85">Sin asignar</div>
-                  </div>
-                </div>
-                <p className="mt-5 text-sm leading-6 text-white/55">
-                  Esta idea existe en NEXUS pero todavía no compite con tus proyectos activos. Más adelante podremos convertirla en oportunidad, proyecto o descartarla desde aquí.
-                </p>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </>
+    </div>
   );
 }

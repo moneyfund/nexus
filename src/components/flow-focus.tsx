@@ -1,65 +1,257 @@
 "use client";
-
-import { useEffect, useMemo, useState } from "react";
-import { AnimatePresence, motion } from "motion/react";
-import { Check, Pause, Sparkles, X } from "lucide-react";
-import { useNexus } from "@/components/nexus-provider";
-
-function formatTime(totalSeconds: number) {
-  const safe = Math.max(0, totalSeconds);
-  const hours = Math.floor(safe / 3600);
-  const minutes = Math.floor((safe % 3600) / 60);
-  const seconds = safe % 60;
-  return [hours, minutes, seconds].map((value) => String(value).padStart(2, "0")).join(":");
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import {
+  Pause,
+  Play,
+  Plus,
+  ArrowUpRight,
+  Check,
+  AudioLines,
+} from "lucide-react";
+import { useNexus } from "./nexus-provider";
+import {
+  Button,
+  Badge,
+  Modal,
+  ProgressRing,
+  ModuleFrame,
+  Label,
+  Empty,
+} from "./ui/primitives";
+import { flowElapsed } from "@/domain/selectors";
+import type { FlowSession } from "@/domain/models";
+export function formatTime(seconds: number) {
+  const s = Math.max(0, Math.floor(seconds));
+  return [Math.floor(s / 3600), Math.floor((s % 3600) / 60), s % 60]
+    .map((v) => String(v).padStart(2, "0"))
+    .join(":");
 }
-
-export function FlowFocus() {
-  const { activeFlow, endFlow, setCaptureOpen } = useNexus();
-  const [now, setNow] = useState(Date.now());
-
+function FocusEnvironment({ flow }: { flow: FlowSession }) {
+  const n = useNexus();
+  const [now, setNow] = useState(() => Date.now());
+  const [done, setDone] = useState(false);
   useEffect(() => {
-    if (!activeFlow) return;
-    setNow(Date.now());
-    const timer = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => window.clearInterval(timer);
-  }, [activeFlow]);
-
-  const remaining = useMemo(() => {
-    if (!activeFlow) return 0;
-    return activeFlow.durationMinutes * 60 - Math.floor((now - activeFlow.startedAt) / 1000);
-  }, [activeFlow, now]);
-
+    const interval = window.setInterval(() => setNow(Date.now()), 500);
+    return () => clearInterval(interval);
+  }, []);
+  const seconds = flowElapsed(flow, now);
+  const remaining = flow.durationMinutes * 60 - seconds;
+  const percent = Math.min(100, (seconds / (flow.durationMinutes * 60)) * 100);
+  const p = n.projects.find((p) => p.id === flow.projectId);
   return (
-    <AnimatePresence>
-      {activeFlow && (
-        <motion.div className="fixed inset-0 z-[70] overflow-hidden bg-[#05070c]" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-          <div className="nexus-grid absolute inset-0 opacity-70" />
-          <div className="absolute left-1/2 top-[-180px] h-[430px] w-[430px] -translate-x-1/2 rounded-full bg-[#7c3aed]/20 blur-[110px]" />
-          <div className="relative mx-auto flex min-h-screen max-w-5xl flex-col px-6 py-6 sm:px-10">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3 text-xs font-semibold uppercase tracking-[.25em] text-[#758097]">
-                <span className="pulse-dot h-2 w-2 rounded-full bg-[#a78bfa]" /> Nexus Flow
+    <div className={"focus-environment " + (flow.pausedAt ? "is-paused" : "")}>
+      <div className="focus-project">
+        <Badge active>
+          {flow.pausedAt
+            ? "EN PAUSA"
+            : remaining <= 0
+              ? "TIEMPO PLANIFICADO ALCANZADO"
+              : "SESIÓN PROTEGIDA"}
+        </Badge>
+        <span>{flow.projectName}</span>
+        <h2>{flow.title}</h2>
+      </div>
+      <div className="focus-clock">
+        <div className="focus-aura" aria-hidden="true" />
+        <svg viewBox="0 0 320 320" aria-hidden="true">
+          <circle cx="160" cy="160" r="148" className="ring-track" />
+          <circle
+            cx="160"
+            cy="160"
+            r="148"
+            className="ring-value"
+            pathLength="100"
+            strokeDasharray={`${percent} 100`}
+          />
+        </svg>
+        <div className="focus-time">
+          <Label>
+            {remaining >= 0 ? "TIEMPO RESTANTE" : "TIEMPO ADICIONAL"}
+          </Label>
+          <time>{formatTime(Math.abs(remaining))}</time>
+          <span>
+            {Math.round(percent)}% del bloque · {flow.durationMinutes} min
+          </span>
+        </div>
+      </div>
+      <label className="focus-check">
+        <input
+          type="checkbox"
+          checked={done}
+          onChange={(e) => setDone(e.target.checked)}
+        />
+        <span>Conseguí el resultado de esta tarea</span>
+      </label>
+      <div className="focus-actions">
+        <Button variant="secondary" onClick={() => n.openCapture("idea")}>
+          <Plus size={16} />
+          Capture
+        </Button>
+        <Button variant="secondary" onClick={() => n.run(n.actions.pauseFlow)}>
+          {flow.pausedAt ? <Play size={16} /> : <Pause size={16} />}
+          {flow.pausedAt ? "Continuar" : "Pausar"}
+        </Button>
+        <Button onClick={() => n.endFlow(done)}>
+          <Check size={16} />
+          Terminar sesión
+        </Button>
+      </div>
+      <div className="focus-foot">
+        <span>Solo esta tarea. Todo lo demás puede esperar.</span>
+        <span>
+          {p?.tasks.filter((t) => t.completed).length ?? 0} /{" "}
+          {p?.tasks.length ?? 0} tareas del proyecto
+        </span>
+      </div>
+    </div>
+  );
+}
+export function FlowFocus() {
+  const n = useNexus();
+  return (
+    <>
+      <Modal
+        open={!!n.activeFlow}
+        onClose={() => n.endFlow(false)}
+        title="NEXUS FLOW"
+        full
+      >
+        {n.activeFlow && (
+          <FocusEnvironment key={n.activeFlow.id} flow={n.activeFlow} />
+        )}
+      </Modal>
+      <Modal
+        open={!!n.flowResult}
+        onClose={() => n.setFlowResult(null)}
+        title="Una sesión. Un avance."
+      >
+        {n.flowResult && (
+          <div className="flow-result">
+            <ProgressRing
+              value={
+                n.flowResult.completed
+                  ? 100
+                  : Math.min(
+                      100,
+                      ((n.flowResult.elapsedSeconds ?? 0) /
+                        (n.flowResult.durationMinutes * 60)) *
+                        100,
+                    )
+              }
+              size={150}
+              caption={n.flowResult.completed ? "COMPLETADA" : "REGISTRADA"}
+            />
+            <h3>{n.flowResult.title}</h3>
+            <div className="result-times">
+              <div>
+                <Label>REAL</Label>
+                <strong>{formatTime(n.flowResult.elapsedSeconds ?? 0)}</strong>
               </div>
-              <button onClick={() => endFlow(false)} className="rounded-full border border-white/10 p-2 text-[#7d879a] hover:bg-white/5 hover:text-white"><X size={18} /></button>
+              <div>
+                <Label>ESTIMADO</Label>
+                <strong>{n.flowResult.durationMinutes} min</strong>
+              </div>
             </div>
-
-            <div className="flex flex-1 flex-col items-center justify-center py-14 text-center">
-              <motion.div initial={{ y: 16, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="max-w-3xl">
-                <div className="text-sm font-medium text-[#a78bfa]">{activeFlow.projectName}</div>
-                <h2 className="mt-4 text-3xl font-semibold tracking-[-.03em] sm:text-5xl">{activeFlow.title}</h2>
-                <div className="mt-10 font-mono text-5xl font-light tracking-[-.05em] text-gradient sm:text-7xl">{formatTime(remaining)}</div>
-                <p className="mx-auto mt-5 max-w-xl text-sm leading-6 text-[#778198]">Una tarea. Un resultado. Cualquier idea nueva va al Inbox; no cambia la prioridad actual.</p>
-                <div className="mx-auto mt-10 grid max-w-xl grid-cols-1 gap-3 sm:grid-cols-3">
-                  <button onClick={() => setCaptureOpen(true)} className="glass-soft flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm text-[#c4cbea]"><Sparkles size={16} /> Capturar idea</button>
-                  <button className="glass-soft flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm text-[#c4cbea]"><Pause size={16} /> Pausar</button>
-                  <button onClick={() => endFlow(true)} className="flex items-center justify-center gap-2 rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-[#090c13]"><Check size={16} /> Terminar</button>
-                </div>
-              </motion.div>
-            </div>
-            <div className="flex justify-between border-t border-white/7 pt-5 text-xs text-[#5f6879]"><span>Sesión protegida</span><span>{activeFlow.durationMinutes} min planificados</span></div>
+            <p>
+              {n.flowResult.completed
+                ? "Tarea completada y tiempo añadido al proyecto."
+                : "Tiempo registrado. La tarea sigue pendiente."}
+            </p>
+            <Link
+              href={"/projects/" + n.flowResult.projectId}
+              className="button button-secondary"
+              onClick={() => n.setFlowResult(null)}
+            >
+              Ver siguiente acción
+              <ArrowUpRight size={16} />
+            </Link>
+            <Button onClick={() => n.setFlowResult(null)}>
+              Volver a NEXUS
+            </Button>
           </div>
-        </motion.div>
+        )}
+      </Modal>
+    </>
+  );
+}
+export function FlowView() {
+  const n = useNexus();
+  const [minutes, setMinutes] = useState(25);
+  const tasks = n.projects
+    .filter((p) => p.status === "active")
+    .flatMap((p) => p.tasks.filter((t) => !t.completed).map((t) => ({ p, t })));
+  return (
+    <ModuleFrame
+      eyebrow="Focus environment / 04"
+      title="Flow"
+      description="Cierra el ruido. Abre espacio para una sola cosa."
+    >
+      <div className="flow-launch">
+        <AudioLines size={45} strokeWidth={1} />
+        <h2>Elige tu próximo avance.</h2>
+        <div className="row wrap">
+          {[25, 50, 90].map((m) => (
+            <button
+              className={
+                "button " +
+                (minutes === m ? "button-primary" : "button-secondary")
+              }
+              key={m}
+              onClick={() => setMinutes(m)}
+            >
+              {m} min
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="flow-task-list">
+        {tasks.map(({ p, t }) => (
+          <button
+            key={t.id}
+            className="flow-task"
+            onClick={() => n.startFlow(p.id, t.id, minutes)}
+          >
+            <div>
+              <Label>{p.name}</Label>
+              <h3>{t.title}</h3>
+              <span className="small muted">
+                {t.estimatedMinutes} min estimados
+              </span>
+            </div>
+            <Play size={20} />
+          </button>
+        ))}
+      </div>
+      {!tasks.length && (
+        <Empty
+          title="Un momento para decidir."
+          text="Agrega una tarea a un proyecto activo antes de entrar en Flow."
+          onAction={() => n.openCapture("task")}
+        />
       )}
-    </AnimatePresence>
+      <section className="section">
+        <Label>SESIONES RECIENTES</Label>
+        {n.data.flows.slice(0, 10).map((f) => (
+          <div className="activity-row" key={f.id}>
+            <div>
+              <h3>{f.title}</h3>
+              <span className="small muted">
+                {f.projectName} ·{" "}
+                {new Date(f.startedAt).toLocaleDateString("es-NI")}
+              </span>
+            </div>
+            <span className="accent mono">
+              {formatTime(f.elapsedSeconds ?? 0)}
+            </span>
+          </div>
+        ))}
+        {!n.data.flows.length && (
+          <p className="muted" style={{ marginTop: 20 }}>
+            Tu primera sesión marcará el comienzo del registro.
+          </p>
+        )}
+      </section>
+    </ModuleFrame>
   );
 }

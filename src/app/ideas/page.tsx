@@ -1,2 +1,4 @@
-import { IdeasView } from "@/components/module-views";
-export default function IdeasPage() { return <IdeasView />; }
+import { IdeasView } from "@/components/modules/ideas";
+export default function IdeasPage() {
+  return <IdeasView />;
+}
