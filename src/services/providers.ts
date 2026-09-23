@@ -116,8 +116,23 @@ export class GoogleCalendarProvider implements CalendarProvider {
       from,
       to,
     );
-    for (const event of remote)
-      await this.repository.save(userId, event);
+    const existing = await this.repository.list(userId);
+    for (const event of remote) {
+      const local = existing.find(
+        (item) => item.providerId && item.providerId === event.providerId,
+      );
+      await this.repository.save(userId, {
+        ...event,
+        id: local?.id ?? event.id,
+        createdAt: local?.createdAt ?? event.createdAt,
+        projectId: local?.projectId,
+        category: local?.category ?? event.category,
+        metadata: {
+          ...local?.metadata,
+          ...event.metadata,
+        },
+      });
+    }
     return remote;
   }
 
