@@ -37,9 +37,9 @@ function CaptureForm() {
   const [url, setUrl] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [error, setError] = useState("");
-  function submit() {
+  async function submit() {
     try {
-      n.actions.capture({
+      const targetId = n.actions.capture({
         type,
         content,
         projectId: projectId || undefined,
@@ -50,6 +50,23 @@ function CaptureForm() {
           ? { name: file.name, type: file.type, size: file.size }
           : undefined,
       });
+      if (type === "file" && file) {
+        const uploaded = await n.services.storage.upload(n.data.user.id, file);
+        n.update((w) => {
+          const attachment = w.attachments.find((a) => a.id === targetId);
+          if (attachment) {
+            attachment.provider = "firebase";
+            attachment.externalId = uploaded.externalId;
+            attachment.metadata = uploaded.metadata;
+            attachment.updatedAt = Date.now();
+          }
+          const knowledge = w.knowledge.find((k) => k.attachmentId === targetId);
+          if (knowledge) {
+            knowledge.content = "Archivo almacenado de forma privada en Firebase Storage.";
+            knowledge.updatedAt = Date.now();
+          }
+        });
+      }
       interfaceSound(n.data.user.preferences.sounds, "capture");
       n.setCaptureOpen(false);
       n.notify(
@@ -70,7 +87,7 @@ function CaptureForm() {
       onKeyDown={(e) => {
         if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
           e.preventDefault();
-          submit();
+          void submit();
         }
       }}
     >
@@ -173,9 +190,7 @@ function CaptureForm() {
               />
             </label>
             <p className="form-note">
-              Por ahora se registra el nombre y los metadatos. El archivo no se
-              sube ni queda disponible para descargar; Storage está pendiente de
-              conexión.
+              El archivo se subirá de forma privada a Firebase Storage y quedará vinculado a esta referencia.
             </p>
           </>
         )}
@@ -189,7 +204,7 @@ function CaptureForm() {
         <span className="form-note">
           Ctrl / ⌘ + Enter
           <br />
-          Guardado en este navegador
+          Guardado y sincronizado con Firebase
         </span>
         <Button type="submit" disabled={!content.trim()}>
           Capturar {type === "idea" ? "idea" : ""}
