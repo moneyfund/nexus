@@ -298,6 +298,15 @@ export function reassignWorkspaceUser(
       .toUpperCase(),
   };
 
+  next.incomes = next.incomes.filter(
+    (record) =>
+      !(record.id === "income-criscasa" && record.source === "demo"),
+  );
+  next.notifications = next.notifications.filter(
+    (notification) =>
+      !(notification.id === "notice-receivable" && notification.source === "demo"),
+  );
+
   validateWorkspace(next, userId);
   return next;
 }
@@ -333,6 +342,19 @@ export function syncKnownPortfolio(data: Workspace, userId: string): Workspace {
     }
 
     const existing = next.projects[index];
+    existing.source = "user";
+    existing.userId = userId;
+    existing.tasks = existing.tasks.map((task) => ({
+      ...task,
+      source: "user",
+      userId,
+    }));
+    existing.milestones = existing.milestones.map((milestone) => ({
+      ...milestone,
+      source: "user",
+      userId,
+    }));
+
     if (existing.metadata?.portfolioVersion === PORTFOLIO_VERSION) continue;
 
     const canonicalTaskIds = new Set(canonical.tasks.map((task) => task.id));
@@ -344,7 +366,7 @@ export function syncKnownPortfolio(data: Workspace, userId: string): Workspace {
       ...existing,
       ...canonical,
       createdAt: existing.createdAt,
-      source: existing.source,
+      source: "user",
       value: existing.value ?? canonical.value,
       paid: existing.paid ?? canonical.paid,
       notes: existing.notes ?? canonical.notes,
