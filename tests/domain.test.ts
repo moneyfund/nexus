@@ -146,13 +146,12 @@ test("invalid finance captures never leave partial Inbox or financial records", 
     amount: 100.12,
     projectId: "criscasa",
   });
+  const criscasa = store
+    .getSnapshot()
+    .projects.find((project) => project.id === "criscasa")!;
+  assert.equal(projectFinance(store.getSnapshot(), criscasa).paid, 500.12);
   assert.equal(
-    projectFinance(store.getSnapshot(), store.getSnapshot().projects[0]).paid,
-    500.12,
-  );
-  assert.equal(
-    projectFinance(store.getSnapshot(), store.getSnapshot().projects[0])
-      .receivable,
+    projectFinance(store.getSnapshot(), criscasa).receivable,
     299.88,
   );
 });
@@ -184,7 +183,10 @@ test("own financial records remain visible on demo projects without inheriting d
   assert.equal(projectFinance(scoped, project).paid, 125);
   assert.equal(projectFinance(scoped, project).profit, 100);
   assert.equal(projectFinance(scoped, project).receivable, 0);
-  assert.equal(store.getSnapshot().projects[0].value, 800);
+  assert.equal(
+    store.getSnapshot().projects.find((item) => item.id === "criscasa")?.value,
+    800,
+  );
 });
 test("failed persistence preserves last good state; invalid backups are rejected", () => {
   const store = new WorkspaceStore({
@@ -209,8 +211,8 @@ test("calendar availability excludes overlapping blocks and review scheduling up
   const provider = new MockCalendarProvider(createRepositories(store).calendar);
   const slots = await provider.findAvailability(
     store.userId,
-    "2026-09-22T12:00:00-06:00",
-    "2026-09-22T14:00:00-06:00",
+    "2026-09-23T12:00:00-06:00",
+    "2026-09-23T14:00:00-06:00",
     60,
   );
   assert.equal(slots.length, 0);
