@@ -170,6 +170,12 @@ export async function POST(request: Request) {
 
   const payload = (await openAIResponse.json()) as {
     output_text?: string;
+    output?: Array<{
+      content?: Array<{
+        type?: string;
+        text?: string;
+      }>;
+    }>;
     error?: { message?: string };
     usage?: { input_tokens?: number; output_tokens?: number };
   };
@@ -185,9 +191,18 @@ export async function POST(request: Request) {
     );
   }
 
+  const outputText =
+    payload.output_text ||
+    payload.output
+      ?.flatMap((item) => item.content ?? [])
+      .filter((item) => item.type === "output_text")
+      .map((item) => item.text ?? "")
+      .join("") ||
+    "";
+
   let result: unknown;
   try {
-    result = JSON.parse(payload.output_text ?? "");
+    result = JSON.parse(outputText);
   } catch {
     return NextResponse.json(
       { error: "La IA devolvió una respuesta que NEXUS no pudo interpretar." },
