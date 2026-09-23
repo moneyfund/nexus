@@ -29,3 +29,37 @@ Los seis proyectos iniciales y sus importes, fechas, horas y avances se conserva
 Los datos de `nexus-os-v01` se migran sin borrar la clave anterior. Los datos nuevos se guardan por perfil en este navegador. Exporta/importa respaldos desde System → Data. El perfil local no es autenticación; no hay sincronización multiusuario aún.
 
 Ver [auditoría inicial](docs/AUDIT.md), [arquitectura y límites](docs/ARCHITECTURE.md) y [verificación](docs/QA.md).
+
+
+## Integraciones reales
+
+### Google Workspace
+
+NEXUS reutiliza la sesión de Google de Firebase y solicita permisos adicionales
+solo cuando el usuario pulsa **Conectar Calendar + Drive**.
+
+Permisos utilizados:
+
+- `calendar.events`: leer y gestionar eventos del calendario principal.
+- `drive.readonly`: buscar archivos existentes y conectar referencias a Knowledge.
+
+Para que Google acepte esos permisos, habilita **Google Calendar API** y
+**Google Drive API** en el mismo proyecto de Google Cloud/Firebase y declara los
+scopes en la pantalla de consentimiento OAuth. El token de acceso se conserva
+solo en `sessionStorage` y nunca se escribe en Firestore.
+
+### NEXUS AI
+
+La ruta `/api/ai` usa OpenAI Responses API desde el servidor. No expongas la
+clave en el cliente. Configura en Vercel:
+
+```bash
+OPENAI_API_KEY=...
+NEXUS_OWNER_UID=...
+OPENAI_MODEL=gpt-5.6-terra
+```
+
+`NEXUS_OWNER_UID` debe ser el UID de Firebase del propietario y evita que otra
+cuenta autenticada pueda consumir la clave de OpenAI. El modelo puede cambiarse
+sin modificar código. Las acciones que propone la IA requieren confirmación
+explícita en la interfaz antes de modificar proyectos o finanzas.
