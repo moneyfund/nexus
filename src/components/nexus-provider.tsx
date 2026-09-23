@@ -1,6 +1,7 @@
 "use client";
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useMemo,
@@ -122,7 +123,7 @@ function useSystem() {
   const osReduced = useReducedMotion();
   const reduceMotion = !!osReduced || data.user.preferences.motion !== "full";
 
-  const activateSession = async (next: FirebaseSession) => {
+  const activateSession = useCallback(async (next: FirebaseSession) => {
     setCloudReady(false);
     setCloudError("");
 
@@ -141,11 +142,14 @@ function useSystem() {
       );
       throw error;
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    store.load();
+  }, [store]);
 
   useEffect(() => {
     let active = true;
-    store.load();
 
     void firebaseClient
       .getSession()
@@ -168,7 +172,7 @@ function useSystem() {
     return () => {
       active = false;
     };
-  }, [store]);
+  }, [activateSession]);
 
   useEffect(() => {
     if (!session || !cloudReady || !store.ready) return;
