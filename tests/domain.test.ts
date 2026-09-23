@@ -5,6 +5,7 @@ import {
   WorkspaceStore,
   migrateLegacy,
   reassignWorkspaceUser,
+  syncKnownPortfolio,
 } from "../src/repositories/workspace";
 import { NexusActions } from "../src/services/actions";
 import { seedWorkspace } from "../src/domain/seed";
@@ -46,7 +47,7 @@ test("legacy migration preserves all projects, captured text and actual IDs with
     },
     seed.user.id,
   );
-  assert.equal(migrated.projects.length, 6);
+  assert.equal(migrated.projects.length, 16);
   assert.equal(migrated.ideas.length, 1);
   assert.equal(migrated.ideas[0].id, "kept-id");
   assert.equal(migrated.ideas[0].title, "Mi idea privada");
@@ -61,7 +62,7 @@ test("WIP rejects the sixth project and allows activation after pausing one", ()
     store.getSnapshot().projects.find((p) => p.id === "nicasa")?.status,
     "backlog",
   );
-  actions.setStatus("criscasa", "waiting");
+  actions.setStatus("nexus", "waiting");
   actions.setStatus("nicasa", "active");
   assert.equal(
     store.getSnapshot().projects.filter((p) => p.status === "active").length,
@@ -93,15 +94,23 @@ test("capture routes to its domain; conversion is idempotent and does not consum
 });
 test("task progress can decrease when work is reopened", () => {
   const { store, actions } = setup();
-  actions.toggleTask("criscasa", "ct1");
-  actions.toggleTask("criscasa", "ct2");
-  const completed = store.getSnapshot().projects[0].progress;
-  actions.toggleTask("criscasa", "ct1");
-  assert.ok(store.getSnapshot().projects[0].progress < completed);
+  actions.toggleTask("pequenos-escritores", "pt1");
+  actions.toggleTask("pequenos-escritores", "pt2");
+  const project = store
+    .getSnapshot()
+    .projects.find((item) => item.id === "pequenos-escritores")!;
+  const completed = project.progress;
+  actions.toggleTask("pequenos-escritores", "pt1");
+  assert.ok(
+    store
+      .getSnapshot()
+      .projects.find((item) => item.id === "pequenos-escritores")!.progress <
+      completed,
+  );
 });
 test("Flow uses wall time minus pauses, persists and completes only once", () => {
   const { store, storage, actions } = setup();
-  actions.startFlow("criscasa", "ct1", 25);
+  actions.startFlow("pequenos-escritores", "pt1", 25);
   const flow = store.getSnapshot().activeFlow!;
   assert.equal(
     flowElapsed({ ...flow, startedAt: 0, pausedMs: 1000 }, 10000),
@@ -215,13 +224,24 @@ test("calendar availability excludes overlapping blocks and review scheduling up
 });
 test("dependency cycles are rejected and unfinished dependencies block completion", () => {
   const { store, actions } = setup();
-  const [a, b] = store.getSnapshot().projects[0].tasks;
+  const project = store
+    .getSnapshot()
+    .projects.find((item) => item.id === "pequenos-escritores")!;
+  const [a, b] = project.tasks;
   actions.addDependency(a, b.id);
   assert.throws(() => actions.addDependency(b, a.id), /ciclo/);
-  assert.throws(() => actions.toggleTask("criscasa", a.id), /primero/);
-  actions.toggleTask("criscasa", b.id);
-  actions.toggleTask("criscasa", a.id);
-  assert.ok(store.getSnapshot().projects[0].tasks[0].completed);
+  assert.throws(
+    () => actions.toggleTask("pequenos-escritores", a.id),
+    /primero/,
+  );
+  actions.toggleTask("pequenos-escritores", b.id);
+  actions.toggleTask("pequenos-escritores", a.id);
+  assert.ok(
+    store
+      .getSnapshot()
+      .projects.find((item) => item.id === "pequenos-escritores")!.tasks[0]
+      .completed,
+  );
 });
 test("AI context omits disabled categories", () => {
   const w = seedWorkspace();
@@ -312,5 +332,43 @@ test("Firebase migration rewrites ownership across the entire workspace graph", 
     migrated.goals
       .flatMap((goal) => goal.milestones)
       .every((record) => record.userId === "firebase-user-123"),
+  );
+});
+
+
+test("known portfolio sync updates curated projects without deleting user projects", () => {
+  const original = reassignWorkspaceUser(seedWorkspace(), "firebase-user-123");
+  original.projects = original.projects.filter(
+    (project) => !["nexus", "amy-blandon"].includes(project.id),
+  );
+  original.projects.push({
+    ...structuredClone(original.projects[0]),
+    id: "custom-client-project",
+    name: "Proyecto manual",
+    userId: "firebase-user-123",
+    source: "user",
+    tasks: [],
+    milestones: [],
+  });
+
+  const synced = syncKnownPortfolio(original, "firebase-user-123");
+
+  assert.equal(synced.projects.length, 17);
+  assert.equal(
+    synced.projects.find((project) => project.id === "criscasa")?.progress,
+    100,
+  );
+  assert.equal(
+    synced.projects.find((project) => project.id === "criscasa")?.status,
+    "completed",
+  );
+  assert.equal(
+    synced.projects.find((project) => project.id === "tesis-civil")?.progress,
+    86,
+  );
+  assert.ok(synced.projects.some((project) => project.id === "nexus"));
+  assert.ok(synced.projects.some((project) => project.id === "amy-blandon"));
+  assert.ok(
+    synced.projects.some((project) => project.id === "custom-client-project"),
   );
 });
