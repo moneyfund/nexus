@@ -216,6 +216,9 @@ export function migrateLegacy(raw: unknown, userId: string): Workspace {
   return w;
 }
 export class BrowserWorkspaceStorage implements WorkspaceStorage {
+  constructor(
+    private onWrite?: (userId: string, data: Workspace) => void,
+  ) {}
   read(userId: string) {
     const raw = window.localStorage.getItem("nexus-os-v02:" + userId);
     if (raw) {
@@ -231,6 +234,7 @@ export class BrowserWorkspaceStorage implements WorkspaceStorage {
   }
   write(userId: string, data: Workspace) {
     window.localStorage.setItem("nexus-os-v02:" + userId, JSON.stringify(data));
+    this.onWrite?.(userId, structuredClone(data));
   }
 }
 export class MemoryWorkspaceStorage implements WorkspaceStorage {
@@ -242,6 +246,79 @@ export class MemoryWorkspaceStorage implements WorkspaceStorage {
     this.data.set(userId, structuredClone(data));
   }
 }
+export function reassignWorkspaceUser(
+  data: Workspace,
+  userId: string,
+  profile?: { displayName?: string | null; email?: string | null },
+): Workspace {
+  const next = structuredClone(data);
+  const now = Date.now();
+  const entities = [
+    ...next.projects,
+    ...next.inbox,
+    ...next.ideas,
+    ...next.events,
+    ...next.flows,
+    ...next.goals,
+    ...next.incomes,
+    ...next.expenses,
+    ...next.financialGoals,
+    ...next.contacts,
+    ...next.knowledge,
+    ...next.attachments,
+    ...next.notifications,
+    ...next.activity,
+    ...next.messages,
+    ...next.memories,
+    ...next.aiUsage,
+    ...next.dailyPlans,
+    ...next.dependencies,
+  ];
+  for (const record of entities) {
+    record.userId = userId;
+    record.updatedAt = now;
+  }
+  for (const project of next.projects) {
+    for (const task of project.tasks) {
+      task.userId = userId;
+      task.updatedAt = now;
+    }
+    for (const milestone of project.milestones) {
+      milestone.userId = userId;
+      milestone.updatedAt = now;
+    }
+  }
+  for (const goal of next.goals) {
+    for (const milestone of goal.milestones) {
+      milestone.userId = userId;
+      milestone.updatedAt = now;
+    }
+  }
+  if (next.activeFlow) {
+    next.activeFlow.userId = userId;
+    next.activeFlow.updatedAt = now;
+  }
+  const name = profile?.displayName?.trim() || next.user.name || "Mi espacio";
+  next.user = {
+    ...next.user,
+    id: userId,
+    userId,
+    source: "user",
+    updatedAt: now,
+    name,
+    email: profile?.email ?? next.user.email,
+    initials: name
+      .split(" ")
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0])
+      .join("")
+      .toUpperCase(),
+  };
+  validateWorkspace(next, userId);
+  return next;
+}
+
 export class WorkspaceStore {
   private current: Workspace;
   private listeners = new Set<() => void>();
