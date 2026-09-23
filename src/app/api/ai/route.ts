@@ -31,8 +31,14 @@ function extractBearer(request: Request) {
 
 export async function GET() {
   return NextResponse.json({
-    configured: Boolean(process.env.OPENAI_API_KEY),
+    configured: Boolean(
+      process.env.OPENAI_API_KEY && process.env.NEXUS_OWNER_UID,
+    ),
     model: process.env.OPENAI_MODEL || DEFAULT_MODEL,
+    requirements: {
+      openAIKey: Boolean(process.env.OPENAI_API_KEY),
+      ownerUid: Boolean(process.env.NEXUS_OWNER_UID),
+    },
   });
 }
 
@@ -49,6 +55,23 @@ export async function POST(request: Request) {
     return NextResponse.json(
       { error: "La sesión Firebase no es válida." },
       { status: 401 },
+    );
+
+  const ownerUid = process.env.NEXUS_OWNER_UID;
+  if (!ownerUid)
+    return NextResponse.json(
+      {
+        code: "OWNER_UID_NOT_CONFIGURED",
+        error:
+          "NEXUS AI está preparado, pero falta NEXUS_OWNER_UID en Vercel.",
+      },
+      { status: 503 },
+    );
+
+  if (user.localId !== ownerUid)
+    return NextResponse.json(
+      { error: "Esta cuenta no tiene acceso a NEXUS AI." },
+      { status: 403 },
     );
 
   const apiKey = process.env.OPENAI_API_KEY;
