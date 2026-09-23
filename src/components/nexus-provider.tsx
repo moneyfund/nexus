@@ -164,7 +164,10 @@ function useSystem() {
   }, []);
 
   useEffect(() => {
-    setGoogleGrant(readGoogleWorkspaceGrant());
+    const timer = window.setTimeout(() => {
+      setGoogleGrant(readGoogleWorkspaceGrant());
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   useEffect(() => {
