@@ -621,5 +621,10 @@ export const initialProjects: Project[] = projectSeeds.map((p) => ({
     portfolioVersion: PORTFOLIO_VERSION,
   },
   tasks: p.tasks.map((t) => ({ ...t, ...stamp, projectId: p.id })),
-  milestones: p.milestones.map((m) => ({ ...m, ...stamp, projectId: p.id })),
+  milestones: p.milestones.map((m) => ({
+    ...m,
+    ...stamp,
+    projectId: p.id,
+    baselineProgress: m.progress,
+  })),
 }));
