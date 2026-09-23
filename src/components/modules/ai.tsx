@@ -326,9 +326,9 @@ export function AIView() {
             <div className="system-alert" style={{ marginBottom: 22 }}>
               <strong>NEXUS AI está preparado, pero aún no tiene credencial.</strong>
               <p style={{ marginTop: 8 }}>
-                Añade OPENAI_API_KEY en las variables de entorno de Vercel para
-                activar respuestas reales. El resto del sistema sigue funcionando
-                sin esa clave.
+                Añade OPENAI_API_KEY y NEXUS_OWNER_UID en las variables de
+                entorno de Vercel para activar respuestas reales solo para tu
+                cuenta. El resto del sistema sigue funcionando sin esas variables.
               </p>
             </div>
           )}
