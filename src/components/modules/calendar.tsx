@@ -56,6 +56,7 @@ function EventEditor({
   const [projectId, setProjectId] = useState(event?.projectId ?? "");
   const [error, setError] = useState("");
   const [deleting, setDeleting] = useState(false);
+  const [saving, setSaving] = useState(false);
   const conflicts =
     start && end
       ? n.data.events.filter(
@@ -87,20 +88,32 @@ function EventEditor({
       className="stack"
       onSubmit={(e) => {
         e.preventDefault();
-        try {
-          n.actions.saveEvent({
-            ...(event ?? entity(crypto.randomUUID(), "user", n.data.user.id)),
-            title: title.trim(),
-            start: zonedISO(start, timezone),
-            end: zonedISO(end, timezone),
-            category,
-            projectId: projectId || undefined,
-          });
-          close();
-          n.notify("Bloque guardado.");
-        } catch (e) {
-          setError(e instanceof Error ? e.message : "No se pudo guardar.");
-        }
+        void (async () => {
+          setSaving(true);
+          try {
+            const next = {
+              ...(event ?? entity(crypto.randomUUID(), "user", n.data.user.id)),
+              title: title.trim(),
+              start: zonedISO(start, timezone),
+              end: zonedISO(end, timezone),
+              category,
+              projectId: projectId || undefined,
+            };
+            if (event)
+              await n.services.calendar.updateEvent(n.data.user.id, next);
+            else await n.services.calendar.createEvent(n.data.user.id, next);
+            close();
+            n.notify(
+              n.googleWorkspace.connected
+                ? "Bloque guardado y sincronizado con Google Calendar."
+                : "Bloque guardado en NEXUS.",
+            );
+          } catch (e) {
+            setError(e instanceof Error ? e.message : "No se pudo guardar.");
+          } finally {
+            setSaving(false);
+          }
+        })();
       }}
     >
       <label className="field">
@@ -178,10 +191,15 @@ function EventEditor({
         </p>
       )}
       <div className="form-note">
-        Hora de {timezone}. Google Calendar no está conectado.
+        Hora de {timezone}.{" "}
+        {n.googleWorkspace.connected
+          ? "Los cambios se sincronizan con tu calendario principal de Google."
+          : "Conecta Google Workspace para sincronizar estos bloques."}
       </div>
       <div className="row between">
-        <Button type="submit">Guardar bloque</Button>
+        <Button type="submit" disabled={saving}>
+          {saving ? "Guardando…" : "Guardar bloque"}
+        </Button>
         {event && (
           <Button
             type="button"
@@ -189,11 +207,23 @@ function EventEditor({
             onClick={() => {
               if (!deleting) setDeleting(true);
               else {
-                n.run(
-                  () => n.actions.deleteEvent(event.id),
-                  "Bloque eliminado.",
-                );
-                close();
+                void n.services.calendar
+                  .deleteEvent(n.data.user.id, event.id)
+                  .then(() => {
+                    n.notify(
+                      n.googleWorkspace.connected
+                        ? "Bloque eliminado de NEXUS y Google Calendar."
+                        : "Bloque eliminado.",
+                    );
+                    close();
+                  })
+                  .catch((error) =>
+                    setError(
+                      error instanceof Error
+                        ? error.message
+                        : "No se pudo eliminar.",
+                    ),
+                  );
               }
             }}
           >
@@ -212,6 +242,7 @@ export function CalendarView() {
   const [filter, setFilter] = useState("all");
   const [edit, setEdit] = useState<CalendarEvent | null | undefined>(undefined);
   const [selectedDate, setSelectedDate] = useState(anchor);
+  const [syncing, setSyncing] = useState(false);
   const day = new Date(anchor + "T12:00:00Z");
   const weekday = (day.getUTCDay() + 6) % 7;
   const weekStart = addDays(anchor, -weekday);
@@ -258,10 +289,52 @@ export function CalendarView() {
       title="Calendar"
       description="Diseña tu tiempo alrededor de lo que importa."
       action={
-        <Button onClick={() => open(anchor)}>
-          <Plus size={15} />
-          Reservar tiempo
-        </Button>
+        <div className="row wrap">
+          <Button
+            variant="secondary"
+            disabled={syncing}
+            onClick={() => {
+              void (async () => {
+                setSyncing(true);
+                try {
+                  if (!n.googleWorkspace.connected)
+                    await n.googleWorkspace.connect();
+                  const from = addDays(anchor, -90) + "T00:00:00-06:00";
+                  const to = addDays(anchor, 90) + "T23:59:59-06:00";
+                  const synced = await n.services.calendar.sync(
+                    n.data.user.id,
+                    from,
+                    to,
+                  );
+                  n.notify(
+                    synced.length +
+                      " eventos sincronizados desde Google Calendar.",
+                  );
+                } catch (error) {
+                  n.notify(
+                    error instanceof Error
+                      ? error.message
+                      : "No se pudo sincronizar Google Calendar.",
+                    true,
+                  );
+                } finally {
+                  setSyncing(false);
+                }
+              })();
+            }}
+          >
+            <CalendarDays size={15} />
+            {syncing
+              ? "Sincronizando…"
+              : n.googleWorkspace.connected
+                ? "Sincronizar Google"
+                : "Conectar Google"}
+          </Button>
+          <Button onClick={() => open(anchor)}>
+            <Plus size={15} />
+            Reservar tiempo
+          </Button>
+        </div>
       }
     >
       <div className="toolbar">
@@ -330,7 +403,10 @@ export function CalendarView() {
           ).toFixed(1)}{" "}
           h reservadas en el periodo
         </span>
-        <Badge>GOOGLE CALENDAR · NOT CONNECTED</Badge>
+        <Badge active={n.googleWorkspace.connected}>
+          GOOGLE CALENDAR ·{" "}
+          {n.googleWorkspace.connected ? "CONNECTED" : "NOT CONNECTED"}
+        </Badge>
       </div>
       {view === "timeline" ? (
         <div className="calendar-timeline">

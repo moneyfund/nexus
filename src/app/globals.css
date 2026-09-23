@@ -3939,3 +3939,48 @@ html[data-motion="reduced"] *:after {
     display: none;
   }
 }
+
+
+/* NEXUS AI confirmed-action layer */
+.ai-actions {
+  margin: 0 0 26px;
+  padding: 22px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background:
+    radial-gradient(circle at 90% 0%, #d946ef12, transparent 42%),
+    #ffffff02;
+}
+.ai-actions .ai-side-heading {
+  margin: 0 0 16px;
+}
+.ai-action-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 16px 0;
+  border-top: 1px solid var(--line);
+}
+.ai-action-card strong {
+  display: block;
+  color: #f6eafa;
+  font-size: 0.84rem;
+  font-weight: 500;
+}
+.ai-action-card p {
+  margin-top: 6px;
+  max-width: 650px;
+  color: var(--muted);
+  font-size: 0.74rem;
+  line-height: 1.55;
+}
+@media (max-width: 700px) {
+  .ai-action-card {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .ai-action-card .row {
+    width: 100%;
+  }
+}

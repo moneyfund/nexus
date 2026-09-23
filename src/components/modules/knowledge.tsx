@@ -10,6 +10,8 @@ import {
   Plus,
   BookOpen,
   Trash2,
+  Cloud,
+  RefreshCw,
 } from "lucide-react";
 import { useNexus } from "../nexus-provider";
 import {
@@ -22,6 +24,8 @@ import {
 } from "../ui/primitives";
 import type { KnowledgeItem } from "@/domain/models";
 import { CATEGORIES } from "@/config/system";
+import type { GoogleDriveFile } from "@/lib/google-workspace";
+import { entity } from "@/domain/seed";
 const icons = {
   note: NotebookPen,
   link: Link2,
@@ -185,6 +189,72 @@ export function KnowledgeView({
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("all");
   const [selected, setSelected] = useState(initialItemId);
+  const [driveOpen, setDriveOpen] = useState(false);
+  const [driveFiles, setDriveFiles] = useState<GoogleDriveFile[]>([]);
+  const [driveQuery, setDriveQuery] = useState("");
+  const [driveProject, setDriveProject] = useState("");
+  const [driveBusy, setDriveBusy] = useState(false);
+
+  async function loadDrive(query = driveQuery) {
+    setDriveBusy(true);
+    try {
+      if (!n.googleWorkspace.connected) await n.googleWorkspace.connect();
+      const token = await import("@/lib/google-workspace").then((module) =>
+        module.readGoogleWorkspaceGrant(),
+      );
+      if (!token) throw new Error("Vuelve a conectar Google Workspace.");
+      setDriveFiles(await n.services.google.listDriveFiles(token.accessToken, query));
+      setDriveOpen(true);
+    } catch (error) {
+      n.notify(
+        error instanceof Error ? error.message : "No se pudo leer Google Drive.",
+        true,
+      );
+    } finally {
+      setDriveBusy(false);
+    }
+  }
+
+  function importDriveFile(file: GoogleDriveFile) {
+    if (!file.webViewLink) {
+      n.notify("Google no devolvió un enlace para este archivo.", true);
+      return;
+    }
+    const exists = n.data.knowledge.some(
+      (item) => item.metadata?.googleDriveId === file.id,
+    );
+    if (exists) {
+      n.notify("Ese archivo de Drive ya está conectado a Knowledge.");
+      return;
+    }
+    n.update((w) => {
+      w.knowledge.unshift({
+        ...entity(crypto.randomUUID(), "user", w.user.id),
+        title: file.name,
+        type:
+          file.mimeType === "application/pdf"
+            ? "pdf"
+            : file.mimeType.startsWith("application/vnd.google-apps.")
+              ? "document"
+              : "link",
+        content:
+          "Referencia importada desde Google Drive" +
+          (file.modifiedTime
+            ? " · actualizado " +
+              new Date(file.modifiedTime).toLocaleString("es-NI")
+            : ""),
+        url: file.webViewLink,
+        projectId: driveProject || undefined,
+        category: "Personal",
+        tags: ["drive", "google"],
+        metadata: {
+          googleDriveId: file.id,
+          googleMimeType: file.mimeType,
+        },
+      });
+    });
+    n.notify("Archivo de Drive conectado a Knowledge.");
+  }
   const items = n.data.knowledge.filter(
     (k) =>
       (category === "all" || k.category === category) &&
@@ -217,6 +287,14 @@ export function KnowledgeView({
           <Button variant="secondary" onClick={() => n.openCapture("link")}>
             <Link2 size={15} />
             Enlace
+          </Button>
+          <Button
+            variant="secondary"
+            disabled={driveBusy}
+            onClick={() => void loadDrive()}
+          >
+            <Cloud size={15} />
+            {driveBusy ? "Abriendo Drive…" : "Google Drive"}
           </Button>
           <Button variant="secondary" onClick={() => n.openCapture("file")}>
             <Paperclip size={15} />
@@ -311,6 +389,88 @@ export function KnowledgeView({
             close={() => setSelected("")}
           />
         )}
+      </Modal>
+      <Modal
+        open={driveOpen}
+        onClose={() => setDriveOpen(false)}
+        title="Google Drive / importar referencia"
+        wide
+      >
+        <div className="stack">
+          <div className="form-grid">
+            <label className="field">
+              Buscar en Drive
+              <input
+                value={driveQuery}
+                onChange={(e) => setDriveQuery(e.target.value)}
+                placeholder="Nombre del archivo…"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    void loadDrive(driveQuery);
+                  }
+                }}
+              />
+            </label>
+            <label className="field">
+              Vincular al proyecto
+              <select
+                value={driveProject}
+                onChange={(e) => setDriveProject(e.target.value)}
+              >
+                <option value="">Sin proyecto</option>
+                {n.projects.map((project) => (
+                  <option key={project.id} value={project.id}>
+                    {project.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <Button
+            variant="secondary"
+            disabled={driveBusy}
+            onClick={() => void loadDrive(driveQuery)}
+          >
+            <RefreshCw size={15} />
+            {driveBusy ? "Buscando…" : "Actualizar resultados"}
+          </Button>
+          <div className="knowledge-items">
+            {driveFiles.map((file) => (
+              <button
+                key={file.id}
+                className="knowledge-item"
+                onClick={() => importDriveFile(file)}
+              >
+                <div className="knowledge-type-icon">
+                  <Cloud size={20} />
+                </div>
+                <div>
+                  <Label>GOOGLE DRIVE</Label>
+                  <h3>{file.name}</h3>
+                  <p>
+                    {file.mimeType}
+                    {file.modifiedTime
+                      ? " · " +
+                        new Date(file.modifiedTime).toLocaleDateString("es-NI")
+                      : ""}
+                  </p>
+                </div>
+                <Plus size={17} />
+              </button>
+            ))}
+          </div>
+          {!driveFiles.length && !driveBusy && (
+            <Empty
+              title="Sin resultados."
+              text="Prueba otro nombre o revisa los permisos de Google Drive."
+            />
+          )}
+          <p className="form-note">
+            NEXUS importa una referencia y enlace al archivo; no copia el contenido
+            completo a Firestore.
+          </p>
+        </div>
       </Modal>
     </ModuleFrame>
   );

@@ -1,5 +1,5 @@
 "use client";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
   Orbit,
@@ -10,11 +10,14 @@ import {
   Wallet,
   Library,
   Plus,
+  Check,
+  Zap,
 } from "lucide-react";
 import { useNexus } from "../nexus-provider";
 import { ModuleFrame, Badge, Label, Button } from "../ui/primitives";
 import { entity } from "@/domain/seed";
 import { NexusToolRegistry } from "@/services/providers";
+import type { NexusAIAction } from "@/services/openai";
 const prompts = [
   "¿Qué debería priorizar mañana?",
   "¿Qué proyectos están activos?",
@@ -31,9 +34,127 @@ export function AIView() {
   const [prompt, setPrompt] = useState("");
   const [busy, setBusy] = useState(false);
   const [memory, setMemory] = useState("");
+  const [aiStatus, setAIStatus] = useState<{
+    configured: boolean;
+    model: string;
+    error?: string;
+  } | null>(null);
+  const [pendingActions, setPendingActions] = useState<
+    Array<{ id: string; action: NexusAIAction }>
+  >([]);
   const endRef = useRef<HTMLDivElement>(null);
   const requestRef = useRef(false);
   const context = n.services.context.build(n.data);
+
+  useEffect(() => {
+    let active = true;
+    void n.services.ai
+      .status()
+      .then((status) => {
+        if (active) setAIStatus(status);
+      })
+      .catch((error) => {
+        if (active)
+          setAIStatus({
+            configured: false,
+            model: "",
+            error:
+              error instanceof Error
+                ? error.message
+                : "No se pudo comprobar NEXUS AI.",
+          });
+      });
+    return () => {
+      active = false;
+    };
+  }, [n.services.ai]);
+
+  function actionLabel(action: NexusAIAction) {
+    const project = n.projects.find((item) => item.id === action.projectId);
+    const projectName = project?.name ?? "Proyecto";
+    switch (action.type) {
+      case "complete_task":
+        return "Completar · " + (action.title ?? "tarea") + " · " + projectName;
+      case "create_task":
+        return "Crear tarea · " + (action.title ?? "Nueva tarea") + " · " + projectName;
+      case "record_income":
+        return "Registrar ingreso · $" + (action.amount ?? 0) + " · " + projectName;
+      case "record_expense":
+        return "Registrar gasto · $" + (action.amount ?? 0) + " · " + projectName;
+      case "update_project_status":
+        return "Cambiar estado · " + projectName + " → " + (action.status ?? "");
+      case "update_project_value":
+        return "Actualizar valor · " + projectName + " → $" + (action.value ?? 0);
+    }
+  }
+
+  function applyAction(id: string, action: NexusAIAction) {
+    const applied = n.run(() => {
+      switch (action.type) {
+        case "complete_task": {
+          if (!action.projectId || !action.taskId)
+            throw new Error("La IA no identificó una tarea válida.");
+          const task = n.projects
+            .find((project) => project.id === action.projectId)
+            ?.tasks.find((item) => item.id === action.taskId);
+          if (!task) throw new Error("La tarea propuesta ya no existe.");
+          if (!task.completed)
+            n.actions.toggleTask(action.projectId, action.taskId);
+          break;
+        }
+        case "create_task": {
+          if (!action.projectId || !action.title?.trim())
+            throw new Error("Falta proyecto o título para crear la tarea.");
+          const taskId = n.actions.capture({
+            type: "task",
+            content: action.title,
+            projectId: action.projectId,
+          });
+          const project = n.projects.find(
+            (item) => item.id === action.projectId,
+          );
+          if (
+            action.milestone &&
+            project?.milestones.some(
+              (milestone) => milestone.title === action.milestone,
+            )
+          )
+            n.actions.updateTask(action.projectId, taskId, {
+              milestone: action.milestone,
+            });
+          break;
+        }
+        case "record_income":
+        case "record_expense": {
+          if (!action.amount || action.amount <= 0)
+            throw new Error("La propuesta no contiene un importe válido.");
+          n.actions.capture({
+            type: action.type === "record_income" ? "income" : "expense",
+            content:
+              action.title?.trim() ||
+              (action.type === "record_income" ? "Ingreso" : "Gasto"),
+            amount: action.amount,
+            projectId: action.projectId || undefined,
+          });
+          break;
+        }
+        case "update_project_status":
+          if (!action.projectId || !action.status)
+            throw new Error("Falta proyecto o estado.");
+          n.actions.setStatus(action.projectId, action.status);
+          break;
+        case "update_project_value":
+          if (!action.projectId || action.value == null || action.value < 0)
+            throw new Error("Falta un valor válido para el proyecto.");
+          n.actions.updateProject(action.projectId, { value: action.value });
+          break;
+      }
+      return true;
+    }, "Acción aplicada en NEXUS.");
+
+    if (applied)
+      setPendingActions((items) => items.filter((item) => item.id !== id));
+  }
   async function send(text: string) {
     if (!text.trim() || requestRef.current) return;
     requestRef.current = true;
@@ -44,24 +165,33 @@ export function AIView() {
       role: "user" as const,
       content: text.trim(),
       contextIds: [],
-      simulated: true,
+      simulated: false,
     };
     try {
       n.store.update((w) => {
         w.messages.push(message);
       });
       setPrompt("");
-      const answer = await n.services.ai.respond(text, context);
+      const result = await n.services.ai.respondDetailed(text, context);
       n.store.update((w) => {
-        w.messages.push(answer);
+        w.messages.push(result.message);
         w.aiUsage.push({
           ...entity(crypto.randomUUID(), "user", w.user.id),
-          provider: "mock",
-          inputTokens: 0,
-          outputTokens: 0,
+          provider: "openai",
+          inputTokens: result.usage.inputTokens,
+          outputTokens: result.usage.outputTokens,
           costUSD: 0,
+          metadata: { model: result.model },
         });
       });
+      setAIStatus({ configured: true, model: result.model });
+      setPendingActions((items) => [
+        ...items,
+        ...result.actions.map((action) => ({
+          id: crypto.randomUUID(),
+          action,
+        })),
+      ]);
       requestAnimationFrame(() =>
         endRef.current?.scrollIntoView({
           behavior: n.reduceMotion ? "instant" : "smooth",
@@ -83,7 +213,15 @@ export function AIView() {
       eyebrow="Nexus intelligence / 10"
       title="Piensa en voz alta"
       description="Tus proyectos, tu tiempo y tu conocimiento en una conversación."
-      action={<Badge active>SIMULACIÓN LOCAL · SIN IA CONECTADA</Badge>}
+      action={
+        <Badge active={!!aiStatus?.configured}>
+          {aiStatus?.configured
+            ? "OPENAI · " + aiStatus.model.toUpperCase()
+            : aiStatus
+              ? "OPENAI · CONFIGURACIÓN PENDIENTE"
+              : "OPENAI · COMPROBANDO"}
+        </Badge>
+      }
     >
       <div className="ai-workspace">
         <section className="ai-conversation">
@@ -98,8 +236,9 @@ export function AIView() {
               <span className="accent">Una perspectiva más clara.</span>
             </h2>
             <p>
-              Esta vista prueba el flujo con respuestas predeterminadas basadas
-              en tus prioridades. No realiza llamadas a OpenAI.
+              NEXUS puede razonar sobre tus proyectos, calendario, finanzas y
+              conocimiento. Los cambios sensibles se presentan como propuestas
+              y solo se ejecutan cuando tú los confirmas.
             </p>
           </div>
           {!n.data.messages.length && (
@@ -121,7 +260,7 @@ export function AIView() {
               <article className={"ai-message " + m.role} key={m.id}>
                 <Label>
                   {m.role === "assistant"
-                    ? "NEXUS · RESPUESTA SIMULADA"
+                    ? "NEXUS · OPENAI"
                     : n.data.user.name.toUpperCase()}
                 </Label>
                 <p>{m.content}</p>
@@ -143,11 +282,56 @@ export function AIView() {
             {busy && (
               <div className="ai-processing" role="status">
                 <Orbit size={16} />
-                <span>Preparando contexto local…</span>
+                <span>Analizando tu contexto con NEXUS AI…</span>
               </div>
             )}
             <div ref={endRef} />
           </div>
+          {pendingActions.length > 0 && (
+            <section className="ai-actions">
+              <div className="ai-side-heading">
+                <Label>
+                  <Zap size={13} />
+                  ACTIONS / REQUIEREN CONFIRMACIÓN
+                </Label>
+                <h3>NEXUS entendió acciones posibles.</h3>
+              </div>
+              {pendingActions.map(({ id, action }) => (
+                <div className="ai-action-card" key={id}>
+                  <div>
+                    <strong>{actionLabel(action)}</strong>
+                    <p>{action.reason}</p>
+                  </div>
+                  <div className="row">
+                    <Button
+                      variant="ghost"
+                      onClick={() =>
+                        setPendingActions((items) =>
+                          items.filter((item) => item.id !== id),
+                        )
+                      }
+                    >
+                      Descartar
+                    </Button>
+                    <Button onClick={() => applyAction(id, action)}>
+                      <Check size={14} />
+                      Aplicar
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </section>
+          )}
+          {aiStatus && !aiStatus.configured && (
+            <div className="system-alert" style={{ marginBottom: 22 }}>
+              <strong>NEXUS AI está preparado, pero aún no tiene credencial.</strong>
+              <p style={{ marginTop: 8 }}>
+                Añade OPENAI_API_KEY y NEXUS_OWNER_UID en las variables de
+                entorno de Vercel para activar respuestas reales solo para tu
+                cuenta. El resto del sistema sigue funcionando sin esas variables.
+              </p>
+            </div>
+          )}
           <form
             className="ai-composer"
             onSubmit={(e) => {
@@ -178,7 +362,7 @@ export function AIView() {
           </form>
           <div className="form-note">
             Enter para enviar · Shift + Enter para nueva línea · No se ejecutan
-            acciones automáticamente.
+            acciones sin tu confirmación.
           </div>
         </section>
         <aside className="ai-context">
@@ -207,6 +391,7 @@ export function AIView() {
             <span>{context.projects.length} proyectos</span>
             <span>{context.events.length} bloques</span>
             <span>{context.knowledge.length} referencias</span>
+            <span>{context.memories.length} memorias</span>
           </div>
           <Section label="TOOLS" title="Acciones preparadas." />
           {new NexusToolRegistry().tools.map((t) => (
@@ -232,8 +417,8 @@ export function AIView() {
           ))}
           {!n.data.memories.length && (
             <p className="form-note">
-              Guarda aquí el contexto que querrás compartir con el futuro
-              asistente. La simulación actual no lo analiza.
+              Guarda aquí contexto estable que NEXUS AI debe considerar en
+              conversaciones futuras cuando Conocimiento esté habilitado.
             </p>
           )}
           <form

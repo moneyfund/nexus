@@ -351,9 +351,7 @@ const projectSeeds: SeedProject[] = [
     status: "completed",
     priority: "medium",
     deadline: "ENTREGADO",
-    value: 800,
-    paid: 400,
-    accent: "#8b5cf6",
+     accent: "#8b5cf6",
     nextAction: "Etapa 1 cerrada; esperar una nueva fase o solicitud del cliente",
     hours: 18.4,
     stage: "delivery",
@@ -610,7 +608,7 @@ const stamp = {
   userId: "local-norvin",
   createdAt: Date.UTC(2026, 8, 23, 12),
   updatedAt: Date.UTC(2026, 8, 23, 12),
-  source: "demo" as const,
+  source: "user" as const,
 };
 
 export const initialProjects: Project[] = projectSeeds.map((p) => ({
@@ -621,5 +619,10 @@ export const initialProjects: Project[] = projectSeeds.map((p) => ({
     portfolioVersion: PORTFOLIO_VERSION,
   },
   tasks: p.tasks.map((t) => ({ ...t, ...stamp, projectId: p.id })),
-  milestones: p.milestones.map((m) => ({ ...m, ...stamp, projectId: p.id })),
+  milestones: p.milestones.map((m) => ({
+    ...m,
+    ...stamp,
+    projectId: p.id,
+    baselineProgress: m.progress,
+  })),
 }));

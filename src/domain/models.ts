@@ -29,6 +29,7 @@ export interface Milestone extends Entity {
   title: string;
   weight: number;
   progress: number;
+  baselineProgress?: number;
 }
 export interface Project extends Entity {
   name: string;

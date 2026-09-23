@@ -24,10 +24,19 @@ interface CompatUser {
   email: string | null;
   displayName: string | null;
   photoURL: string | null;
+  getIdToken(forceRefresh?: boolean): Promise<string>;
+  reauthenticateWithPopup(
+    provider: CompatGoogleProvider,
+  ): Promise<CompatAuthResult>;
 }
 
 interface CompatGoogleProvider {
   setCustomParameters(parameters: Record<string, string>): void;
+  addScope(scope: string): void;
+}
+
+interface CompatOAuthCredential {
+  accessToken?: string | null;
 }
 
 interface CompatAuthResult {
@@ -98,7 +107,12 @@ interface FirebaseCompatNamespace {
   apps: unknown[];
   initializeApp(config: typeof firebaseConfig): unknown;
   auth: (() => CompatAuth) & {
-    GoogleAuthProvider: new () => CompatGoogleProvider;
+    GoogleAuthProvider: {
+      new (): CompatGoogleProvider;
+      credentialFromResult(
+        result: CompatAuthResult,
+      ): CompatOAuthCredential | null;
+    };
   };
   firestore(): CompatFirestore;
   storage(): CompatStorage;
@@ -299,6 +313,47 @@ export const firebaseClient = {
     } catch (error) {
       throw friendlyFirebaseError(error);
     }
+  },
+
+  async connectGoogleWorkspace() {
+    try {
+      const firebase = await getFirebase();
+      const user = firebase.auth().currentUser;
+      if (!user) throw new Error("Inicia sesión antes de conectar Google Workspace.");
+
+      const provider = new firebase.auth.GoogleAuthProvider();
+      provider.addScope("https://www.googleapis.com/auth/calendar.events");
+      provider.addScope("https://www.googleapis.com/auth/drive.readonly");
+      provider.setCustomParameters({
+        prompt: "consent",
+        include_granted_scopes: "true",
+      });
+
+      const result = await user.reauthenticateWithPopup(provider);
+      const credential =
+        firebase.auth.GoogleAuthProvider.credentialFromResult(result);
+      const accessToken = credential?.accessToken;
+      if (!accessToken)
+        throw new Error("Google no devolvió un token para Workspace.");
+
+      return {
+        accessToken,
+        expiresAt: Date.now() + 50 * 60 * 1000,
+        scopes: [
+          "https://www.googleapis.com/auth/calendar.events",
+          "https://www.googleapis.com/auth/drive.readonly",
+        ],
+      };
+    } catch (error) {
+      throw friendlyFirebaseError(error);
+    }
+  },
+
+  async getIdToken() {
+    const firebase = await getFirebase();
+    const user = firebase.auth().currentUser;
+    if (!user) throw new Error("Inicia sesión para usar NEXUS AI.");
+    return user.getIdToken();
   },
 
   async signIn(email: string, password: string) {

@@ -1,5 +1,5 @@
 "use client";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Download,
   Upload,
@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import { useNexus } from "../nexus-provider";
 import { ModuleFrame, Button, Label, Badge } from "../ui/primitives";
-import { INTEGRATIONS, SYSTEM } from "@/config/system";
+import { SYSTEM } from "@/config/system";
 const sections = [
   { id: "profile", label: "Profile", icon: UserRound },
   { id: "appearance", label: "Appearance", icon: Palette },
@@ -40,8 +40,36 @@ export function SettingsView() {
   const name = profileDraft?.name ?? n.data.user.name;
   const email = profileDraft?.email ?? n.data.user.email;
   const [pendingImport, setPendingImport] = useState<unknown>(null);
+  const [aiStatus, setAIStatus] = useState<{
+    configured: boolean;
+    model: string;
+    error?: string;
+  } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const prefs = n.data.user.preferences;
+
+  useEffect(() => {
+    let active = true;
+    void n.services.ai
+      .status()
+      .then((status) => {
+        if (active) setAIStatus(status);
+      })
+      .catch((error) => {
+        if (active)
+          setAIStatus({
+            configured: false,
+            model: "",
+            error:
+              error instanceof Error
+                ? error.message
+                : "No se pudo comprobar OpenAI.",
+          });
+      });
+    return () => {
+      active = false;
+    };
+  }, [n.services.ai]);
   function exportData() {
     const blob = new Blob([JSON.stringify(n.data, null, 2)], {
       type: "application/json",
@@ -276,34 +304,97 @@ export function SettingsView() {
           )}
           {section === "integrations" && (
             <>
-              <h2>Listo para conectar.</h2>
+              <h2>Servicios que amplían NEXUS.</h2>
               <p>
-                Firebase Auth, Firestore, Storage y Analytics ya están cableados
-                al proyecto NEXUS. Las demás integraciones continúan pendientes.
+                Firebase mantiene tu workspace privado. Google Workspace añade
+                calendario y referencias de Drive; OpenAI aporta la capa de
+                razonamiento operativo.
               </p>
-              {INTEGRATIONS.map((name) => (
-                <div className="integration-row" key={name}>
-                  <span>
-                    <PlugZap size={18} />
-                    {name}
-                  </span>
-                  <Badge>
-                    {name === "Firebase"
-                      ? n.cloudReady
-                        ? "CONNECTED"
-                        : "AUTHENTICATED"
-                      : "NOT CONNECTED"}
-                  </Badge>
-                </div>
-              ))}
+              <div className="integration-row">
+                <span>
+                  <PlugZap size={18} />
+                  Firebase
+                </span>
+                <Badge active={n.cloudReady}>
+                  {n.cloudReady ? "CONNECTED" : "AUTHENTICATED"}
+                </Badge>
+              </div>
+              <div className="integration-row">
+                <span>
+                  <PlugZap size={18} />
+                  Google Calendar
+                </span>
+                <Badge active={n.googleWorkspace.connected}>
+                  {n.googleWorkspace.connected ? "CONNECTED" : "NOT CONNECTED"}
+                </Badge>
+              </div>
+              <div className="integration-row">
+                <span>
+                  <PlugZap size={18} />
+                  Google Drive
+                </span>
+                <Badge active={n.googleWorkspace.connected}>
+                  {n.googleWorkspace.connected ? "CONNECTED" : "NOT CONNECTED"}
+                </Badge>
+              </div>
+              <div className="row wrap">
+                {n.googleWorkspace.connected ? (
+                  <Button
+                    variant="secondary"
+                    onClick={() => n.googleWorkspace.disconnect()}
+                  >
+                    Desconectar Google Workspace
+                  </Button>
+                ) : (
+                  <Button
+                    onClick={() =>
+                      void n.googleWorkspace.connect().catch((error) =>
+                        n.notify(
+                          error instanceof Error
+                            ? error.message
+                            : "No se pudo conectar Google Workspace.",
+                          true,
+                        ),
+                      )
+                    }
+                  >
+                    Conectar Calendar + Drive
+                  </Button>
+                )}
+              </div>
+              <p className="form-note">
+                La autorización de Google vive solo en esta sesión del navegador;
+                el token OAuth no se guarda en Firestore.
+              </p>
+              <div className="integration-row">
+                <span>
+                  <PlugZap size={18} />
+                  OpenAI
+                </span>
+                <Badge active={!!aiStatus?.configured}>
+                  {aiStatus?.configured
+                    ? "CONNECTED · " + aiStatus.model
+                    : aiStatus
+                      ? "API KEY REQUIRED"
+                      : "CHECKING"}
+                </Badge>
+              </div>
+              <div className="integration-row">
+                <span>
+                  <PlugZap size={18} />
+                  MCP / futuras herramientas
+                </span>
+                <Badge>READY FOR NEXT PHASE</Badge>
+              </div>
             </>
           )}
           {section === "ai" && (
             <>
               <h2>El contexto está bajo tu control.</h2>
               <p>
-                Estos permisos filtran el contexto de la simulación y serán la
-                base del futuro asistente.
+                Estos permisos deciden qué partes de tu workspace recibe NEXUS AI.
+                Las acciones propuestas requieren tu confirmación antes de modificar
+                datos reales.
               </p>
               {(
                 Object.keys(prefs.aiContext) as (keyof typeof prefs.aiContext)[]
@@ -329,9 +420,13 @@ export function SettingsView() {
                 />
               ))}
               <div className="surface">
-                <Label>USAGE / MOCK</Label>
+                <Label>USAGE / OPENAI</Label>
                 <p>
-                  {n.data.aiUsage.length} respuestas simuladas · $0 de uso API.
+                  {n.data.aiUsage.filter((item) => item.provider === "openai").length}{" "}
+                  respuestas reales registradas.
+                  {aiStatus?.configured
+                    ? " Modelo actual: " + aiStatus.model + "."
+                    : " Faltan OPENAI_API_KEY y/o NEXUS_OWNER_UID en Vercel para activar las llamadas."}
                 </p>
               </div>
             </>
@@ -424,12 +519,15 @@ export function SettingsView() {
                 NEXUS usa Firebase Authentication para el acceso, Firestore
                 para sincronizar tu workspace y Firebase Storage para archivos.
                 Cada workspace se guarda bajo el UID autenticado. Google
-                Calendar, Google Drive y OpenAI siguen desconectados.
+                Calendar y Drive se autorizan mediante OAuth por sesión, y NEXUS
+                AI usa un endpoint de servidor protegido por el token de Firebase.
               </p>
               <div className="surface">
-                <Label>PRÓXIMA CONEXIÓN</Label>
+                <Label>SEGURIDAD DE INTEGRACIONES</Label>
                 <p>
-                  Firestore y Storage usan rutas privadas ligadas al UID autenticado. Las reglas incluidas en el repositorio deben publicarse en Firebase.
+                  Firestore y Storage usan rutas privadas ligadas al UID. El token
+                  de Google Workspace no se persiste en la nube y la clave de
+                  OpenAI permanece únicamente como variable de entorno del servidor.
                 </p>
               </div>
               <p>
@@ -452,8 +550,24 @@ export function SettingsView() {
                     ? "Firebase · " + (n.session.email || n.session.uid)
                     : "Sin sesión",
                 ],
-                ["Calendar", "MockCalendarProvider"],
-                ["AI", "MockAIProvider"],
+                [
+                  "Calendar",
+                  n.googleWorkspace.connected
+                    ? "GoogleCalendarProvider · connected"
+                    : "GoogleCalendarProvider · local fallback",
+                ],
+                [
+                  "Drive",
+                  n.googleWorkspace.connected
+                    ? "Google Drive REST · connected"
+                    : "Google Drive REST · not authorized",
+                ],
+                [
+                  "AI",
+                  aiStatus?.configured
+                    ? "OpenAI Responses API · " + aiStatus.model
+                    : "OpenAI Responses API · API key required",
+                ],
                 ["Storage", "Firebase Storage"],
                 [
                   "Persistence",
@@ -466,7 +580,9 @@ export function SettingsView() {
                 </div>
               ))}
               <p className="form-note">
-                Firebase usa la configuración pública del proyecto y reglas por UID. Las integraciones con APIs privadas deberán usar secretos del servidor.
+                Firebase usa configuración pública y reglas por UID. OpenAI usa
+                secretos del servidor; Google Workspace usa consentimiento OAuth
+                explícito del usuario.
               </p>
             </>
           )}

@@ -13,6 +13,7 @@ import type {
 } from "@/repositories/contracts";
 import { entity } from "@/domain/seed";
 import { analytics, projectFinance } from "@/domain/selectors";
+import { googleWorkspaceClient } from "@/lib/google-workspace";
 export class IntegrationNotConnectedError extends Error {
   constructor(service: string) {
     super(service + " todavía no está conectado.");
@@ -87,13 +88,92 @@ export class MockCalendarProvider implements CalendarProvider {
     return this.createEvent(userId, { ...event, category: "focus" });
   }
 }
-export abstract class GoogleCalendarProvider implements CalendarProvider {
-  abstract getEvents: CalendarProvider["getEvents"];
-  abstract createEvent: CalendarProvider["createEvent"];
-  abstract updateEvent: CalendarProvider["updateEvent"];
-  abstract deleteEvent: CalendarProvider["deleteEvent"];
-  abstract findAvailability: CalendarProvider["findAvailability"];
-  abstract scheduleFocusBlock: CalendarProvider["scheduleFocusBlock"];
+export class GoogleCalendarProvider implements CalendarProvider {
+  private local: MockCalendarProvider;
+
+  constructor(
+    private repository: CalendarRepository,
+    private getAccessToken: () => string | null,
+  ) {
+    this.local = new MockCalendarProvider(repository);
+  }
+
+  get connected() {
+    return !!this.getAccessToken();
+  }
+
+  async getEvents(userId: string, from: string, to: string) {
+    return this.local.getEvents(userId, from, to);
+  }
+
+  async sync(userId: string, from: string, to: string) {
+    const token = this.getAccessToken();
+    if (!token)
+      throw new IntegrationNotConnectedError("Google Calendar");
+    const remote = await googleWorkspaceClient.listCalendarEvents(
+      token,
+      userId,
+      from,
+      to,
+    );
+    const existing = await this.repository.list(userId);
+    for (const event of remote) {
+      const local = existing.find(
+        (item) => item.providerId && item.providerId === event.providerId,
+      );
+      await this.repository.save(userId, {
+        ...event,
+        id: local?.id ?? event.id,
+        createdAt: local?.createdAt ?? event.createdAt,
+        projectId: local?.projectId,
+        category: local?.category ?? event.category,
+        metadata: {
+          ...local?.metadata,
+          ...event.metadata,
+        },
+      });
+    }
+    return remote;
+  }
+
+  async createEvent(userId: string, event: CalendarEvent) {
+    if (new Date(event.end) <= new Date(event.start))
+      throw new Error("El bloque debe terminar después de iniciar.");
+    const token = this.getAccessToken();
+    const saved = token
+      ? await googleWorkspaceClient.createCalendarEvent(token, event)
+      : event;
+    await this.repository.save(userId, saved);
+  }
+
+  async updateEvent(userId: string, event: CalendarEvent) {
+    const token = this.getAccessToken();
+    const saved = token
+      ? await googleWorkspaceClient.updateCalendarEvent(token, event)
+      : event;
+    await this.repository.save(userId, saved);
+  }
+
+  async deleteEvent(userId: string, id: string) {
+    const event = await this.repository.get(userId, id);
+    const token = this.getAccessToken();
+    if (token && event?.providerId)
+      await googleWorkspaceClient.deleteCalendarEvent(token, event.providerId);
+    await this.repository.remove(userId, id);
+  }
+
+  async findAvailability(
+    userId: string,
+    from: string,
+    to: string,
+    minutes: number,
+  ) {
+    return this.local.findAvailability(userId, from, to, minutes);
+  }
+
+  async scheduleFocusBlock(userId: string, event: CalendarEvent) {
+    return this.createEvent(userId, { ...event, category: "focus" });
+  }
 }
 export interface StorageProvider {
   upload(userId: string, file: File): Promise<Attachment>;
@@ -141,13 +221,46 @@ export class LocalNotificationService implements NotificationService {
 }
 export interface NexusContext {
   userId: string;
-  projects: Pick<
-    Workspace["projects"][number],
-    "id" | "name" | "priority" | "nextAction" | "status" | "dueDate"
-  >[];
+  projects: Array<{
+    id: string;
+    name: string;
+    area: string;
+    priority: Workspace["projects"][number]["priority"];
+    nextAction: string;
+    status: Workspace["projects"][number]["status"];
+    dueDate?: string;
+    progress: number;
+    value?: number;
+    tasks: Array<{
+      id: string;
+      title: string;
+      completed: boolean;
+      milestone: string;
+      priority: Workspace["projects"][number]["tasks"][number]["priority"];
+    }>;
+  }>;
   events: CalendarEvent[];
-  finance: { projectId: string; receivable: number }[];
-  knowledge: { id: string; title: string }[];
+  finance: Array<{
+    projectId: string;
+    value?: number;
+    paid: number;
+    expenses: number;
+    receivable: number;
+  }>;
+  knowledge: Array<{
+    id: string;
+    title: string;
+    category: string;
+    tags: string[];
+    content: string;
+    url?: string;
+    projectId?: string;
+  }>;
+  memories: Array<{ id: string; content: string; projectIds: string[] }>;
+  recentMessages: Array<{
+    role: "user" | "assistant";
+    content: string;
+  }>;
 }
 export class NexusContextBuilder {
   build(w: Workspace): NexusContext {
@@ -155,27 +268,64 @@ export class NexusContextBuilder {
     return {
       userId: w.user.id,
       projects: c.projects
-        ? w.projects.map(
-            ({ id, name, priority, nextAction, status, dueDate }) => ({
-              id,
-              name,
-              priority,
-              nextAction,
-              status,
-              dueDate,
-            }),
-          )
+        ? w.projects.map((project) => ({
+            id: project.id,
+            name: project.name,
+            area: project.area,
+            priority: project.priority,
+            nextAction: project.nextAction,
+            status: project.status,
+            dueDate: project.dueDate,
+            progress: project.progress,
+            value: project.value,
+            tasks: project.tasks.map((task) => ({
+              id: task.id,
+              title: task.title,
+              completed: task.completed,
+              milestone: task.milestone,
+              priority: task.priority,
+            })),
+          }))
         : [],
       events: c.calendar ? w.events : [],
       finance: c.finance
-        ? w.projects.map((p) => ({
-            projectId: p.id,
-            receivable: projectFinance(w, p).receivable,
-          }))
+        ? w.projects.map((project) => {
+            const finance = projectFinance(w, project);
+            return {
+              projectId: project.id,
+              value: project.value,
+              paid: finance.paid,
+              expenses: finance.expenses,
+              receivable: finance.receivable,
+            };
+          })
         : [],
       knowledge: c.knowledge
-        ? w.knowledge.map(({ id, title }) => ({ id, title }))
+        ? w.knowledge.map(
+            ({ id, title, category, tags, content, url, projectId }) => ({
+              id,
+              title,
+              category,
+              tags,
+              content: content.slice(0, 4000),
+              url,
+              projectId,
+            }),
+          )
         : [],
+      memories: c.knowledge
+        ? w.memories.map(({ id, content, projectIds }) => ({
+            id,
+            content: content.slice(0, 2500),
+            projectIds,
+          }))
+        : [],
+      recentMessages: w.messages
+        .slice(-12)
+        .map(({ role, content }) => ({
+          role,
+          content: content.slice(0, 3500),
+        })),
     };
   }
 }
@@ -185,6 +335,9 @@ export class NexusToolRegistry {
     { id: "calendar.read", label: "Consultar calendario", access: "read" },
     { id: "finance.read", label: "Consultar finanzas", access: "read" },
     { id: "task.propose", label: "Proponer una tarea", access: "confirm" },
+    { id: "task.complete", label: "Completar tarea", access: "confirm" },
+    { id: "finance.write", label: "Registrar movimiento", access: "confirm" },
+    { id: "project.update", label: "Actualizar proyecto", access: "confirm" },
   ];
 }
 export interface AIProvider {

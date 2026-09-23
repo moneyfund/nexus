@@ -20,13 +20,20 @@ import {
 import { createRepositories } from "@/repositories/contracts";
 import { NexusActions } from "@/services/actions";
 import {
-  MockAIProvider,
-  MockCalendarProvider,
+  GoogleCalendarProvider,
   NexusContextBuilder,
   LocalNotificationService,
 } from "@/services/providers";
 import { RestFirebaseStorageProvider } from "@/services/firebase-storage";
+import { NexusOpenAIClient } from "@/services/openai";
 import { firebaseClient, type FirebaseSession } from "@/lib/firebase";
+import {
+  clearGoogleWorkspaceGrant,
+  readGoogleWorkspaceGrant,
+  saveGoogleWorkspaceGrant,
+  googleWorkspaceClient,
+  type GoogleWorkspaceGrant,
+} from "@/lib/google-workspace";
 import { interfaceSound } from "@/services/sound";
 import { SYSTEM } from "@/config/system";
 import type { CaptureType, FlowSession, Workspace } from "@/domain/models";
@@ -96,15 +103,24 @@ function useSystem() {
   const data = store.getSnapshot();
   const actions = useMemo(() => new NexusActions(store), [store]);
   const repositories = useMemo(() => createRepositories(store), [store]);
+  const [googleGrant, setGoogleGrant] = useState<GoogleWorkspaceGrant | null>(
+    null,
+  );
+  const googleConnected = !!googleGrant;
+  const googleAccessToken = googleGrant?.accessToken ?? null;
   const services = useMemo(
     () => ({
-      ai: new MockAIProvider(),
+      ai: new NexusOpenAIClient(),
       context: new NexusContextBuilder(),
-      calendar: new MockCalendarProvider(repositories.calendar),
+      calendar: new GoogleCalendarProvider(
+        repositories.calendar,
+        () => googleAccessToken,
+      ),
+      google: googleWorkspaceClient,
       storage: new RestFirebaseStorageProvider(),
       notifications: new LocalNotificationService(repositories.notifications),
     }),
-    [repositories],
+    [repositories, googleAccessToken],
   );
 
   const [session, setSession] = useState<FirebaseSession | null>(null);
@@ -148,6 +164,23 @@ function useSystem() {
       throw error;
     }
   }, []);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setGoogleGrant(readGoogleWorkspaceGrant());
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    if (!googleGrant) return;
+    const delay = Math.max(0, googleGrant.expiresAt - Date.now());
+    const timer = window.setTimeout(() => {
+      clearGoogleWorkspaceGrant();
+      setGoogleGrant(null);
+    }, delay);
+    return () => window.clearTimeout(timer);
+  }, [googleGrant]);
 
   useEffect(() => {
     store.load();
@@ -250,9 +283,25 @@ function useSystem() {
     notify("Cuenta creada y NEXUS sincronizado.");
   };
 
+  const connectGoogleWorkspace = async () => {
+    const grant = await firebaseClient.connectGoogleWorkspace();
+    saveGoogleWorkspaceGrant(grant);
+    setGoogleGrant(grant);
+    notify("Google Calendar y Drive conectados.");
+    return grant;
+  };
+
+  const disconnectGoogleWorkspace = () => {
+    clearGoogleWorkspaceGrant();
+    setGoogleGrant(null);
+    notify("Google Workspace desconectado de esta sesión.");
+  };
+
   const signOut = async () => {
     if (syncTimer.current) clearTimeout(syncTimer.current);
     await firebaseClient.signOut();
+    clearGoogleWorkspaceGrant();
+    setGoogleGrant(null);
     setSession(null);
     setCloudReady(false);
     setCloudError("");
@@ -295,6 +344,13 @@ function useSystem() {
     session,
     authReady,
     cloudReady,
+    googleWorkspace: {
+      connected: googleConnected,
+      expiresAt: googleGrant?.expiresAt,
+      scopes: googleGrant?.scopes ?? [],
+      connect: connectGoogleWorkspace,
+      disconnect: disconnectGoogleWorkspace,
+    },
     signInWithGoogle,
     signIn,
     signUp,
