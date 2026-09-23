@@ -20,12 +20,12 @@ import {
 import { createRepositories } from "@/repositories/contracts";
 import { NexusActions } from "@/services/actions";
 import {
-  MockAIProvider,
   GoogleCalendarProvider,
   NexusContextBuilder,
   LocalNotificationService,
 } from "@/services/providers";
 import { RestFirebaseStorageProvider } from "@/services/firebase-storage";
+import { NexusOpenAIClient } from "@/services/openai";
 import { firebaseClient, type FirebaseSession } from "@/lib/firebase";
 import {
   clearGoogleWorkspaceGrant,
@@ -108,7 +108,7 @@ function useSystem() {
   );
   const services = useMemo(
     () => ({
-      ai: new MockAIProvider(),
+      ai: new NexusOpenAIClient(),
       context: new NexusContextBuilder(),
       calendar: new GoogleCalendarProvider(
         repositories.calendar,
