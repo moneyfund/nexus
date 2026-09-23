@@ -106,9 +106,8 @@ function useSystem() {
   const [googleGrant, setGoogleGrant] = useState<GoogleWorkspaceGrant | null>(
     null,
   );
-  const googleConnected =
-    !!googleGrant && googleGrant.expiresAt > Date.now() + 30_000;
-  const googleAccessToken = googleConnected ? googleGrant.accessToken : null;
+  const googleConnected = !!googleGrant;
+  const googleAccessToken = googleGrant?.accessToken ?? null;
   const services = useMemo(
     () => ({
       ai: new NexusOpenAIClient(),
