@@ -87,8 +87,18 @@ interface APIResponse {
   code?: string;
 }
 
+const STATIC_GITHUB_PAGES =
+  process.env.NEXT_PUBLIC_DEPLOY_TARGET === "github-pages";
+
 export class NexusOpenAIClient implements AIProvider {
   async status() {
+    if (STATIC_GITHUB_PAGES)
+      return {
+        configured: false,
+        model: "",
+        error:
+          "NEXUS AI requiere backend y está desactivado en la copia temporal de GitHub Pages.",
+      };
     const response = await fetch("/api/ai", { cache: "no-store" });
     if (!response.ok)
       return { configured: false, model: "", error: "NEXUS AI no responde." };
@@ -104,6 +114,10 @@ export class NexusOpenAIClient implements AIProvider {
     context: NexusContext,
     signal?: AbortSignal,
   ): Promise<NexusAIResponse> {
+    if (STATIC_GITHUB_PAGES)
+      throw new Error(
+        "NEXUS AI no puede ejecutarse en GitHub Pages porque requiere un backend seguro. El resto de NEXUS sigue disponible.",
+      );
     const idToken = await firebaseClient.getIdToken();
     const response = await fetch("/api/ai", {
       method: "POST",
