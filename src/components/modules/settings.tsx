@@ -14,6 +14,9 @@ import {
   Code2,
   Palette,
   Smartphone,
+  Cloud,
+  LogIn,
+  LogOut,
 } from "lucide-react";
 import { useNexus } from "../nexus-provider";
 import { ModuleFrame, Button, Label, Badge } from "../ui/primitives";
@@ -128,9 +131,49 @@ export function SettingsView() {
                 </label>
                 <Button type="submit">Guardar perfil</Button>
               </form>
+              <div className="surface">
+                <Label>
+                  <Cloud size={15} />
+                  FIREBASE CLOUD
+                </Label>
+                {n.authLoading ? (
+                  <p style={{ marginTop: 14 }}>Comprobando sesión…</p>
+                ) : n.authUser ? (
+                  <>
+                    <p style={{ marginTop: 14 }}>
+                      Conectado como <strong>{n.authUser.email ?? n.authUser.displayName ?? "Google"}</strong>.
+                    </p>
+                    <div className="integration-row">
+                      <span>Sincronización</span>
+                      <Badge>{n.cloudStatus.toUpperCase()}</Badge>
+                    </div>
+                    {n.cloudError && (
+                      <p className="accent" role="alert">{n.cloudError}</p>
+                    )}
+                    <Button variant="secondary" onClick={() => void n.disconnectGoogle()}>
+                      <LogOut size={16} />
+                      Cerrar sesión
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <p style={{ marginTop: 14 }}>
+                      Conecta tu cuenta de Google para sincronizar NEXUS entre dispositivos y habilitar Firebase Storage.
+                    </p>
+                    {n.authError && (
+                      <p className="accent" role="alert">{n.authError}</p>
+                    )}
+                    <Button onClick={() => void n.connectGoogle()}>
+                      <LogIn size={16} />
+                      Conectar con Google
+                    </Button>
+                  </>
+                )}
+              </div>
               <p className="form-note">
-                Perfil local. El correo no inicia una sesión. Google Login se
-                habilitará al conectar Firebase Auth.
+                El perfil sigue disponible sin conexión. Al iniciar sesión por
+                primera vez, NEXUS migra tu espacio local al UID de Firebase sin
+                perder proyectos, ideas, Flow, finanzas ni preferencias.
               </p>
             </>
           )}
@@ -258,8 +301,9 @@ export function SettingsView() {
             <>
               <h2>Listo para conectar.</h2>
               <p>
-                Los proveedores actuales son locales o simulados. No hay
-                credenciales ni llamadas a estas APIs.
+                Firebase ya tiene cliente real para Auth, Firestore y Storage.
+                Las demás integraciones continúan desacopladas detrás de sus
+                proveedores.
               </p>
               {INTEGRATIONS.map((name) => (
                 <div className="integration-row" key={name}>
@@ -267,7 +311,13 @@ export function SettingsView() {
                     <PlugZap size={18} />
                     {name}
                   </span>
-                  <Badge>NOT CONNECTED</Badge>
+                  <Badge>
+                    {name === "Firebase"
+                      ? n.authUser
+                        ? "CONNECTED"
+                        : "READY"
+                      : "NOT CONNECTED"}
+                  </Badge>
                 </div>
               ))}
             </>
@@ -314,8 +364,9 @@ export function SettingsView() {
             <>
               <h2>Tu información sigue siendo tuya.</h2>
               <p>
-                Los cambios viven en este navegador. Exporta una copia antes de
-                cambiar de equipo o limpiar los datos del sitio.
+                {n.authUser
+                  ? "Los cambios se guardan primero en este dispositivo y se reflejan en Firestore. El respaldo JSON sigue disponible como copia portátil."
+                  : "Los cambios viven en este navegador. Conecta Google para activar la sincronización con Firestore."}
               </p>
               <div className="row wrap">
                 <Button onClick={exportData}>
@@ -394,19 +445,17 @@ export function SettingsView() {
           )}
           {section === "privacy" && (
             <>
-              <h2>Un espacio local.</h2>
+              <h2>Tu espacio, aislado por usuario.</h2>
               <p>
-                NEXUS todavía no sincroniza datos con Firebase, Google u OpenAI.
-                El perfil local organiza tus datos, pero no constituye
-                autenticación ni una barrera de seguridad frente a otra persona
-                que use este navegador.
+                {n.authUser
+                  ? "Firebase Auth identifica tu sesión y Firestore/Storage trabajan bajo tu UID. La copia local se mantiene para respuesta inmediata y continuidad offline."
+                  : "Sin iniciar sesión, NEXUS permanece en modo local en este navegador y no sincroniza información con Firebase."}
               </p>
               <div className="surface">
-                <Label>PRÓXIMA CONEXIÓN</Label>
+                <Label>SEGURIDAD DE NUBE</Label>
                 <p>
-                  La activación multiusuario requerirá Firebase Auth, reglas de
-                  acceso por usuario y verificación de propietarios antes de
-                  sincronizar.
+                  El repositorio incluye reglas para limitar Firestore y Storage
+                  a rutas cuyo UID coincida con la sesión autenticada.
                 </p>
               </div>
               <p>
@@ -421,12 +470,28 @@ export function SettingsView() {
               <h2>System diagnostics.</h2>
               {[
                 ["NEXUS", SYSTEM.version],
-                ["Data adapter", "BrowserWorkspaceStorage"],
+                [
+                  "Data adapter",
+                  n.authUser
+                    ? "BrowserWorkspaceStorage + Firestore mirror"
+                    : "BrowserWorkspaceStorage",
+                ],
                 ["User ID", n.data.user.id],
-                ["Auth session", "Local · no autenticada"],
+                [
+                  "Auth session",
+                  n.authUser
+                    ? "Firebase · " + (n.authUser.email ?? n.authUser.uid)
+                    : "Local · no autenticada",
+                ],
+                ["Cloud sync", n.cloudStatus],
                 ["Calendar", "MockCalendarProvider"],
                 ["AI", "MockAIProvider"],
-                ["Storage", "MockStorageProvider"],
+                [
+                  "Storage",
+                  n.authUser
+                    ? "FirebaseFileStorageService"
+                    : "MockStorageProvider",
+                ],
                 [
                   "Persistence",
                   n.storageError || (n.ready ? "Ready" : "Loading"),
@@ -438,8 +503,9 @@ export function SettingsView() {
                 </div>
               ))}
               <p className="form-note">
-                Contratos, migración e integraciones documentados en el
-                repositorio. Nunca pegues claves API en estos ajustes.
+                Auth, sincronización local-first y Storage están cableados al
+                proyecto Firebase. Google Calendar, Drive y OpenAI siguen como
+                proveedores independientes.
               </p>
             </>
           )}
