@@ -7,6 +7,8 @@ import {
   TrendingUp,
   ArrowDownLeft,
   ArrowUpRight as Out,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 import { useNexus } from "../nexus-provider";
 import {
@@ -27,6 +29,104 @@ import {
   projectFinance,
 } from "@/domain/selectors";
 import { entity } from "@/domain/seed";
+import type { MoneyRecord } from "@/domain/models";
+
+type EditableRecord = MoneyRecord & { kind: "income" | "expense" };
+
+function TransactionEditor({
+  record,
+  close,
+}: {
+  record: EditableRecord;
+  close: () => void;
+}) {
+  const n = useNexus();
+  const [title, setTitle] = useState(record.title);
+  const [amount, setAmount] = useState(String(record.amount));
+  const [date, setDate] = useState(record.date);
+  const [projectId, setProjectId] = useState(record.projectId ?? "");
+  const [category, setCategory] = useState(record.category);
+  const [deleting, setDeleting] = useState(false);
+
+  return (
+    <form
+      className="stack"
+      onSubmit={(e) => {
+        e.preventDefault();
+        n.run(() => {
+          n.actions.updateMoneyRecord(record.kind, record.id, {
+            title,
+            amount: Number(amount),
+            date,
+            projectId: projectId || undefined,
+            category,
+          });
+          close();
+        }, "Movimiento actualizado.");
+      }}
+    >
+      <label className="field">
+        Concepto
+        <input value={title} onChange={(e) => setTitle(e.target.value)} required />
+      </label>
+      <div className="form-grid">
+        <label className="field">
+          Importe USD
+          <input
+            type="number"
+            min=".01"
+            step=".01"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            required
+          />
+        </label>
+        <label className="field">
+          Fecha
+          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+        </label>
+      </div>
+      <div className="form-grid">
+        <label className="field">
+          Proyecto
+          <select value={projectId} onChange={(e) => setProjectId(e.target.value)}>
+            <option value="">Sin proyecto</option>
+            {n.projects.map((project) => (
+              <option key={project.id} value={project.id}>
+                {project.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="field">
+          Categoría
+          <input value={category} onChange={(e) => setCategory(e.target.value)} />
+        </label>
+      </div>
+      <div className="row between">
+        <Button type="submit">Guardar movimiento</Button>
+        <Button
+          type="button"
+          variant="danger"
+          onClick={() => {
+            if (!deleting) {
+              setDeleting(true);
+              return;
+            }
+            n.run(
+              () => n.actions.deleteMoneyRecord(record.kind, record.id),
+              "Movimiento eliminado.",
+            );
+            close();
+          }}
+        >
+          <Trash2 size={14} />
+          {deleting ? "Confirmar eliminación" : "Eliminar"}
+        </Button>
+      </div>
+    </form>
+  );
+}
 export function FinanceView() {
   const n = useNexus();
   const [scope, setScope] = useState<"all" | "user">("all");
@@ -34,6 +134,7 @@ export function FinanceView() {
   const [goalName, setGoalName] = useState("");
   const [goalTarget, setGoalTarget] = useState("");
   const [goalKind, setGoalKind] = useState<"savings" | "investment">("savings");
+  const [editingRecord, setEditingRecord] = useState<EditableRecord | null>(null);
   const scoped = financialScope(n.data, scope);
   const { incomes, expenses, projects, financialGoals } = scoped;
   const income = incomes.reduce((s, i) => s + i.amount, 0);
@@ -61,9 +162,9 @@ export function FinanceView() {
         .reduce((s, r) => s + r.amount, 0),
     };
   });
-  const records = [
-    ...incomes.map((i) => ({ ...i, kind: "income" })),
-    ...expenses.map((i) => ({ ...i, kind: "expense" })),
+  const records: EditableRecord[] = [
+    ...incomes.map((i) => ({ ...i, kind: "income" as const })),
+    ...expenses.map((i) => ({ ...i, kind: "expense" as const })),
   ].sort((a, b) => b.date.localeCompare(a.date));
   return (
     <ModuleFrame
@@ -292,6 +393,13 @@ export function FinanceView() {
               {r.kind === "expense" ? "−" : "+"}
               {money(r.amount)}
             </strong>
+            <button
+              className="icon-button"
+              aria-label={"Editar movimiento " + r.title}
+              onClick={() => setEditingRecord(r)}
+            >
+              <Pencil size={14} />
+            </button>
           </div>
         ))}
         {!records.length && (
@@ -302,6 +410,19 @@ export function FinanceView() {
           />
         )}
       </section>
+      <Modal
+        open={!!editingRecord}
+        onClose={() => setEditingRecord(null)}
+        title="Editar movimiento"
+      >
+        {editingRecord && (
+          <TransactionEditor
+            key={editingRecord.id + editingRecord.kind}
+            record={editingRecord}
+            close={() => setEditingRecord(null)}
+          />
+        )}
+      </Modal>
       <Modal
         open={goalOpen}
         onClose={() => setGoalOpen(false)}
