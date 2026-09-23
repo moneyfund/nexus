@@ -56,6 +56,7 @@ interface CompatDocumentSnapshot {
 }
 
 interface CompatDocumentReference {
+  collection(name: string): CompatCollectionReference;
   get(): Promise<CompatDocumentSnapshot>;
   set(data: Record<string, unknown>, options?: { merge?: boolean }): Promise<void>;
 }
