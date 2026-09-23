@@ -106,19 +106,22 @@ function useSystem() {
   const [googleGrant, setGoogleGrant] = useState<GoogleWorkspaceGrant | null>(
     null,
   );
+  const googleConnected =
+    !!googleGrant && googleGrant.expiresAt > Date.now() + 30_000;
+  const googleAccessToken = googleConnected ? googleGrant.accessToken : null;
   const services = useMemo(
     () => ({
       ai: new NexusOpenAIClient(),
       context: new NexusContextBuilder(),
       calendar: new GoogleCalendarProvider(
         repositories.calendar,
-        () => googleGrant?.accessToken ?? null,
+        () => googleAccessToken,
       ),
       google: googleWorkspaceClient,
       storage: new RestFirebaseStorageProvider(),
       notifications: new LocalNotificationService(repositories.notifications),
     }),
-    [repositories, googleGrant?.accessToken],
+    [repositories, googleAccessToken],
   );
 
   const [session, setSession] = useState<FirebaseSession | null>(null);
@@ -169,6 +172,16 @@ function useSystem() {
     }, 0);
     return () => window.clearTimeout(timer);
   }, []);
+
+  useEffect(() => {
+    if (!googleGrant) return;
+    const delay = Math.max(0, googleGrant.expiresAt - Date.now());
+    const timer = window.setTimeout(() => {
+      clearGoogleWorkspaceGrant();
+      setGoogleGrant(null);
+    }, delay);
+    return () => window.clearTimeout(timer);
+  }, [googleGrant]);
 
   useEffect(() => {
     store.load();
@@ -333,7 +346,7 @@ function useSystem() {
     authReady,
     cloudReady,
     googleWorkspace: {
-      connected: !!googleGrant,
+      connected: googleConnected,
       expiresAt: googleGrant?.expiresAt,
       scopes: googleGrant?.scopes ?? [],
       connect: connectGoogleWorkspace,
