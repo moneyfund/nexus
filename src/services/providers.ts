@@ -102,7 +102,9 @@ export class GoogleCalendarProvider implements CalendarProvider {
     return !!this.getAccessToken();
   }
 
-  getEvents = this.local.getEvents.bind(this.local);
+  async getEvents(userId: string, from: string, to: string) {
+    return this.local.getEvents(userId, from, to);
+  }
 
   async sync(userId: string, from: string, to: string) {
     const token = this.getAccessToken();
@@ -145,7 +147,14 @@ export class GoogleCalendarProvider implements CalendarProvider {
     await this.repository.remove(userId, id);
   }
 
-  findAvailability = this.local.findAvailability.bind(this.local);
+  async findAvailability(
+    userId: string,
+    from: string,
+    to: string,
+    minutes: number,
+  ) {
+    return this.local.findAvailability(userId, from, to, minutes);
+  }
 
   async scheduleFocusBlock(userId: string, event: CalendarEvent) {
     return this.createEvent(userId, { ...event, category: "focus" });
