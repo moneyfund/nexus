@@ -13,6 +13,7 @@ import type {
 } from "@/repositories/contracts";
 import { entity } from "@/domain/seed";
 import { analytics, projectFinance } from "@/domain/selectors";
+import { googleWorkspaceClient } from "@/lib/google-workspace";
 export class IntegrationNotConnectedError extends Error {
   constructor(service: string) {
     super(service + " todavía no está conectado.");
@@ -87,13 +88,68 @@ export class MockCalendarProvider implements CalendarProvider {
     return this.createEvent(userId, { ...event, category: "focus" });
   }
 }
-export abstract class GoogleCalendarProvider implements CalendarProvider {
-  abstract getEvents: CalendarProvider["getEvents"];
-  abstract createEvent: CalendarProvider["createEvent"];
-  abstract updateEvent: CalendarProvider["updateEvent"];
-  abstract deleteEvent: CalendarProvider["deleteEvent"];
-  abstract findAvailability: CalendarProvider["findAvailability"];
-  abstract scheduleFocusBlock: CalendarProvider["scheduleFocusBlock"];
+export class GoogleCalendarProvider implements CalendarProvider {
+  private local: MockCalendarProvider;
+
+  constructor(
+    private repository: CalendarRepository,
+    private getAccessToken: () => string | null,
+  ) {
+    this.local = new MockCalendarProvider(repository);
+  }
+
+  get connected() {
+    return !!this.getAccessToken();
+  }
+
+  getEvents = this.local.getEvents.bind(this.local);
+
+  async sync(userId: string, from: string, to: string) {
+    const token = this.getAccessToken();
+    if (!token)
+      throw new IntegrationNotConnectedError("Google Calendar");
+    const remote = await googleWorkspaceClient.listCalendarEvents(
+      token,
+      userId,
+      from,
+      to,
+    );
+    for (const event of remote)
+      await this.repository.save(userId, event);
+    return remote;
+  }
+
+  async createEvent(userId: string, event: CalendarEvent) {
+    if (new Date(event.end) <= new Date(event.start))
+      throw new Error("El bloque debe terminar después de iniciar.");
+    const token = this.getAccessToken();
+    const saved = token
+      ? await googleWorkspaceClient.createCalendarEvent(token, event)
+      : event;
+    await this.repository.save(userId, saved);
+  }
+
+  async updateEvent(userId: string, event: CalendarEvent) {
+    const token = this.getAccessToken();
+    const saved = token
+      ? await googleWorkspaceClient.updateCalendarEvent(token, event)
+      : event;
+    await this.repository.save(userId, saved);
+  }
+
+  async deleteEvent(userId: string, id: string) {
+    const event = await this.repository.get(userId, id);
+    const token = this.getAccessToken();
+    if (token && event?.providerId)
+      await googleWorkspaceClient.deleteCalendarEvent(token, event.providerId);
+    await this.repository.remove(userId, id);
+  }
+
+  findAvailability = this.local.findAvailability.bind(this.local);
+
+  async scheduleFocusBlock(userId: string, event: CalendarEvent) {
+    return this.createEvent(userId, { ...event, category: "focus" });
+  }
 }
 export interface StorageProvider {
   upload(userId: string, file: File): Promise<Attachment>;
