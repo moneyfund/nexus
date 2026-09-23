@@ -252,8 +252,15 @@ export interface NexusContext {
     title: string;
     category: string;
     tags: string[];
+    content: string;
+    url?: string;
+    projectId?: string;
   }>;
   memories: Array<{ id: string; content: string; projectIds: string[] }>;
+  recentMessages: Array<{
+    role: "user" | "assistant";
+    content: string;
+  }>;
 }
 export class NexusContextBuilder {
   build(w: Workspace): NexusContext {
@@ -294,20 +301,31 @@ export class NexusContextBuilder {
           })
         : [],
       knowledge: c.knowledge
-        ? w.knowledge.map(({ id, title, category, tags }) => ({
-            id,
-            title,
-            category,
-            tags,
-          }))
+        ? w.knowledge.map(
+            ({ id, title, category, tags, content, url, projectId }) => ({
+              id,
+              title,
+              category,
+              tags,
+              content: content.slice(0, 4000),
+              url,
+              projectId,
+            }),
+          )
         : [],
       memories: c.knowledge
         ? w.memories.map(({ id, content, projectIds }) => ({
             id,
-            content,
+            content: content.slice(0, 2500),
             projectIds,
           }))
         : [],
+      recentMessages: w.messages
+        .slice(-12)
+        .map(({ role, content }) => ({
+          role,
+          content: content.slice(0, 3500),
+        })),
     };
   }
 }
