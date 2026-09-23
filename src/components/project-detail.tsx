@@ -12,6 +12,8 @@ import {
   Users,
   GitBranch,
   Orbit,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 import { useNexus } from "./nexus-provider";
 import {
@@ -26,8 +28,12 @@ import {
   Tabs,
 } from "./ui/primitives";
 import { money, projectFinance } from "@/domain/selectors";
-import { entity } from "@/domain/seed";
-import type { Project, ProjectStatus } from "@/domain/models";
+import type {
+  Project,
+  ProjectStatus,
+  Task,
+  Milestone,
+} from "@/domain/models";
 function ProjectEditor({
   project,
   close,
@@ -49,6 +55,9 @@ function ProjectEditor({
             priority: draft.priority,
             dueDate: draft.dueDate,
             value: draft.value,
+            area: draft.area,
+            client: draft.client,
+            stage: draft.stage,
           });
           close();
         }, "Proyecto actualizado.");
@@ -96,7 +105,43 @@ function ProjectEditor({
           />
         </label>
       </div>
-      <label className="field">
+      <div className="form-grid">
+        <label className="field">
+          Área
+          <input
+            value={draft.area}
+            onChange={(e) => setDraft({ ...draft, area: e.target.value })}
+          />
+        </label>
+        <label className="field">
+          Cliente
+          <input
+            value={draft.client ?? ""}
+            onChange={(e) =>
+              setDraft({ ...draft, client: e.target.value || undefined })
+            }
+          />
+        </label>
+      </div>
+      <div className="form-grid">
+        <label className="field">
+          Etapa
+          <select
+            value={draft.stage ?? "execution"}
+            onChange={(e) =>
+              setDraft({
+                ...draft,
+                stage: e.target.value as Project["stage"],
+              })
+            }
+          >
+            <option value="discovery">Descubrimiento</option>
+            <option value="planning">Planificación</option>
+            <option value="execution">Ejecución</option>
+            <option value="delivery">Entrega</option>
+          </select>
+        </label>
+        <label className="field">
         Prioridad
         <select
           value={draft.priority}
@@ -112,17 +157,205 @@ function ProjectEditor({
           <option value="medium">Media</option>
           <option value="low">Baja</option>
         </select>
-      </label>
+        </label>
+      </div>
       <Button type="submit">Guardar cambios</Button>
     </form>
   );
 }
+
+function MilestoneEditor({
+  project,
+  milestone,
+  close,
+}: {
+  project: Project;
+  milestone: Milestone;
+  close: () => void;
+}) {
+  const n = useNexus();
+  const [title, setTitle] = useState(milestone.title);
+  const [weight, setWeight] = useState(String(milestone.weight));
+  const [baseline, setBaseline] = useState(
+    String(milestone.baselineProgress ?? milestone.progress),
+  );
+  const [deleting, setDeleting] = useState(false);
+
+  return (
+    <form
+      className="stack"
+      onSubmit={(e) => {
+        e.preventDefault();
+        n.run(() => {
+          n.actions.updateMilestone(project.id, milestone.id, {
+            title,
+            weight: Number(weight),
+            baselineProgress: Number(baseline),
+          });
+          close();
+        }, "Hito actualizado.");
+      }}
+    >
+      <label className="field">
+        Nombre del hito
+        <input value={title} onChange={(e) => setTitle(e.target.value)} required />
+      </label>
+      <div className="form-grid">
+        <label className="field">
+          Peso en el proyecto · %
+          <input
+            type="number"
+            min="0"
+            step="1"
+            value={weight}
+            onChange={(e) => setWeight(e.target.value)}
+          />
+        </label>
+        <label className="field">
+          Avance base comprobado · %
+          <input
+            type="number"
+            min="0"
+            max="100"
+            step="1"
+            value={baseline}
+            onChange={(e) => setBaseline(e.target.value)}
+          />
+        </label>
+      </div>
+      <p className="form-note">
+        El avance base representa trabajo ya realizado. Las tareas de este hito
+        completarán automáticamente el porcentaje restante hasta 100%.
+      </p>
+      <div className="row between">
+        <Button type="submit">Guardar hito</Button>
+        <Button
+          type="button"
+          variant="danger"
+          onClick={() => {
+            if (!deleting) {
+              setDeleting(true);
+              return;
+            }
+            const result = n.run(
+              () => n.actions.deleteMilestone(project.id, milestone.id),
+              "Hito eliminado.",
+            );
+            if (result !== undefined) close();
+          }}
+        >
+          <Trash2 size={14} />
+          {deleting ? "Confirmar eliminación" : "Eliminar"}
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+function TaskEditor({
+  project,
+  task,
+  close,
+}: {
+  project: Project;
+  task: Task;
+  close: () => void;
+}) {
+  const n = useNexus();
+  const [title, setTitle] = useState(task.title);
+  const [minutes, setMinutes] = useState(String(task.estimatedMinutes));
+  const [priority, setPriority] = useState(task.priority);
+  const [milestone, setMilestone] = useState(task.milestone);
+  const [deleting, setDeleting] = useState(false);
+
+  return (
+    <form
+      className="stack"
+      onSubmit={(e) => {
+        e.preventDefault();
+        n.run(() => {
+          n.actions.updateTask(project.id, task.id, {
+            title,
+            estimatedMinutes: Number(minutes),
+            priority,
+            milestone,
+          });
+          close();
+        }, "Tarea actualizada.");
+      }}
+    >
+      <label className="field">
+        Tarea
+        <input value={title} onChange={(e) => setTitle(e.target.value)} required />
+      </label>
+      <div className="form-grid">
+        <label className="field">
+          Hito
+          <select value={milestone} onChange={(e) => setMilestone(e.target.value)}>
+            {project.milestones.map((item) => (
+              <option key={item.id} value={item.title}>
+                {item.title}
+              </option>
+            ))}
+            {!project.milestones.length && <option value="Ejecución">Ejecución</option>}
+          </select>
+        </label>
+        <label className="field">
+          Tiempo estimado · min
+          <input
+            type="number"
+            min="1"
+            value={minutes}
+            onChange={(e) => setMinutes(e.target.value)}
+          />
+        </label>
+      </div>
+      <label className="field">
+        Prioridad
+        <select
+          value={priority}
+          onChange={(e) => setPriority(e.target.value as Task["priority"])}
+        >
+          <option value="critical">Crítica</option>
+          <option value="high">Alta</option>
+          <option value="medium">Media</option>
+          <option value="low">Baja</option>
+        </select>
+      </label>
+      <div className="row between">
+        <Button type="submit">Guardar tarea</Button>
+        <Button
+          type="button"
+          variant="danger"
+          onClick={() => {
+            if (!deleting) {
+              setDeleting(true);
+              return;
+            }
+            n.run(
+              () => n.actions.deleteTask(project.id, task.id),
+              "Tarea eliminada.",
+            );
+            close();
+          }}
+        >
+          <Trash2 size={14} />
+          {deleting ? "Confirmar eliminación" : "Eliminar"}
+        </Button>
+      </div>
+    </form>
+  );
+}
+
 export function ProjectDetail({ id }: { id: string }) {
   const n = useNexus();
   const p = n.projects.find((p) => p.id === id);
   const [tab, setTab] = useState("overview");
   const [edit, setEdit] = useState(false);
   const [milestoneTitle, setMilestoneTitle] = useState("");
+  const [milestoneWeight, setMilestoneWeight] = useState("10");
+  const [editingMilestone, setEditingMilestone] = useState<Milestone | null>(null);
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
   if (!p)
     return (
       <Empty
@@ -245,7 +478,17 @@ export function ProjectDetail({ id }: { id: string }) {
                   </span>
                   <h3>{m.title}</h3>
                   <span className="accent">{m.progress}%</span>
-                  <small>Peso {m.weight}%</small>
+                  <small>
+                    Peso {m.weight}% · base {m.baselineProgress ?? m.progress}%
+                  </small>
+                  <button
+                    className="icon-button"
+                    aria-label={"Editar hito " + m.title}
+                    onClick={() => setEditingMilestone(m)}
+                    style={{ marginTop: 10 }}
+                  >
+                    <Pencil size={13} />
+                  </button>
                 </div>
               ))}
             </div>
@@ -254,23 +497,29 @@ export function ProjectDetail({ id }: { id: string }) {
                 Define los hitos que llevarán este proyecto a su entrega.
               </p>
             )}
+            <p className="form-note" style={{ marginTop: 16 }}>
+              Progreso automático = avance base del hito + proporción de tareas
+              completadas sobre el tramo pendiente. El proyecto pondera cada hito
+              según su peso.
+            </p>
             <form
               className="row wrap"
               style={{ marginTop: 22 }}
               onSubmit={(e) => {
                 e.preventDefault();
                 if (!milestoneTitle.trim()) return;
-                n.update((w) => {
-                  const pr = w.projects.find((x) => x.id === p.id)!;
-                  pr.milestones.push({
-                    ...entity(crypto.randomUUID(), "user", w.user.id),
-                    projectId: p.id,
-                    title: milestoneTitle.trim(),
-                    weight: 1,
-                    progress: 0,
-                  });
-                });
+                n.run(
+                  () =>
+                    n.actions.addMilestone(
+                      p.id,
+                      milestoneTitle,
+                      Number(milestoneWeight) || 0,
+                      0,
+                    ),
+                  "Hito añadido.",
+                );
                 setMilestoneTitle("");
+                setMilestoneWeight("10");
               }}
             >
               <input
@@ -279,6 +528,15 @@ export function ProjectDetail({ id }: { id: string }) {
                 placeholder="Añadir un hito…"
                 value={milestoneTitle}
                 onChange={(e) => setMilestoneTitle(e.target.value)}
+              />
+              <input
+                style={{ width: 110 }}
+                type="number"
+                min="0"
+                aria-label="Peso del nuevo hito"
+                value={milestoneWeight}
+                onChange={(e) => setMilestoneWeight(e.target.value)}
+                placeholder="Peso %"
               />
               <Button variant="secondary" type="submit">
                 <Plus size={15} />
@@ -401,14 +659,23 @@ export function ProjectDetail({ id }: { id: string }) {
                     ))}
                 </div>
               </div>
-              <button
-                className="icon-button"
-                aria-label={"Iniciar Flow: " + t.title}
-                disabled={t.completed || p.status !== "active"}
-                onClick={() => n.startFlow(p.id, t.id)}
-              >
-                <Play size={15} />
-              </button>
+              <div className="row">
+                <button
+                  className="icon-button"
+                  aria-label={"Editar " + t.title}
+                  onClick={() => setEditingTask(t)}
+                >
+                  <Pencil size={15} />
+                </button>
+                <button
+                  className="icon-button"
+                  aria-label={"Iniciar Flow: " + t.title}
+                  disabled={t.completed || p.status !== "active"}
+                  onClick={() => n.startFlow(p.id, t.id)}
+                >
+                  <Play size={15} />
+                </button>
+              </div>
             </div>
           ))}
           {!p.tasks.length && (
@@ -579,6 +846,34 @@ export function ProjectDetail({ id }: { id: string }) {
       )}
       <Modal open={edit} onClose={() => setEdit(false)} title="Editar proyecto">
         <ProjectEditor project={p} close={() => setEdit(false)} />
+      </Modal>
+      <Modal
+        open={!!editingMilestone}
+        onClose={() => setEditingMilestone(null)}
+        title="Editar hito"
+      >
+        {editingMilestone && (
+          <MilestoneEditor
+            key={editingMilestone.id}
+            project={p}
+            milestone={editingMilestone}
+            close={() => setEditingMilestone(null)}
+          />
+        )}
+      </Modal>
+      <Modal
+        open={!!editingTask}
+        onClose={() => setEditingTask(null)}
+        title="Editar tarea"
+      >
+        {editingTask && (
+          <TaskEditor
+            key={editingTask.id}
+            project={p}
+            task={editingTask}
+            close={() => setEditingTask(null)}
+          />
+        )}
       </Modal>
     </div>
   );
