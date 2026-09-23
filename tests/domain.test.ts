@@ -381,18 +381,18 @@ test("milestone baseline protects existing progress while tasks advance the rema
   const project = () =>
     store
       .getSnapshot()
-      .projects.find((item) => item.id === "pequenos-escritores")!;
+      .projects.find((item) => item.id === "tesis-civil")!;
   const milestone = () =>
-    project().milestones.find((item) => item.id === "p2")!;
+    project().milestones.find((item) => item.id === "t4")!;
 
-  assert.equal(milestone().baselineProgress, 72);
-  actions.toggleTask("pequenos-escritores", "pt1");
-  assert.equal(milestone().progress, 86);
-  actions.toggleTask("pequenos-escritores", "pt2");
+  assert.equal(milestone().baselineProgress, 55);
+  actions.toggleTask("tesis-civil", "tt1");
+  assert.equal(milestone().progress, 78);
+  actions.toggleTask("tesis-civil", "tt2");
   assert.equal(milestone().progress, 100);
-  actions.toggleTask("pequenos-escritores", "pt1");
-  assert.equal(milestone().progress, 86);
-  assert.ok(milestone().progress >= 72);
+  actions.toggleTask("tesis-civil", "tt1");
+  assert.equal(milestone().progress, 78);
+  assert.ok(milestone().progress >= 55);
 });
 
 test("financial movements can be edited and deleted without touching unrelated data", () => {
