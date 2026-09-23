@@ -10,7 +10,7 @@ export function entity(
   return { id, userId, createdAt: now, updatedAt: now, source };
 }
 export function seedWorkspace(): Workspace {
-  const date = "2026-09-22";
+  const date = "2026-09-23";
   const base = (id: string) =>
     entity(id, "demo", SYSTEM.localUserId, Date.UTC(2026, 8, 22, 12));
   return {
@@ -71,7 +71,7 @@ export function seedWorkspace(): Workspace {
         ...base("g-xarcon"),
         title: "Lanzar XARCON formalmente",
         targetDate: "2027-03-01",
-        projectIds: ["xarcon-creative"],
+        projectIds: ["xarcon-creative", "xarcon-realty", "xarcon-construcciones"],
         milestones: ["Portafolio", "Marca", "Estructura comercial"].map(
           (title, i) => ({
             ...base("gx-" + i),
@@ -97,7 +97,7 @@ export function seedWorkspace(): Workspace {
         ...base("g-nexus"),
         title: "Construir NEXUS OS",
         targetDate: "2026-12-31",
-        projectIds: [],
+        projectIds: ["nexus"],
         milestones: ["Execution Core", "Integraciones", "Inteligencia"].map(
           (title, i) => ({
             ...base("gn-" + i),

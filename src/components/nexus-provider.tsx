@@ -15,6 +15,7 @@ import {
   BrowserWorkspaceStorage,
   WorkspaceStore,
   reassignWorkspaceUser,
+  syncKnownPortfolio,
 } from "@/repositories/workspace";
 import { createRepositories } from "@/repositories/contracts";
 import { NexusActions } from "@/services/actions";
@@ -52,14 +53,15 @@ async function hydrateAuthenticatedStore(
   const remote = await firebaseClient.readWorkspace();
 
   if (remote) {
-    const normalized = reassignWorkspaceUser(remote, session.uid, {
-      displayName: session.displayName,
-      email: session.email,
-    });
+    const normalized = syncKnownPortfolio(
+      reassignWorkspaceUser(remote, session.uid, {
+        displayName: session.displayName,
+        email: session.email,
+      }),
+      session.uid,
+    );
     store.import(normalized);
-
-    if (remote.user?.id !== session.uid)
-      await firebaseClient.writeWorkspace(normalized);
+    await firebaseClient.writeWorkspace(normalized);
 
     return;
   }
@@ -67,10 +69,13 @@ async function hydrateAuthenticatedStore(
   const userLocal = new BrowserWorkspaceStorage().read(session.uid);
   const previousLocal = readLocalMigrationSource();
   const source = userLocal ?? previousLocal ?? store.getSnapshot();
-  const normalized = reassignWorkspaceUser(source, session.uid, {
-    displayName: session.displayName,
-    email: session.email,
-  });
+  const normalized = syncKnownPortfolio(
+    reassignWorkspaceUser(source, session.uid, {
+      displayName: session.displayName,
+      email: session.email,
+    }),
+    session.uid,
+  );
 
   store.import(normalized);
   await firebaseClient.writeWorkspace(normalized);

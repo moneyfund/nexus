@@ -1,6 +1,7 @@
 import type { Workspace, Project, InboxItem } from "@/domain/models";
 import { entity, seedWorkspace } from "@/domain/seed";
 import { SYSTEM } from "@/config/system";
+import { initialProjects, PORTFOLIO_VERSION } from "@/lib/mock-data";
 
 export interface WorkspaceStorage {
   read(userId: string): Workspace | null;
@@ -296,6 +297,78 @@ export function reassignWorkspaceUser(
       .join("")
       .toUpperCase(),
   };
+
+  validateWorkspace(next, userId);
+  return next;
+}
+
+
+export function syncKnownPortfolio(data: Workspace, userId: string): Workspace {
+  const next = structuredClone(data);
+  const now = Date.now();
+
+  const ownTask = <T extends { userId: string; updatedAt: number }>(record: T) => ({
+    ...record,
+    userId,
+    updatedAt: now,
+  });
+
+  for (const seed of initialProjects) {
+    const canonical: Project = {
+      ...structuredClone(seed),
+      userId,
+      updatedAt: now,
+      metadata: {
+        ...seed.metadata,
+        portfolioVersion: PORTFOLIO_VERSION,
+      },
+      tasks: seed.tasks.map(ownTask),
+      milestones: seed.milestones.map(ownTask),
+    };
+
+    const index = next.projects.findIndex((project) => project.id === seed.id);
+    if (index === -1) {
+      next.projects.push(canonical);
+      continue;
+    }
+
+    const existing = next.projects[index];
+    if (existing.metadata?.portfolioVersion === PORTFOLIO_VERSION) continue;
+
+    const canonicalTaskIds = new Set(canonical.tasks.map((task) => task.id));
+    const canonicalMilestoneIds = new Set(
+      canonical.milestones.map((milestone) => milestone.id),
+    );
+
+    next.projects[index] = {
+      ...existing,
+      ...canonical,
+      createdAt: existing.createdAt,
+      source: existing.source,
+      value: existing.value ?? canonical.value,
+      paid: existing.paid ?? canonical.paid,
+      notes: existing.notes ?? canonical.notes,
+      contactIds: existing.contactIds ?? canonical.contactIds,
+      dependsOn: existing.dependsOn ?? canonical.dependsOn,
+      metadata: {
+        ...existing.metadata,
+        ...canonical.metadata,
+        portfolioVersion: PORTFOLIO_VERSION,
+      },
+      tasks: [
+        ...canonical.tasks,
+        ...existing.tasks
+          .filter((task) => !canonicalTaskIds.has(task.id))
+          .map(ownTask),
+      ],
+      milestones: [
+        ...canonical.milestones,
+        ...existing.milestones
+          .filter((milestone) => !canonicalMilestoneIds.has(milestone.id))
+          .map(ownTask),
+      ],
+    };
+  }
 
   validateWorkspace(next, userId);
   return next;
