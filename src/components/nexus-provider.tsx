@@ -4,7 +4,6 @@ import {
   useContext,
   useEffect,
   useMemo,
-  useRef,
   useState,
   useSyncExternalStore,
   type ReactNode,
@@ -13,24 +12,122 @@ import { MotionConfig, useReducedMotion } from "motion/react";
 import {
   BrowserWorkspaceStorage,
   WorkspaceStore,
+  reassignWorkspaceUser,
 } from "@/repositories/workspace";
 import { createRepositories } from "@/repositories/contracts";
 import { NexusActions } from "@/services/actions";
 import {
   MockAIProvider,
   MockCalendarProvider,
+  MockStorageProvider,
   NexusContextBuilder,
   LocalNotificationService,
 } from "@/services/providers";
-import { RestFirebaseStorageProvider } from "@/services/firebase-storage";
-import { firebaseClient, type FirebaseSession } from "@/lib/firebase";
+import {
+  FirebaseFileStorageService,
+  loadWorkspaceFromCloud,
+  observeFirebaseAuth,
+  queueWorkspaceCloudSave,
+  signInWithGoogle,
+  signOutFirebase,
+  type FirebaseUserProfile,
+} from "@/lib/firebase-client";
 import { interfaceSound } from "@/services/sound";
+import { SYSTEM } from "@/config/system";
 import type { CaptureType, FlowSession, Workspace } from "@/domain/models";
 
+type CloudStatus = "local" | "loading" | "syncing" | "synced" | "error";
+
+function useFirebaseSession() {
+  const [user, setUser] = useState<FirebaseUserProfile | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let disposed = false;
+    let unsubscribe: (() => void) | undefined;
+
+    observeFirebaseAuth(
+      (next) => {
+        if (disposed) return;
+        setUser(next);
+        setError("");
+        setLoading(false);
+      },
+      (message) => {
+        if (disposed) return;
+        setError(message);
+        setLoading(false);
+      },
+    )
+      .then((off) => {
+        if (disposed) off();
+        else unsubscribe = off;
+      })
+      .catch((cause: unknown) => {
+        if (disposed) return;
+        setError(
+          cause instanceof Error
+            ? cause.message
+            : "No se pudo inicializar Firebase Auth.",
+        );
+        setLoading(false);
+      });
+
+    return () => {
+      disposed = true;
+      unsubscribe?.();
+    };
+  }, []);
+
+  return {
+    user,
+    loading,
+    error,
+    signIn: signInWithGoogle,
+    signOut: signOutFirebase,
+  };
+}
+
+async function hydrateAuthenticatedWorkspace(
+  store: WorkspaceStore,
+  user: FirebaseUserProfile,
+) {
+  const cloud = await loadWorkspaceFromCloud(user.uid);
+  if (cloud) {
+    store.import(
+      reassignWorkspaceUser(cloud, user.uid, {
+        displayName: user.displayName,
+        email: user.email,
+      }),
+    );
+    return "cloud" as const;
+  }
+
+  const browser = new BrowserWorkspaceStorage();
+  const existing = browser.read(user.uid);
+  const local = existing ?? browser.read(SYSTEM.localUserId);
+  const migrated = reassignWorkspaceUser(
+    local ?? store.getSnapshot(),
+    user.uid,
+    {
+      displayName: user.displayName,
+      email: user.email,
+    },
+  );
+  store.import(migrated);
+  await queueWorkspaceCloudSave(user.uid, migrated);
+  return existing ? ("device" as const) : ("migrated" as const);
+}
+
 function useSystem() {
-  const [store] = useState(
+  const auth = useFirebaseSession();
+  const [store, setStore] = useState(
     () => new WorkspaceStore(new BrowserWorkspaceStorage()),
   );
+  const [cloudStatus, setCloudStatus] = useState<CloudStatus>("local");
+  const [cloudError, setCloudError] = useState("");
+
   useSyncExternalStore(store.subscribe, store.getRevision, () => 0);
   const data = store.getSnapshot();
   const actions = useMemo(() => new NexusActions(store), [store]);
@@ -40,17 +137,13 @@ function useSystem() {
       ai: new MockAIProvider(),
       context: new NexusContextBuilder(),
       calendar: new MockCalendarProvider(repositories.calendar),
-      storage: new RestFirebaseStorageProvider(),
+      storage: auth.user
+        ? new FirebaseFileStorageService()
+        : new MockStorageProvider(),
       notifications: new LocalNotificationService(repositories.notifications),
     }),
-    [repositories],
+    [repositories, auth.user],
   );
-
-  const [session, setSession] = useState<FirebaseSession | null>(null);
-  const [authReady, setAuthReady] = useState(false);
-  const [cloudReady, setCloudReady] = useState(false);
-  const [cloudError, setCloudError] = useState("");
-  const syncTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [captureOpen, setCaptureOpen] = useState(false);
   const [captureType, setCaptureType] = useState<CaptureType>("idea");
@@ -67,57 +160,68 @@ function useSystem() {
   const osReduced = useReducedMotion();
   const reduceMotion = !!osReduced || data.user.preferences.motion !== "full";
 
-  const hydrateCloud = async () => {
-    setCloudReady(false);
-    setCloudError("");
-    const remote = await firebaseClient.readWorkspace();
-    if (remote) store.import(remote);
-    else await firebaseClient.writeWorkspace(store.getSnapshot());
-    setCloudReady(true);
-  };
-
   useEffect(() => {
     store.load();
-    let active = true;
-    firebaseClient
-      .getSession()
-      .then(async (saved) => {
-        if (!active) return;
-        setSession(saved);
-        if (saved) await hydrateCloud();
-      })
-      .catch((error) => {
-        if (active)
-          setCloudError(
-            error instanceof Error
-              ? error.message
-              : "No se pudo conectar con Firebase.",
-          );
-      })
-      .finally(() => {
-        if (active) setAuthReady(true);
-      });
-    return () => {
-      active = false;
-    };
   }, [store]);
 
   useEffect(() => {
-    if (!session || !cloudReady || !store.ready) return;
-    if (syncTimer.current) clearTimeout(syncTimer.current);
-    syncTimer.current = setTimeout(() => {
-      firebaseClient.writeWorkspace(store.getSnapshot()).catch((error) => {
+    if (auth.loading) return;
+
+    let cancelled = false;
+    const userId = auth.user?.uid ?? SYSTEM.localUserId;
+    const storage = new BrowserWorkspaceStorage();
+    const nextStore = new WorkspaceStore(storage, userId);
+    nextStore.load();
+    setStore(nextStore);
+
+    if (!auth.user) {
+      setCloudStatus("local");
+      setCloudError("");
+      return;
+    }
+
+    const user = auth.user;
+    setCloudStatus("loading");
+    setCloudError("");
+
+    void hydrateAuthenticatedWorkspace(nextStore, user)
+      .then(() => {
+        if (cancelled) return;
+        storage.setOnWrite((uid, workspace) => {
+          if (uid !== user.uid) return;
+          setCloudStatus("syncing");
+          setCloudError("");
+          void queueWorkspaceCloudSave(uid, workspace)
+            .then(() => {
+              if (!cancelled) setCloudStatus("synced");
+            })
+            .catch((cause: unknown) => {
+              if (cancelled) return;
+              setCloudStatus("error");
+              setCloudError(
+                cause instanceof Error
+                  ? cause.message
+                  : "No se pudo sincronizar con Firestore.",
+              );
+            });
+        });
+        setCloudStatus("synced");
+      })
+      .catch((cause: unknown) => {
+        if (cancelled) return;
+        setCloudStatus("error");
         setCloudError(
-          error instanceof Error
-            ? error.message
-            : "No se pudo sincronizar con Firebase.",
+          cause instanceof Error
+            ? cause.message
+            : "No se pudo cargar el espacio desde Firestore.",
         );
       });
-    }, 550);
+
     return () => {
-      if (syncTimer.current) clearTimeout(syncTimer.current);
+      cancelled = true;
+      storage.setOnWrite(undefined);
     };
-  }, [data, session, cloudReady, store]);
+  }, [auth.loading, auth.user?.uid]);
 
   useEffect(() => {
     document.documentElement.dataset.motion = reduceMotion ? "reduced" : "full";
@@ -147,27 +251,6 @@ function useSystem() {
     }
   };
 
-  const signIn = async (email: string, password: string) => {
-    const next = await firebaseClient.signIn(email, password);
-    setSession(next);
-    await hydrateCloud();
-    notify("NEXUS conectado a Firebase.");
-  };
-
-  const signUp = async (email: string, password: string) => {
-    const next = await firebaseClient.signUp(email, password);
-    setSession(next);
-    await hydrateCloud();
-    notify("Cuenta creada y NEXUS sincronizado.");
-  };
-
-  const signOut = () => {
-    firebaseClient.signOut();
-    setSession(null);
-    setCloudReady(false);
-    notify("Sesión cerrada.");
-  };
-
   const openCapture = (type: CaptureType = "idea", projectId = "") => {
     setCaptureType(type);
     setCaptureProject(projectId);
@@ -187,6 +270,34 @@ function useSystem() {
       interfaceSound(data.user.preferences.sounds, "complete");
     });
 
+  const connectGoogle = async () => {
+    try {
+      await auth.signIn();
+      notify("Sesión de Google conectada.");
+    } catch (cause) {
+      notify(
+        cause instanceof Error
+          ? cause.message
+          : "No se pudo iniciar sesión con Google.",
+        true,
+      );
+    }
+  };
+
+  const disconnectGoogle = async () => {
+    try {
+      await auth.signOut();
+      notify("Sesión cerrada. NEXUS volvió al espacio local.");
+    } catch (cause) {
+      notify(
+        cause instanceof Error
+          ? cause.message
+          : "No se pudo cerrar la sesión.",
+        true,
+      );
+    }
+  };
+
   return {
     data,
     store,
@@ -194,17 +305,11 @@ function useSystem() {
     services,
     actions,
     ready: store.ready,
-    storageError: store.error || cloudError,
+    storageError: store.error,
     reduceMotion,
     projects: data.projects,
     inbox: data.inbox,
     activeFlow: data.activeFlow,
-    session,
-    authReady,
-    cloudReady,
-    signIn,
-    signUp,
-    signOut,
     captureOpen,
     setCaptureOpen,
     captureType,
@@ -224,6 +329,13 @@ function useSystem() {
     run,
     startFlow,
     endFlow,
+    authUser: auth.user,
+    authLoading: auth.loading,
+    authError: auth.error,
+    cloudStatus,
+    cloudError,
+    connectGoogle,
+    disconnectGoogle,
     toggleTask: (projectId: string, taskId: string) =>
       run(() => actions.toggleTask(projectId, taskId)),
     capture: (type: CaptureType, content: string) =>
