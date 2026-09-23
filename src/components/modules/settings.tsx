@@ -128,10 +128,27 @@ export function SettingsView() {
                 </label>
                 <Button type="submit">Guardar perfil</Button>
               </form>
-              <p className="form-note">
-                Perfil local. El correo no inicia una sesión. Google Login se
-                habilitará al conectar Firebase Auth.
-              </p>
+              <div className="surface">
+                <Label>FIREBASE AUTH</Label>
+                <p style={{ marginTop: 12 }}>
+                  {n.firebaseUser
+                    ? `Sesión activa · ${n.firebaseUser.email ?? "Cuenta Google"}`
+                    : n.authReady
+                      ? "Sin sesión. Conecta tu cuenta Google para sincronizar entre dispositivos."
+                      : "Comprobando sesión…"}
+                </p>
+                <Button
+                  variant={n.firebaseUser ? "secondary" : "primary"}
+                  disabled={!n.authReady || n.cloudStatus === "syncing"}
+                  onClick={() =>
+                    void (n.firebaseUser
+                      ? n.disconnectFirebase()
+                      : n.connectFirebase())
+                  }
+                >
+                  {n.firebaseUser ? "Cerrar sesión" : "Conectar con Google"}
+                </Button>
+              </div>
             </>
           )}
           {section === "appearance" && (
@@ -256,12 +273,48 @@ export function SettingsView() {
           )}
           {section === "integrations" && (
             <>
-              <h2>Listo para conectar.</h2>
+              <h2>Conexiones de NEXUS.</h2>
               <p>
-                Los proveedores actuales son locales o simulados. No hay
-                credenciales ni llamadas a estas APIs.
+                Firebase ya funciona como identidad, sincronización de datos,
+                almacenamiento de archivos y analítica web.
               </p>
-              {INTEGRATIONS.map((name) => (
+              <div className="integration-row">
+                <span>
+                  <PlugZap size={18} />
+                  Firebase
+                </span>
+                <Badge>
+                  {n.firebaseUser
+                    ? n.cloudStatus === "synced"
+                      ? "CONNECTED"
+                      : n.cloudStatus.toUpperCase()
+                    : "READY"}
+                </Badge>
+              </div>
+              <div className="surface">
+                <Label>AUTH / FIRESTORE / STORAGE / ANALYTICS</Label>
+                <p style={{ marginTop: 12 }}>
+                  {n.firebaseUser
+                    ? `${n.firebaseUser.email ?? "Cuenta Google"} · ${n.cloudStatus === "synced" ? "datos sincronizados" : n.cloudStatus}`
+                    : "Inicia sesión con Google para activar Firestore y Storage en tu espacio."}
+                </p>
+                {n.cloudError && <p className="accent">{n.cloudError}</p>}
+                <p className="small muted">
+                  Analytics: {n.analyticsConnected ? "activo" : "no disponible en este navegador"}.
+                </p>
+                <Button
+                  variant={n.firebaseUser ? "secondary" : "primary"}
+                  disabled={!n.authReady || n.cloudStatus === "syncing"}
+                  onClick={() =>
+                    void (n.firebaseUser
+                      ? n.disconnectFirebase()
+                      : n.connectFirebase())
+                  }
+                >
+                  {n.firebaseUser ? "Desconectar Firebase" : "Conectar Google"}
+                </Button>
+              </div>
+              {INTEGRATIONS.filter((name) => name !== "Firebase").map((name) => (
                 <div className="integration-row" key={name}>
                   <span>
                     <PlugZap size={18} />
@@ -314,8 +367,9 @@ export function SettingsView() {
             <>
               <h2>Tu información sigue siendo tuya.</h2>
               <p>
-                Los cambios viven en este navegador. Exporta una copia antes de
-                cambiar de equipo o limpiar los datos del sitio.
+                {n.firebaseUser
+                  ? "Tus cambios se guardan en este navegador y se sincronizan con Firestore. El respaldo JSON sigue disponible como copia portátil."
+                  : "Los cambios viven en este navegador. Conecta Firebase para sincronizarlos entre dispositivos."}
               </p>
               <div className="row wrap">
                 <Button onClick={exportData}>
@@ -386,33 +440,32 @@ export function SettingsView() {
                 </span>
               </div>
               <p className="form-note">
-                La migración conserva la clave original de la versión anterior.
-                Los archivos adjuntos solo guardan metadatos. No incluyen sus
-                bytes en el respaldo.
+                La migración conserva la clave local original. Los archivos
+                almacenados en Firebase Storage no incluyen sus bytes dentro del
+                respaldo JSON; el respaldo conserva sus referencias.
               </p>
             </>
           )}
           {section === "privacy" && (
             <>
-              <h2>Un espacio local.</h2>
+              <h2>Tu espacio, aislado por cuenta.</h2>
               <p>
-                NEXUS todavía no sincroniza datos con Firebase, Google u OpenAI.
-                El perfil local organiza tus datos, pero no constituye
-                autenticación ni una barrera de seguridad frente a otra persona
-                que use este navegador.
+                Con Firebase conectado, cada espacio se guarda bajo el UID de
+                la cuenta autenticada. Las reglas incluidas en el repositorio
+                exigen que el UID autenticado coincida con el propietario de
+                los datos y archivos.
               </p>
               <div className="surface">
-                <Label>PRÓXIMA CONEXIÓN</Label>
+                <Label>LOCAL-FIRST</Label>
                 <p>
-                  La activación multiusuario requerirá Firebase Auth, reglas de
-                  acceso por usuario y verificación de propietarios antes de
-                  sincronizar.
+                  NEXUS conserva una copia local para respuesta inmediata y
+                  sincroniza con Firestore cuando hay sesión. Al cerrar sesión,
+                  vuelve al espacio local de este navegador.
                 </p>
               </div>
               <p>
-                La caché offline solo conserva la pantalla de conexión y los
-                iconos. No almacena conversaciones ni documentos en el service
-                worker.
+                La caché offline del service worker sigue limitada a la pantalla
+                de conexión y los iconos; no guarda documentos ni conversaciones.
               </p>
             </>
           )}
@@ -421,15 +474,33 @@ export function SettingsView() {
               <h2>System diagnostics.</h2>
               {[
                 ["NEXUS", SYSTEM.version],
-                ["Data adapter", "BrowserWorkspaceStorage"],
+                [
+                  "Data adapter",
+                  n.firebaseUser
+                    ? "BrowserWorkspaceStorage + Firestore"
+                    : "BrowserWorkspaceStorage",
+                ],
                 ["User ID", n.data.user.id],
-                ["Auth session", "Local · no autenticada"],
+                [
+                  "Auth session",
+                  n.firebaseUser
+                    ? `Firebase · ${n.firebaseUser.email ?? "Google"}`
+                    : "Local · no autenticada",
+                ],
                 ["Calendar", "MockCalendarProvider"],
                 ["AI", "MockAIProvider"],
-                ["Storage", "MockStorageProvider"],
+                [
+                  "Storage",
+                  n.firebaseUser ? "FirebaseStorageAdapter" : "MockStorageProvider",
+                ],
                 [
                   "Persistence",
-                  n.storageError || (n.ready ? "Ready" : "Loading"),
+                  n.storageError ||
+                    (n.firebaseUser
+                      ? `Firestore · ${n.cloudStatus}`
+                      : n.ready
+                        ? "Local · Ready"
+                        : "Loading"),
                 ],
               ].map(([key, value]) => (
                 <div className="integration-row" key={key}>
@@ -438,8 +509,9 @@ export function SettingsView() {
                 </div>
               ))}
               <p className="form-note">
-                Contratos, migración e integraciones documentados en el
-                repositorio. Nunca pegues claves API en estos ajustes.
+                Firebase usa la configuración pública de la Web App. Las reglas
+                de Firestore y Storage son la barrera de autorización. Los
+                secretos de servidor nunca deben exponerse en estos ajustes.
               </p>
             </>
           )}
