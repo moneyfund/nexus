@@ -2,7 +2,7 @@ name: NEXUS GitHub Pages Fallback
 
 on:
   push:
-    branches: [main]
+    branches: [main, "feat/github-pages-fallback"]
   workflow_dispatch:
 
 permissions:
