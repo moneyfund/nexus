@@ -179,7 +179,7 @@ export class NexusActions {
             ...base,
             title: content,
             content:
-              "Referencia local: el contenido del archivo no se ha subido.",
+              "Preparando archivo para Firebase Storage.",
             type: input.file.type === "application/pdf" ? "pdf" : "document",
             category: input.category ?? "Personal",
             tags: [],
