@@ -82,7 +82,9 @@ function createLocalStore() {
 }
 
 function useSystem() {
-  const [store, setStore] = useState(createLocalStore);
+  const [store, setStore] = useState(
+    () => new WorkspaceStore(new BrowserWorkspaceStorage()),
+  );
   useSyncExternalStore(store.subscribe, store.getRevision, () => 0);
 
   const data = store.getSnapshot();
@@ -143,6 +145,7 @@ function useSystem() {
 
   useEffect(() => {
     let active = true;
+    store.load();
 
     void firebaseClient
       .getSession()
@@ -165,7 +168,7 @@ function useSystem() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [store]);
 
   useEffect(() => {
     if (!session || !cloudReady || !store.ready) return;
