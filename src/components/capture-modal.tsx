@@ -16,6 +16,7 @@ import type { CaptureType } from "@/domain/models";
 import { CATEGORIES } from "@/config/system";
 import { Button, Modal } from "./ui/primitives";
 import { interfaceSound } from "@/services/sound";
+
 const options = [
   { type: "idea", label: "Idea", icon: Lightbulb },
   { type: "task", label: "Tarea", icon: ListTodo },
@@ -27,6 +28,7 @@ const options = [
   { type: "file", label: "Archivo", icon: Paperclip },
   { type: "link", label: "Enlace", icon: Link2 },
 ] as const;
+
 function CaptureForm() {
   const n = useNexus();
   const [type, setType] = useState<CaptureType>(n.captureType);
@@ -37,8 +39,21 @@ function CaptureForm() {
   const [url, setUrl] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [error, setError] = useState("");
-  function submit() {
+  const [saving, setSaving] = useState(false);
+
+  async function submit() {
+    if (saving) return;
+    setSaving(true);
+    setError("");
     try {
+      if (type === "file" && file && file.size > 25 * 1024 * 1024)
+        throw new Error("El archivo supera el límite de 25 MB.");
+
+      const uploaded =
+        type === "file" && file && n.authUser
+          ? await n.services.storage.upload(n.data.user.id, file)
+          : null;
+
       n.actions.capture({
         type,
         content,
@@ -47,30 +62,42 @@ function CaptureForm() {
         amount: Number(amount),
         url,
         file: file
-          ? { name: file.name, type: file.type, size: file.size }
+          ? {
+              name: file.name,
+              type: file.type,
+              size: file.size,
+              provider: uploaded?.provider,
+              externalId: uploaded?.externalId,
+            }
           : undefined,
       });
+
       interfaceSound(n.data.user.preferences.sounds, "capture");
       n.setCaptureOpen(false);
       n.notify(
         type === "idea"
           ? "Una nueva idea se incorporó a tu universo."
-          : "Captura guardada.",
+          : type === "file" && uploaded
+            ? "Archivo guardado en Firebase Storage."
+            : "Captura guardada.",
       );
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo guardar.");
+    } finally {
+      setSaving(false);
     }
   }
+
   return (
     <form
       onSubmit={(e) => {
         e.preventDefault();
-        submit();
+        void submit();
       }}
       onKeyDown={(e) => {
         if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
           e.preventDefault();
-          submit();
+          void submit();
         }
       }}
     >
@@ -166,16 +193,16 @@ function CaptureForm() {
                 type="file"
                 required
                 onChange={(e) => {
-                  const f = e.target.files?.[0] ?? null;
-                  setFile(f);
-                  if (f && !content) setContent(f.name);
+                  const selected = e.target.files?.[0] ?? null;
+                  setFile(selected);
+                  if (selected && !content) setContent(selected.name);
                 }}
               />
             </label>
             <p className="form-note">
-              Por ahora se registra el nombre y los metadatos. El archivo no se
-              sube ni queda disponible para descargar; Storage está pendiente de
-              conexión.
+              {n.authUser
+                ? "Se subirá a Firebase Storage y quedará vinculado a tu espacio. Máximo 25 MB."
+                : "Sin sesión de Google solo se guardarán el nombre y los metadatos. Conecta Firebase en System → Profile para subir el archivo real."}
             </p>
           </>
         )}
@@ -189,16 +216,19 @@ function CaptureForm() {
         <span className="form-note">
           Ctrl / ⌘ + Enter
           <br />
-          Guardado en este navegador
+          {n.authUser ? "Local-first + Firestore" : "Guardado en este navegador"}
         </span>
-        <Button type="submit" disabled={!content.trim()}>
-          Capturar {type === "idea" ? "idea" : ""}
+        <Button type="submit" disabled={!content.trim() || saving}>
+          {saving
+            ? "Guardando…"
+            : "Capturar " + (type === "idea" ? "idea" : "")}
           <ArrowUpRight size={16} />
         </Button>
       </div>
     </form>
   );
 }
+
 export function CaptureModal() {
   const n = useNexus();
   return (
