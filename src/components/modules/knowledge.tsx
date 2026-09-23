@@ -40,6 +40,7 @@ function KnowledgeEditor({
   const n = useNexus();
   const [draft, setDraft] = useState(item);
   const [deleting, setDeleting] = useState(false);
+  const [openingFile, setOpeningFile] = useState(false);
   const attachment = n.data.attachments.find((a) => a.id === item.attachmentId);
   return (
     <div className="stack">
@@ -128,9 +129,39 @@ function KnowledgeEditor({
             {(attachment.size / 1024).toFixed(1)} KB ·{" "}
             {attachment.mimeType || "Archivo"}
             <br />
-            Solo metadatos. El archivo no está almacenado; Drive y Firebase
-            Storage no están conectados.
+            {attachment.provider === "firebase"
+              ? "Almacenado en Firebase Storage."
+              : "Solo metadatos guardados en este navegador."}
           </p>
+          {attachment.provider === "firebase" && (
+            <Button
+              variant="secondary"
+              disabled={openingFile}
+              onClick={async () => {
+                setOpeningFile(true);
+                try {
+                  const url = await n.services.storage.getUrl(
+                    n.data.user.id,
+                    attachment,
+                  );
+                  if (!url) throw new Error("No se pudo obtener el archivo.");
+                  window.open(url, "_blank", "noopener,noreferrer");
+                } catch (error) {
+                  n.notify(
+                    error instanceof Error
+                      ? error.message
+                      : "No se pudo abrir el archivo.",
+                    true,
+                  );
+                } finally {
+                  setOpeningFile(false);
+                }
+              }}
+            >
+              <ArrowUpRight size={15} />
+              {openingFile ? "Abriendo…" : "Abrir archivo"}
+            </Button>
+          )}
         </div>
       )}
       <div className="row between">
@@ -155,9 +186,21 @@ function KnowledgeEditor({
         </Button>
         <Button
           variant="danger"
-          onClick={() => {
-            if (!deleting) setDeleting(true);
-            else {
+          onClick={async () => {
+            if (!deleting) {
+              setDeleting(true);
+              return;
+            }
+            try {
+              if (
+                attachment?.provider === "firebase" &&
+                attachment.externalId
+              ) {
+                await n.services.storage.remove(
+                  n.data.user.id,
+                  attachment.externalId,
+                );
+              }
               const deleted = n.update((w) => {
                 w.knowledge = w.knowledge.filter((k) => k.id !== item.id);
                 w.inbox = w.inbox.filter((i) => i.targetId !== item.id);
@@ -166,6 +209,13 @@ function KnowledgeEditor({
                 );
               });
               if (deleted) close();
+            } catch (error) {
+              n.notify(
+                error instanceof Error
+                  ? error.message
+                  : "No se pudo eliminar el archivo.",
+                true,
+              );
             }
           }}
         >
