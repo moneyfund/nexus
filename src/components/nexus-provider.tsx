@@ -21,12 +21,19 @@ import { createRepositories } from "@/repositories/contracts";
 import { NexusActions } from "@/services/actions";
 import {
   MockAIProvider,
-  MockCalendarProvider,
+  GoogleCalendarProvider,
   NexusContextBuilder,
   LocalNotificationService,
 } from "@/services/providers";
 import { RestFirebaseStorageProvider } from "@/services/firebase-storage";
 import { firebaseClient, type FirebaseSession } from "@/lib/firebase";
+import {
+  clearGoogleWorkspaceGrant,
+  readGoogleWorkspaceGrant,
+  saveGoogleWorkspaceGrant,
+  googleWorkspaceClient,
+  type GoogleWorkspaceGrant,
+} from "@/lib/google-workspace";
 import { interfaceSound } from "@/services/sound";
 import { SYSTEM } from "@/config/system";
 import type { CaptureType, FlowSession, Workspace } from "@/domain/models";
@@ -96,15 +103,22 @@ function useSystem() {
   const data = store.getSnapshot();
   const actions = useMemo(() => new NexusActions(store), [store]);
   const repositories = useMemo(() => createRepositories(store), [store]);
+  const [googleGrant, setGoogleGrant] = useState<GoogleWorkspaceGrant | null>(
+    null,
+  );
   const services = useMemo(
     () => ({
       ai: new MockAIProvider(),
       context: new NexusContextBuilder(),
-      calendar: new MockCalendarProvider(repositories.calendar),
+      calendar: new GoogleCalendarProvider(
+        repositories.calendar,
+        () => googleGrant?.accessToken ?? null,
+      ),
+      google: googleWorkspaceClient,
       storage: new RestFirebaseStorageProvider(),
       notifications: new LocalNotificationService(repositories.notifications),
     }),
-    [repositories],
+    [repositories, googleGrant?.accessToken],
   );
 
   const [session, setSession] = useState<FirebaseSession | null>(null);
@@ -147,6 +161,10 @@ function useSystem() {
       );
       throw error;
     }
+  }, []);
+
+  useEffect(() => {
+    setGoogleGrant(readGoogleWorkspaceGrant());
   }, []);
 
   useEffect(() => {
@@ -250,9 +268,25 @@ function useSystem() {
     notify("Cuenta creada y NEXUS sincronizado.");
   };
 
+  const connectGoogleWorkspace = async () => {
+    const grant = await firebaseClient.connectGoogleWorkspace();
+    saveGoogleWorkspaceGrant(grant);
+    setGoogleGrant(grant);
+    notify("Google Calendar y Drive conectados.");
+    return grant;
+  };
+
+  const disconnectGoogleWorkspace = () => {
+    clearGoogleWorkspaceGrant();
+    setGoogleGrant(null);
+    notify("Google Workspace desconectado de esta sesión.");
+  };
+
   const signOut = async () => {
     if (syncTimer.current) clearTimeout(syncTimer.current);
     await firebaseClient.signOut();
+    clearGoogleWorkspaceGrant();
+    setGoogleGrant(null);
     setSession(null);
     setCloudReady(false);
     setCloudError("");
@@ -295,6 +329,13 @@ function useSystem() {
     session,
     authReady,
     cloudReady,
+    googleWorkspace: {
+      connected: !!googleGrant,
+      expiresAt: googleGrant?.expiresAt,
+      scopes: googleGrant?.scopes ?? [],
+      connect: connectGoogleWorkspace,
+      disconnect: disconnectGoogleWorkspace,
+    },
     signInWithGoogle,
     signIn,
     signUp,
