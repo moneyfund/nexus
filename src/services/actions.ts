@@ -172,14 +172,17 @@ export class NexusActions {
             name: input.file.name,
             mimeType: input.file.type,
             size: input.file.size,
-            provider: "mock",
+            provider: input.file.provider ?? "mock",
+            externalId: input.file.externalId,
             projectId: input.projectId,
           });
           w.knowledge.unshift({
             ...base,
             title: content,
             content:
-              "Referencia local: el contenido del archivo no se ha subido.",
+              input.file.provider === "firebase"
+                ? "Archivo almacenado en Firebase Storage."
+                : "Referencia local: el contenido del archivo no se ha subido.",
             type: input.file.type === "application/pdf" ? "pdf" : "document",
             category: input.category ?? "Personal",
             tags: [],
