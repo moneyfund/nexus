@@ -37,9 +37,25 @@ function CaptureForm() {
   const [url, setUrl] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [error, setError] = useState("");
-  function submit() {
+  const [saving, setSaving] = useState(false);
+
+  async function submit() {
+    if (saving) return;
+    setSaving(true);
+    setError("");
+    let uploadedExternalId = "";
+
     try {
-      n.actions.capture({
+      let uploaded:
+        | Awaited<ReturnType<typeof n.services.storage.upload>>
+        | undefined;
+
+      if (type === "file" && file && n.firebaseUser) {
+        uploaded = await n.services.storage.upload(n.data.user.id, file);
+        uploadedExternalId = uploaded.externalId ?? "";
+      }
+
+      const targetId = n.actions.capture({
         type,
         content,
         projectId: projectId || undefined,
@@ -50,15 +66,45 @@ function CaptureForm() {
           ? { name: file.name, type: file.type, size: file.size }
           : undefined,
       });
+
+      if (uploaded && targetId) {
+        n.update((w) => {
+          const attachment = w.attachments.find((a) => a.id === targetId);
+          if (attachment) {
+            attachment.provider = "firebase";
+            attachment.externalId = uploaded.externalId;
+            attachment.mimeType = uploaded.mimeType;
+            attachment.size = uploaded.size;
+            attachment.updatedAt = Date.now();
+          }
+          const knowledge = w.knowledge.find(
+            (k) => k.attachmentId === targetId,
+          );
+          if (knowledge) {
+            knowledge.content = "Archivo almacenado en Firebase Storage.";
+            knowledge.updatedAt = Date.now();
+          }
+        });
+      }
+
       interfaceSound(n.data.user.preferences.sounds, "capture");
       n.setCaptureOpen(false);
       n.notify(
         type === "idea"
           ? "Una nueva idea se incorporó a tu universo."
-          : "Captura guardada.",
+          : type === "file" && uploaded
+            ? "Archivo guardado en Firebase Storage."
+            : "Captura guardada.",
       );
     } catch (e) {
+      if (uploadedExternalId) {
+        await n.services.storage
+          .remove(n.data.user.id, uploadedExternalId)
+          .catch(() => undefined);
+      }
       setError(e instanceof Error ? e.message : "No se pudo guardar.");
+    } finally {
+      setSaving(false);
     }
   }
   return (
@@ -70,7 +116,7 @@ function CaptureForm() {
       onKeyDown={(e) => {
         if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
           e.preventDefault();
-          submit();
+          void submit();
         }
       }}
     >
@@ -173,9 +219,9 @@ function CaptureForm() {
               />
             </label>
             <p className="form-note">
-              Por ahora se registra el nombre y los metadatos. El archivo no se
-              sube ni queda disponible para descargar; Storage está pendiente de
-              conexión.
+              {n.firebaseUser
+                ? "El archivo se subirá a Firebase Storage y sus metadatos se sincronizarán con tu espacio."
+                : "Sin sesión de Google se guardarán solo los metadatos. Conecta Firebase en System → Integrations para almacenar el archivo real."}
             </p>
           </>
         )}
@@ -189,10 +235,10 @@ function CaptureForm() {
         <span className="form-note">
           Ctrl / ⌘ + Enter
           <br />
-          Guardado en este navegador
+{n.firebaseUser ? "Sincronizado con Firebase" : "Guardado en este navegador"}
         </span>
-        <Button type="submit" disabled={!content.trim()}>
-          Capturar {type === "idea" ? "idea" : ""}
+        <Button type="submit" disabled={!content.trim() || saving}>
+          {saving ? "Guardando…" : `Capturar ${type === "idea" ? "idea" : ""}`}
           <ArrowUpRight size={16} />
         </Button>
       </div>
