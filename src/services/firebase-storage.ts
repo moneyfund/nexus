@@ -13,19 +13,18 @@ export class RestFirebaseStorageProvider implements StorageProvider {
       size: file.size,
       provider: "firebase",
       externalId: uploaded.path,
-      metadata: uploaded.downloadToken
-        ? { downloadToken: uploaded.downloadToken }
-        : undefined,
     };
   }
 
-  async getUrl(_userId: string, attachment: Attachment) {
-    if (!attachment.externalId) return null;
-    const token =
-      typeof attachment.metadata?.downloadToken === "string"
-        ? attachment.metadata.downloadToken
-        : undefined;
-    return firebaseClient.getDownloadUrl(attachment.externalId, token);
+  async getUrl(userId: string, attachment: Attachment) {
+    if (
+      attachment.userId !== userId ||
+      attachment.provider !== "firebase" ||
+      !attachment.externalId
+    )
+      return null;
+
+    return firebaseClient.getDownloadUrl(attachment.externalId);
   }
 
   async remove(_userId: string, id: string) {
