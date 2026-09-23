@@ -39,6 +39,9 @@ function CaptureForm() {
   const [error, setError] = useState("");
   async function submit() {
     try {
+      if (type === "file" && file && file.size > 25 * 1024 * 1024)
+        throw new Error("El archivo supera el límite de 25 MB.");
+
       const targetId = n.actions.capture({
         type,
         content,
@@ -51,8 +54,9 @@ function CaptureForm() {
           : undefined,
       });
       if (type === "file" && file) {
-        const uploaded = await n.services.storage.upload(n.data.user.id, file);
-        n.update((w) => {
+        try {
+          const uploaded = await n.services.storage.upload(n.data.user.id, file);
+          n.update((w) => {
           const attachment = w.attachments.find((a) => a.id === targetId);
           if (attachment) {
             attachment.provider = "firebase";
@@ -65,7 +69,18 @@ function CaptureForm() {
             knowledge.content = "Archivo almacenado de forma privada en Firebase Storage.";
             knowledge.updatedAt = Date.now();
           }
-        });
+          });
+        } catch (uploadError) {
+          n.update((w) => {
+            const knowledge = w.knowledge.find((k) => k.attachmentId === targetId);
+            if (knowledge) {
+              knowledge.content =
+                "La referencia se guardó, pero el archivo no pudo subirse a Firebase Storage.";
+              knowledge.updatedAt = Date.now();
+            }
+          });
+          throw uploadError;
+        }
       }
       interfaceSound(n.data.user.preferences.sounds, "capture");
       n.setCaptureOpen(false);
@@ -190,7 +205,8 @@ function CaptureForm() {
               />
             </label>
             <p className="form-note">
-              El archivo se subirá de forma privada a Firebase Storage y quedará vinculado a esta referencia.
+              El archivo se subirá de forma privada a Firebase Storage y
+              quedará vinculado a esta referencia. Máximo 25 MB.
             </p>
           </>
         )}
