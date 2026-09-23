@@ -219,6 +219,9 @@ export class BrowserWorkspaceStorage implements WorkspaceStorage {
   constructor(
     private onWrite?: (userId: string, data: Workspace) => void,
   ) {}
+  setOnWrite(onWrite?: (userId: string, data: Workspace) => void) {
+    this.onWrite = onWrite;
+  }
   read(userId: string) {
     const raw = window.localStorage.getItem("nexus-os-v02:" + userId);
     if (raw) {
