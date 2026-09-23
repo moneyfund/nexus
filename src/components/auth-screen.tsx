@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { Orbit, LockKeyhole, ArrowRight, Chrome } from "lucide-react";
+import { Orbit, LockKeyhole, ArrowRight, LogIn } from "lucide-react";
 import { useNexus } from "./nexus-provider";
 
 export function AuthScreen() {
@@ -76,7 +76,7 @@ export function AuthScreen() {
           disabled={busy !== null}
           onClick={() => void runAuth("google")}
         >
-          <Chrome size={17} />
+          <LogIn size={17} />
           {busy === "google" ? "Conectando con Google…" : "Continuar con Google"}
           {busy !== "google" && <ArrowRight size={16} />}
         </button>
