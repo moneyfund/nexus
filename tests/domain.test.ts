@@ -4,6 +4,7 @@ import {
   MemoryWorkspaceStorage,
   WorkspaceStore,
   migrateLegacy,
+  reassignWorkspaceUser,
 } from "../src/repositories/workspace";
 import { NexusActions } from "../src/services/actions";
 import { seedWorkspace } from "../src/domain/seed";
@@ -266,4 +267,50 @@ test("restoring malformed preferences cannot replace working data", () => {
     .aiContext;
   assert.throws(() => store.import(bad), /Preferencias/);
   assert.equal(store.getSnapshot(), before);
+});
+
+test("Firebase migration rewrites ownership across the entire workspace graph", () => {
+  const original = seedWorkspace();
+  const migrated = reassignWorkspaceUser(original, "firebase-user-123", {
+    displayName: "Norvin García",
+    email: "norvin@example.com",
+  });
+
+  assert.equal(migrated.user.id, "firebase-user-123");
+  assert.equal(migrated.user.userId, "firebase-user-123");
+  assert.equal(migrated.user.email, "norvin@example.com");
+
+  const owned = [
+    ...migrated.projects,
+    ...migrated.inbox,
+    ...migrated.ideas,
+    ...migrated.events,
+    ...migrated.flows,
+    ...migrated.goals,
+    ...migrated.incomes,
+    ...migrated.expenses,
+    ...migrated.financialGoals,
+    ...migrated.contacts,
+    ...migrated.knowledge,
+    ...migrated.attachments,
+    ...migrated.notifications,
+    ...migrated.activity,
+    ...migrated.messages,
+    ...migrated.memories,
+    ...migrated.aiUsage,
+    ...migrated.dailyPlans,
+    ...migrated.dependencies,
+  ];
+
+  assert.ok(owned.every((record) => record.userId === "firebase-user-123"));
+  assert.ok(
+    migrated.projects
+      .flatMap((project) => [...project.tasks, ...project.milestones])
+      .every((record) => record.userId === "firebase-user-123"),
+  );
+  assert.ok(
+    migrated.goals
+      .flatMap((goal) => goal.milestones)
+      .every((record) => record.userId === "firebase-user-123"),
+  );
 });

@@ -128,8 +128,29 @@ export function SettingsView() {
                 </label>
                 <Button type="submit">Guardar perfil</Button>
               </form>
+              <div className="surface">
+                <Label>FIREBASE ACCOUNT</Label>
+                <p style={{ marginTop: 14 }}>
+                  {n.session?.email || n.session?.displayName || "Sesión autenticada"}
+                </p>
+                <div className="integration-row">
+                  <span>Sincronización</span>
+                  <Badge>{n.cloudReady ? "SYNC" : "CONNECTING"}</Badge>
+                </div>
+                {n.cloudError && (
+                  <p className="accent" role="alert">{n.cloudError}</p>
+                )}
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => void n.signOut()}
+                >
+                  Cerrar sesión
+                </Button>
+              </div>
               <p className="form-note">
-                Perfil sincronizado. El acceso a NEXUS está protegido por Firebase Authentication.
+                El acceso está protegido por Firebase Authentication. Google es
+                el método principal; correo y contraseña quedan como alternativa.
               </p>
             </>
           )}
@@ -256,14 +277,23 @@ export function SettingsView() {
           {section === "integrations" && (
             <>
               <h2>Listo para conectar.</h2>
-              <p>Firebase ya está conectado. Las demás integraciones continúan pendientes.</p>
+              <p>
+                Firebase Auth, Firestore, Storage y Analytics ya están cableados
+                al proyecto NEXUS. Las demás integraciones continúan pendientes.
+              </p>
               {INTEGRATIONS.map((name) => (
                 <div className="integration-row" key={name}>
                   <span>
                     <PlugZap size={18} />
                     {name}
                   </span>
-                  <Badge>{name === "Firebase" ? "CONNECTED" : "NOT CONNECTED"}</Badge>
+                  <Badge>
+                    {name === "Firebase"
+                      ? n.cloudReady
+                        ? "CONNECTED"
+                        : "AUTHENTICATED"
+                      : "NOT CONNECTED"}
+                  </Badge>
                 </div>
               ))}
             </>
@@ -391,7 +421,10 @@ export function SettingsView() {
             <>
               <h2>Un espacio privado y sincronizado.</h2>
               <p>
-                NEXUS usa Firebase Authentication para el acceso, Firestore para sincronizar tu workspace y Firebase Storage para archivos. Google Calendar, Google Drive y OpenAI siguen desconectados.
+                NEXUS usa Firebase Authentication para el acceso, Firestore
+                para sincronizar tu workspace y Firebase Storage para archivos.
+                Cada workspace se guarda bajo el UID autenticado. Google
+                Calendar, Google Drive y OpenAI siguen desconectados.
               </p>
               <div className="surface">
                 <Label>PRÓXIMA CONEXIÓN</Label>
@@ -413,7 +446,12 @@ export function SettingsView() {
                 ["NEXUS", SYSTEM.version],
                 ["Data adapter", "BrowserWorkspaceStorage + Firestore sync"],
                 ["User ID", n.data.user.id],
-                ["Auth session", n.session ? "Firebase · autenticada" : "Sin sesión"],
+                [
+                  "Auth session",
+                  n.session
+                    ? "Firebase · " + (n.session.email || n.session.uid)
+                    : "Sin sesión",
+                ],
                 ["Calendar", "MockCalendarProvider"],
                 ["AI", "MockAIProvider"],
                 ["Storage", "Firebase Storage"],
