@@ -129,8 +129,7 @@ export function SettingsView() {
                 <Button type="submit">Guardar perfil</Button>
               </form>
               <p className="form-note">
-                Perfil local. El correo no inicia una sesión. Google Login se
-                habilitará al conectar Firebase Auth.
+                Perfil sincronizado. El acceso a NEXUS está protegido por Firebase Authentication.
               </p>
             </>
           )}
@@ -257,17 +256,14 @@ export function SettingsView() {
           {section === "integrations" && (
             <>
               <h2>Listo para conectar.</h2>
-              <p>
-                Los proveedores actuales son locales o simulados. No hay
-                credenciales ni llamadas a estas APIs.
-              </p>
+              <p>Firebase ya está conectado. Las demás integraciones continúan pendientes.</p>
               {INTEGRATIONS.map((name) => (
                 <div className="integration-row" key={name}>
                   <span>
                     <PlugZap size={18} />
                     {name}
                   </span>
-                  <Badge>NOT CONNECTED</Badge>
+                  <Badge>{name === "Firebase" ? "CONNECTED" : "NOT CONNECTED"}</Badge>
                 </div>
               ))}
             </>
@@ -314,8 +310,7 @@ export function SettingsView() {
             <>
               <h2>Tu información sigue siendo tuya.</h2>
               <p>
-                Los cambios viven en este navegador. Exporta una copia antes de
-                cambiar de equipo o limpiar los datos del sitio.
+                Los cambios se guardan localmente y se sincronizan con tu espacio privado en Firestore. El respaldo JSON sigue disponible como copia adicional.
               </p>
               <div className="row wrap">
                 <Button onClick={exportData}>
@@ -394,19 +389,14 @@ export function SettingsView() {
           )}
           {section === "privacy" && (
             <>
-              <h2>Un espacio local.</h2>
+              <h2>Un espacio privado y sincronizado.</h2>
               <p>
-                NEXUS todavía no sincroniza datos con Firebase, Google u OpenAI.
-                El perfil local organiza tus datos, pero no constituye
-                autenticación ni una barrera de seguridad frente a otra persona
-                que use este navegador.
+                NEXUS usa Firebase Authentication para el acceso, Firestore para sincronizar tu workspace y Firebase Storage para archivos. Google Calendar, Google Drive y OpenAI siguen desconectados.
               </p>
               <div className="surface">
                 <Label>PRÓXIMA CONEXIÓN</Label>
                 <p>
-                  La activación multiusuario requerirá Firebase Auth, reglas de
-                  acceso por usuario y verificación de propietarios antes de
-                  sincronizar.
+                  Firestore y Storage usan rutas privadas ligadas al UID autenticado. Las reglas incluidas en el repositorio deben publicarse en Firebase.
                 </p>
               </div>
               <p>
@@ -421,15 +411,15 @@ export function SettingsView() {
               <h2>System diagnostics.</h2>
               {[
                 ["NEXUS", SYSTEM.version],
-                ["Data adapter", "BrowserWorkspaceStorage"],
+                ["Data adapter", "BrowserWorkspaceStorage + Firestore sync"],
                 ["User ID", n.data.user.id],
-                ["Auth session", "Local · no autenticada"],
+                ["Auth session", n.session ? "Firebase · autenticada" : "Sin sesión"],
                 ["Calendar", "MockCalendarProvider"],
                 ["AI", "MockAIProvider"],
-                ["Storage", "MockStorageProvider"],
+                ["Storage", "Firebase Storage"],
                 [
                   "Persistence",
-                  n.storageError || (n.ready ? "Ready" : "Loading"),
+                  n.storageError || (n.cloudReady ? "Firestore synced" : "Connecting"),
                 ],
               ].map(([key, value]) => (
                 <div className="integration-row" key={key}>
@@ -438,8 +428,7 @@ export function SettingsView() {
                 </div>
               ))}
               <p className="form-note">
-                Contratos, migración e integraciones documentados en el
-                repositorio. Nunca pegues claves API en estos ajustes.
+                Firebase usa la configuración pública del proyecto y reglas por UID. Las integraciones con APIs privadas deberán usar secretos del servidor.
               </p>
             </>
           )}
