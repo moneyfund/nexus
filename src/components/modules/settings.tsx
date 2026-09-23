@@ -426,7 +426,7 @@ export function SettingsView() {
                   respuestas reales registradas.
                   {aiStatus?.configured
                     ? " Modelo actual: " + aiStatus.model + "."
-                    : " Falta OPENAI_API_KEY en Vercel para activar las llamadas."}
+                    : " Faltan OPENAI_API_KEY y/o NEXUS_OWNER_UID en Vercel para activar las llamadas."}
                 </p>
               </div>
             </>
