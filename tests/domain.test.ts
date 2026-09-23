@@ -52,8 +52,7 @@ test("legacy migration preserves all projects, captured text and actual IDs with
   assert.equal(migrated.ideas[0].id, "kept-id");
   assert.equal(migrated.ideas[0].title, "Mi idea privada");
   assert.equal(migrated.inbox[1].content, "$720 por confirmar");
-  assert.equal(migrated.incomes.length, 1);
-  assert.equal(migrated.incomes[0].amount, 400);
+  assert.equal(migrated.incomes.length, 0);
 });
 test("WIP rejects the sixth project and allows activation after pausing one", () => {
   const { store, actions } = setup();
@@ -140,6 +139,7 @@ test("invalid finance captures never leave partial Inbox or financial records", 
     actions.capture({ type: "income", content: "Cobro", amount: NaN }),
   );
   assert.equal(store.getSnapshot(), before);
+  actions.updateProject("criscasa", { value: 800 });
   actions.capture({
     type: "income",
     content: "Cobro real",
@@ -149,10 +149,10 @@ test("invalid finance captures never leave partial Inbox or financial records", 
   const criscasa = store
     .getSnapshot()
     .projects.find((project) => project.id === "criscasa")!;
-  assert.equal(projectFinance(store.getSnapshot(), criscasa).paid, 500.12);
+  assert.equal(projectFinance(store.getSnapshot(), criscasa).paid, 100.12);
   assert.equal(
     projectFinance(store.getSnapshot(), criscasa).receivable,
-    299.88,
+    699.88,
   );
 });
 test("repositories reject access to another owner", async () => {
@@ -160,8 +160,9 @@ test("repositories reject access to another owner", async () => {
   const repos = createRepositories(store);
   await assert.rejects(repos.projects.list("another-owner"), /autorizado/);
 });
-test("own financial records remain visible on demo projects without inheriting demo amounts", () => {
+test("real portfolio finance uses only values and movements the user records", () => {
   const { store, actions } = setup();
+  actions.updateProject("criscasa", { value: 500 });
   actions.capture({
     type: "income",
     content: "Cobro real",
@@ -178,15 +179,10 @@ test("own financial records remain visible on demo projects without inheriting d
   const project = scoped.projects.find((p) => p.id === "criscasa")!;
   assert.ok(project);
   assert.equal(scoped.incomes.length, 1);
-  assert.equal(project.value, undefined);
-  assert.equal(project.hours, 0);
+  assert.equal(project.value, 500);
   assert.equal(projectFinance(scoped, project).paid, 125);
   assert.equal(projectFinance(scoped, project).profit, 100);
-  assert.equal(projectFinance(scoped, project).receivable, 0);
-  assert.equal(
-    store.getSnapshot().projects.find((item) => item.id === "criscasa")?.value,
-    800,
-  );
+  assert.equal(projectFinance(scoped, project).receivable, 375);
 });
 test("failed persistence preserves last good state; invalid backups are rejected", () => {
   const store = new WorkspaceStore({
@@ -372,5 +368,56 @@ test("known portfolio sync updates curated projects without deleting user projec
   assert.ok(synced.projects.some((project) => project.id === "amy-blandon"));
   assert.ok(
     synced.projects.some((project) => project.id === "custom-client-project"),
+  );
+  assert.ok(
+    synced.projects
+      .filter((project) => project.id !== "custom-client-project")
+      .every((project) => project.source === "user"),
+  );
+});
+
+test("milestone baseline protects existing progress while tasks advance the remainder", () => {
+  const { store, actions } = setup();
+  const project = () =>
+    store
+      .getSnapshot()
+      .projects.find((item) => item.id === "pequenos-escritores")!;
+  const milestone = () =>
+    project().milestones.find((item) => item.id === "p2")!;
+
+  assert.equal(milestone().baselineProgress, 72);
+  actions.toggleTask("pequenos-escritores", "pt1");
+  assert.equal(milestone().progress, 86);
+  actions.toggleTask("pequenos-escritores", "pt2");
+  assert.equal(milestone().progress, 100);
+  actions.toggleTask("pequenos-escritores", "pt1");
+  assert.equal(milestone().progress, 86);
+  assert.ok(milestone().progress >= 72);
+});
+
+test("financial movements can be edited and deleted without touching unrelated data", () => {
+  const { store, actions } = setup();
+  const recordId = actions.capture({
+    type: "income",
+    content: "Pago parcial",
+    amount: 100,
+    projectId: "amy-blandon",
+  });
+
+  actions.updateMoneyRecord("income", recordId, {
+    title: "Pago corregido",
+    amount: 150,
+    category: "Cliente",
+  });
+  const updated = store
+    .getSnapshot()
+    .incomes.find((record) => record.id === recordId)!;
+  assert.equal(updated.title, "Pago corregido");
+  assert.equal(updated.amount, 150);
+
+  actions.deleteMoneyRecord("income", recordId);
+  assert.equal(
+    store.getSnapshot().incomes.some((record) => record.id === recordId),
+    false,
   );
 });
