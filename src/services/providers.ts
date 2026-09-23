@@ -206,13 +206,39 @@ export class LocalNotificationService implements NotificationService {
 }
 export interface NexusContext {
   userId: string;
-  projects: Pick<
-    Workspace["projects"][number],
-    "id" | "name" | "priority" | "nextAction" | "status" | "dueDate"
-  >[];
+  projects: Array<{
+    id: string;
+    name: string;
+    area: string;
+    priority: Workspace["projects"][number]["priority"];
+    nextAction: string;
+    status: Workspace["projects"][number]["status"];
+    dueDate?: string;
+    progress: number;
+    value?: number;
+    tasks: Array<{
+      id: string;
+      title: string;
+      completed: boolean;
+      milestone: string;
+      priority: Workspace["projects"][number]["tasks"][number]["priority"];
+    }>;
+  }>;
   events: CalendarEvent[];
-  finance: { projectId: string; receivable: number }[];
-  knowledge: { id: string; title: string }[];
+  finance: Array<{
+    projectId: string;
+    value?: number;
+    paid: number;
+    expenses: number;
+    receivable: number;
+  }>;
+  knowledge: Array<{
+    id: string;
+    title: string;
+    category: string;
+    tags: string[];
+  }>;
+  memories: Array<{ id: string; content: string; projectIds: string[] }>;
 }
 export class NexusContextBuilder {
   build(w: Workspace): NexusContext {
@@ -220,26 +246,52 @@ export class NexusContextBuilder {
     return {
       userId: w.user.id,
       projects: c.projects
-        ? w.projects.map(
-            ({ id, name, priority, nextAction, status, dueDate }) => ({
-              id,
-              name,
-              priority,
-              nextAction,
-              status,
-              dueDate,
-            }),
-          )
+        ? w.projects.map((project) => ({
+            id: project.id,
+            name: project.name,
+            area: project.area,
+            priority: project.priority,
+            nextAction: project.nextAction,
+            status: project.status,
+            dueDate: project.dueDate,
+            progress: project.progress,
+            value: project.value,
+            tasks: project.tasks.map((task) => ({
+              id: task.id,
+              title: task.title,
+              completed: task.completed,
+              milestone: task.milestone,
+              priority: task.priority,
+            })),
+          }))
         : [],
       events: c.calendar ? w.events : [],
       finance: c.finance
-        ? w.projects.map((p) => ({
-            projectId: p.id,
-            receivable: projectFinance(w, p).receivable,
-          }))
+        ? w.projects.map((project) => {
+            const finance = projectFinance(w, project);
+            return {
+              projectId: project.id,
+              value: project.value,
+              paid: finance.paid,
+              expenses: finance.expenses,
+              receivable: finance.receivable,
+            };
+          })
         : [],
       knowledge: c.knowledge
-        ? w.knowledge.map(({ id, title }) => ({ id, title }))
+        ? w.knowledge.map(({ id, title, category, tags }) => ({
+            id,
+            title,
+            category,
+            tags,
+          }))
+        : [],
+      memories: c.knowledge
+        ? w.memories.map(({ id, content, projectIds }) => ({
+            id,
+            content,
+            projectIds,
+          }))
         : [],
     };
   }
@@ -250,6 +302,9 @@ export class NexusToolRegistry {
     { id: "calendar.read", label: "Consultar calendario", access: "read" },
     { id: "finance.read", label: "Consultar finanzas", access: "read" },
     { id: "task.propose", label: "Proponer una tarea", access: "confirm" },
+    { id: "task.complete", label: "Completar tarea", access: "confirm" },
+    { id: "finance.write", label: "Registrar movimiento", access: "confirm" },
+    { id: "project.update", label: "Actualizar proyecto", access: "confirm" },
   ];
 }
 export interface AIProvider {
