@@ -287,5 +287,11 @@ export interface CaptureInput {
   category?: string;
   amount?: number;
   url?: string;
-  file?: { name: string; size: number; type: string };
+  file?: {
+    name: string;
+    size: number;
+    type: string;
+    provider?: Attachment["provider"];
+    externalId?: ID;
+  };
 }
