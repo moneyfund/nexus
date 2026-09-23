@@ -9,6 +9,7 @@ import { Badge, IconButton } from "./ui/primitives";
 import { CommandPalette, NotificationCenter } from "./command-system";
 import { IdeaPanel } from "./idea-panel";
 import { PwaRegistration } from "./pwa-registration";
+import { AuthScreen } from "./auth-screen";
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const n = useNexus();
@@ -18,6 +19,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const isActive = (href: string) =>
     href === "/" ? pathname === "/" : pathname.startsWith(href);
   const groups = ["workspace", "intelligence", "system"];
+  if (!n.authReady) {
+    return <main style={{ minHeight: "100dvh", display: "grid", placeItems: "center" }}>Conectando NEXUS…</main>;
+  }
+  if (!n.session) return <AuthScreen />;
   return (
     <>
       <a href="#main" className="skip-link">
@@ -68,7 +73,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <div className="rail-bottom">
           <div className="small muted" style={{ paddingLeft: 10 }}>
             <span className="status-tick" />
-            LOCAL WORKSPACE
+            FIREBASE · {n.cloudReady ? "SYNC" : "CONNECTING"}
           </div>
           <Link href="/settings" className="profile-link">
             <span className="avatar">{n.data.user.initials}</span>
@@ -91,7 +96,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <strong>{current?.label.toUpperCase() ?? "PROJECT COMMAND"}</strong>
           </div>
           <div className="topbar-tools">
-            <Badge>LOCAL · DEMO + TUS DATOS</Badge>
+            <Badge>FIREBASE · {n.cloudReady ? "SYNC" : "CONNECTING"}</Badge>
             <button
               className="search-trigger"
               onClick={() => n.setCommandOpen(true)}
