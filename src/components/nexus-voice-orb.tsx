@@ -58,13 +58,12 @@ export function NexusVoiceOrb() {
   const pathname = usePathname();
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const transcriptRef = useRef("");
-  const [supported, setSupported] = useState(false);
+  const [supported, setSupported] = useState<boolean | null>(null);
   const [listening, setListening] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [transcript, setTranscript] = useState("");
 
   useEffect(() => {
-    setSupported(!!recognitionConstructor());
     return () => recognitionRef.current?.abort();
   }, []);
 
@@ -86,6 +85,7 @@ export function NexusVoiceOrb() {
   function startListening() {
     const Recognition = recognitionConstructor();
     if (!Recognition) {
+      setSupported(false);
       n.notify(
         "Este navegador no ofrece dictado web. Puedes escribirle a NEXUS AI o usar Chrome/Edge compatible.",
         true,
@@ -94,6 +94,7 @@ export function NexusVoiceOrb() {
       return;
     }
 
+    setSupported(true);
     recognitionRef.current?.abort();
     transcriptRef.current = "";
     setTranscript("");
@@ -177,9 +178,9 @@ export function NexusVoiceOrb() {
               ? "Te escucho…"
               : transcript
                 ? transcript
-                : supported
-                  ? "Pulsa para hablar"
-                  : "Dictado no disponible"}
+                : supported === false
+                  ? "Dictado no disponible"
+                  : "Pulsa para hablar"}
           </strong>
           <small>
             {listening
