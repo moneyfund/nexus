@@ -42,10 +42,10 @@ export interface FirebaseSession {
   photoURL: string | null;
 }
 
-const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const firestore = getFirestore(app);
-const storage = getStorage(app);
+export const firebaseApp = getApps().length ? getApp() : initializeApp(firebaseConfig);
+const auth = getAuth(firebaseApp);
+const firestore = getFirestore(firebaseApp);
+const storage = getStorage(firebaseApp);
 const workspaceQueues = new Map<string, Promise<void>>();
 
 function sessionFromUser(user: User | null): FirebaseSession | null {
