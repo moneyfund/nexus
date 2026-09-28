@@ -7,62 +7,39 @@ import { firebaseApp } from "@/lib/firebase";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import type { AIProvider, NexusContext } from "@/services/providers";
 
-export type NexusAIAction =
-  | {
-      type: "complete_task";
-      projectId: string | null;
-      taskId: string | null;
-      title: string | null;
-      milestone: string | null;
-      amount: number | null;
-      value: number | null;
-      status: ProjectStatus | null;
-      reason: string;
-    }
-  | {
-      type: "create_task";
-      projectId: string | null;
-      taskId: string | null;
-      title: string | null;
-      milestone: string | null;
-      amount: number | null;
-      value: number | null;
-      status: ProjectStatus | null;
-      reason: string;
-    }
-  | {
-      type: "record_income" | "record_expense";
-      projectId: string | null;
-      taskId: string | null;
-      title: string | null;
-      milestone: string | null;
-      amount: number | null;
-      value: number | null;
-      status: ProjectStatus | null;
-      reason: string;
-    }
-  | {
-      type: "update_project_status";
-      projectId: string | null;
-      taskId: string | null;
-      title: string | null;
-      milestone: string | null;
-      amount: number | null;
-      value: number | null;
-      status: ProjectStatus | null;
-      reason: string;
-    }
-  | {
-      type: "update_project_value";
-      projectId: string | null;
-      taskId: string | null;
-      title: string | null;
-      milestone: string | null;
-      amount: number | null;
-      value: number | null;
-      status: ProjectStatus | null;
-      reason: string;
-    };
+export interface NexusAIAction {
+  type:
+    | "complete_task"
+    | "create_task"
+    | "record_income"
+    | "record_expense"
+    | "update_project_status"
+    | "update_project_value"
+    | "create_event"
+    | "create_idea"
+    | "add_memory";
+  projectId: string | null;
+  taskId: string | null;
+  title: string | null;
+  milestone: string | null;
+  amount: number | null;
+  value: number | null;
+  status: ProjectStatus | null;
+  start: string | null;
+  end: string | null;
+  category:
+    | "focus"
+    | "meeting"
+    | "admin"
+    | "client"
+    | "university"
+    | "personal"
+    | "deadline"
+    | null;
+  description: string | null;
+  content: string | null;
+  reason: string;
+}
 
 export interface NexusAIResponse {
   message: AIMessage;
