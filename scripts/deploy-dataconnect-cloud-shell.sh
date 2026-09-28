@@ -36,6 +36,9 @@ if grep -Eiq '(^|[[:space:]])(DROP|TRUNCATE)[[:space:]]' "$DIFF_FILE"; then
 fi
 
 echo "Safety check passed: no DROP/TRUNCATE detected."
+echo "Disabling the experimental FDC API migration path for Cloud Shell compatibility..."
+"${FIREBASE[@]}" experiments:disable fdcapimigration || true
+
 echo "4/6 · Applying PostgreSQL schema migration..."
 "${FIREBASE[@]}" dataconnect:sql:migrate --service "$SERVICE_ID" --location us-east4 --force --project "$PROJECT_ID"
 
