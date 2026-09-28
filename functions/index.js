@@ -14,7 +14,7 @@ setGlobalOptions({
 });
 
 const OPENAI_API_KEY = defineSecret("OPENAI_API_KEY");
-const DEFAULT_MODEL = "gpt-5.6-terra";
+const DEFAULT_MODEL = "gpt-6-luna";
 
 const ACTION_TYPES = [
   "complete_task",
@@ -99,10 +99,9 @@ function safetyIdentifier(uid) {
 
 function estimateCost(model, usage) {
   const pricing = {
-    "gpt-5.6-sol": { input: 4, output: 20 },
-    "gpt-5.6": { input: 4, output: 20 },
-    "gpt-5.6-terra": { input: 2, output: 12 },
-    "gpt-5.6-luna": { input: 0.2, output: 1.2 },
+    "gpt-6-astra": { input: 10, output: 50 },
+    "gpt-6-sol": { input: 2, output: 10 },
+    "gpt-6-luna": { input: 0.1, output: 0.5 },
   };
   const price = pricing[model] || pricing[DEFAULT_MODEL];
   return (
@@ -194,9 +193,9 @@ export const nexusAI = onCall(
     await enforceSoftRateLimit(request.auth.uid);
 
     const model =
-      request.data?.model === "gpt-5.6-sol" ||
-      request.data?.model === "gpt-5.6-luna" ||
-      request.data?.model === "gpt-5.6-terra"
+      request.data?.model === "gpt-6-astra" ||
+      request.data?.model === "gpt-6-sol" ||
+      request.data?.model === "gpt-6-luna"
         ? request.data.model
         : DEFAULT_MODEL;
 
@@ -210,7 +209,7 @@ export const nexusAI = onCall(
         model,
         store: false,
         safety_identifier: safetyIdentifier(request.auth.uid),
-        reasoning: { effort: model === "gpt-5.6-luna" ? "low" : "medium" },
+        reasoning: { effort: model === "gpt-6-luna" ? "low" : "medium" },
         max_output_tokens: 2400,
         instructions:
           "Eres NEXUS AI, el núcleo inteligente de un sistema operativo personal. " +
