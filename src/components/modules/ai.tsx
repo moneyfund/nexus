@@ -54,12 +54,17 @@ export function AIView() {
     if (!voicePrompt) return;
 
     voiceBootRef.current = true;
-    setPrompt(voicePrompt);
+    const shouldSend = params.get("send") === "1";
     window.history.replaceState({}, "", window.location.pathname);
 
-    if (params.get("send") === "1") {
-      void send(voicePrompt);
-    }
+    const timer = window.setTimeout(() => {
+      setPrompt(voicePrompt);
+      if (shouldSend) void send(voicePrompt);
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+    // The one-shot voice handoff is intentionally guarded by voiceBootRef.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
