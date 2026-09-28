@@ -156,7 +156,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </main>
       </div>
       <nav className="mobile-nav" aria-label="Navegación móvil">
-        {["/", "/projects", "/flow"].map((href) => {
+        {["/", "/projects"].map((href) => {
           const item = navigation.find((i) => i.href === href)!;
           return (
             <Link
@@ -176,7 +176,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         >
           <Plus size={22} />
         </button>
-        {["/calendar", "/ai"].map((href) => {
+        {["/finance", "/ai"].map((href) => {
           const item = navigation.find((i) => i.href === href)!;
           return (
             <Link
@@ -185,7 +185,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               className={isActive(href) ? "active" : ""}
             >
               <item.icon size={19} />
-              {item.label === "Nexus AI" ? "AI" : item.label}
+              {item.label === "Nexus AI" ? "AI" : item.label === "Finance" ? "Dinero" : item.label}
             </Link>
           );
         })}
