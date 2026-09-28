@@ -10,12 +10,13 @@ type AppUser @table(key: "uid") {
   photoUrl: String
   locale: String
   timezone: String!
+  preferences: Any
   createdAt: Timestamp! @default(expr: "request.time")
   updatedAt: Timestamp! @default(expr: "request.time")
 }
 
 type Workspace @table {
-  legacyId: String @unique
+  legacyId: String
   owner: AppUser!
   name: String!
   slug: String! @unique
@@ -37,7 +38,7 @@ type Membership @table(key: ["workspace", "user"]) {
 }
 
 type Project @table {
-  legacyId: String @unique
+  legacyId: String
   workspace: Workspace!
   name: String!
   area: String!
@@ -64,7 +65,7 @@ type Project @table {
 }
 
 type Milestone @table {
-  legacyId: String @unique
+  legacyId: String
   project: Project!
   title: String!
   weight: Float!
@@ -76,7 +77,7 @@ type Milestone @table {
 }
 
 type Task @table {
-  legacyId: String @unique
+  legacyId: String
   workspace: Workspace!
   project: Project!
   milestone: Milestone
@@ -102,7 +103,7 @@ type TaskDependency @table(key: ["task", "dependsOnTask"]) {
 }
 
 type FlowSession @table {
-  legacyId: String @unique
+  legacyId: String
   workspace: Workspace!
   project: Project!
   task: Task
@@ -120,7 +121,7 @@ type FlowSession @table {
 }
 
 type InboxItem @table {
-  legacyId: String @unique
+  legacyId: String
   workspace: Workspace!
   type: String!
   content: String!
@@ -131,7 +132,7 @@ type InboxItem @table {
 }
 
 type Idea @table {
-  legacyId: String @unique
+  legacyId: String
   workspace: Workspace!
   title: String!
   category: String!
@@ -151,7 +152,7 @@ type IdeaProject @table(key: ["idea", "project"]) {
 }
 
 type Goal @table {
-  legacyId: String @unique
+  legacyId: String
   workspace: Workspace!
   title: String!
   targetDate: Date
@@ -167,7 +168,7 @@ type GoalProject @table(key: ["goal", "project"]) {
 }
 
 type GoalMilestone @table {
-  legacyId: String @unique
+  legacyId: String
   goal: Goal!
   title: String!
   completed: Boolean!
@@ -177,7 +178,7 @@ type GoalMilestone @table {
 }
 
 type Contact @table {
-  legacyId: String @unique
+  legacyId: String
   workspace: Workspace!
   name: String!
   email: String
@@ -196,7 +197,7 @@ type ProjectContact @table(key: ["project", "contact"]) {
 }
 
 type FinancialAccount @table {
-  legacyId: String @unique
+  legacyId: String
   workspace: Workspace!
   name: String!
   type: String!
@@ -208,7 +209,7 @@ type FinancialAccount @table {
 }
 
 type Receivable @table {
-  legacyId: String @unique
+  legacyId: String
   workspace: Workspace!
   project: Project
   contact: Contact
@@ -224,7 +225,7 @@ type Receivable @table {
 }
 
 type Payable @table {
-  legacyId: String @unique
+  legacyId: String
   workspace: Workspace!
   project: Project
   contact: Contact
@@ -240,7 +241,7 @@ type Payable @table {
 }
 
 type FinancialCommitment @table {
-  legacyId: String @unique
+  legacyId: String
   workspace: Workspace!
   project: Project
   title: String!
@@ -255,9 +256,9 @@ type FinancialCommitment @table {
 }
 
 type Transaction @table {
-  legacyId: String @unique
+  legacyId: String
   workspace: Workspace!
-  account: FinancialAccount!
+  account: FinancialAccount
   project: Project
   receivable: Receivable
   payable: Payable
@@ -276,7 +277,7 @@ type Transaction @table {
 }
 
 type FinancialGoal @table {
-  legacyId: String @unique
+  legacyId: String
   workspace: Workspace!
   title: String!
   targetMinor: Int64!
@@ -289,7 +290,7 @@ type FinancialGoal @table {
 }
 
 type CalendarEvent @table {
-  legacyId: String @unique
+  legacyId: String
   workspace: Workspace!
   project: Project
   title: String!
@@ -306,7 +307,7 @@ type CalendarEvent @table {
 }
 
 type DailyPlan @table {
-  legacyId: String @unique
+  legacyId: String
   workspace: Workspace!
   date: Date!
   directiveProject: Project
@@ -323,7 +324,7 @@ type DailyPlanTask @table(key: ["dailyPlan", "task"]) {
 }
 
 type KnowledgeItem @table {
-  legacyId: String @unique
+  legacyId: String
   workspace: Workspace!
   project: Project
   title: String!
@@ -339,7 +340,7 @@ type KnowledgeItem @table {
 }
 
 type Attachment @table {
-  legacyId: String @unique
+  legacyId: String
   workspace: Workspace!
   project: Project
   knowledgeItem: KnowledgeItem
@@ -355,7 +356,7 @@ type Attachment @table {
 }
 
 type Notification @table {
-  legacyId: String @unique
+  legacyId: String
   workspace: Workspace!
   kind: String!
   title: String!
@@ -369,7 +370,7 @@ type Notification @table {
 }
 
 type ActivityEvent @table {
-  legacyId: String @unique
+  legacyId: String
   workspace: Workspace!
   project: Project
   actor: AppUser
@@ -382,7 +383,7 @@ type ActivityEvent @table {
 }
 
 type IntegrationConnection @table {
-  legacyId: String @unique
+  legacyId: String
   workspace: Workspace!
   user: AppUser!
   provider: String!
@@ -396,7 +397,7 @@ type IntegrationConnection @table {
 }
 
 type AIConversation @table {
-  legacyId: String @unique
+  legacyId: String
   workspace: Workspace!
   user: AppUser!
   title: String!
@@ -407,7 +408,7 @@ type AIConversation @table {
 }
 
 type AIMessage @table {
-  legacyId: String @unique
+  legacyId: String
   conversation: AIConversation!
   role: String!
   content: String!
@@ -421,7 +422,7 @@ type AIMessage @table {
 }
 
 type AIMemory @table {
-  legacyId: String @unique
+  legacyId: String
   workspace: Workspace!
   user: AppUser!
   content: String!
@@ -437,7 +438,7 @@ type AIMemory @table {
 }
 
 type AIUsage @table {
-  legacyId: String @unique
+  legacyId: String
   workspace: Workspace!
   user: AppUser!
   provider: String!
@@ -450,7 +451,7 @@ type AIUsage @table {
 }
 
 type AIToolAction @table {
-  legacyId: String @unique
+  legacyId: String
   workspace: Workspace!
   user: AppUser!
   conversation: AIConversation
@@ -469,7 +470,7 @@ type AIToolAction @table {
 }
 
 type Automation @table {
-  legacyId: String @unique
+  legacyId: String
   workspace: Workspace!
   owner: AppUser!
   name: String!
@@ -486,7 +487,7 @@ type Automation @table {
 }
 
 type AutomationRun @table {
-  legacyId: String @unique
+  legacyId: String
   automation: Automation!
   status: String!
   startedAt: Timestamp! @default(expr: "request.time")
@@ -496,7 +497,7 @@ type AutomationRun @table {
 }
 
 type AuditLog @table {
-  legacyId: String @unique
+  legacyId: String
   workspace: Workspace!
   actor: AppUser
   actorType: String!
