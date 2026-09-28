@@ -1,0 +1,24 @@
+# Safe bootstrap mutations. Broader workspace/project mutations will be added
+# after the schema compiles against the provisioned Cloud SQL instance.
+
+mutation UpsertCurrentUser(
+  $email: String!
+  $displayName: String
+  $photoUrl: String
+  $locale: String
+  $timezone: String!
+) @auth(level: USER) {
+  appUser_upsert(
+    data: {
+      uid_expr: "auth.uid"
+      email: $email
+      displayName: $displayName
+      photoUrl: $photoUrl
+      locale: $locale
+      timezone: $timezone
+      updatedAt_expr: "request.time"
+    }
+  ) {
+    uid
+  }
+}
