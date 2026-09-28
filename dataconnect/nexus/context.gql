@@ -84,7 +84,7 @@ query GetWorkspaceCore(
         }
 
         receivables: receivables_on_workspace(
-          where: {status: {neq: "paid"}}
+          where: {status: {ne: "paid"}}
         ) {
           id
           title
@@ -101,7 +101,7 @@ query GetWorkspaceCore(
         }
 
         payables: payables_on_workspace(
-          where: {status: {neq: "paid"}}
+          where: {status: {ne: "paid"}}
         ) {
           id
           title
@@ -118,7 +118,7 @@ query GetWorkspaceCore(
         }
 
         commitments: financialCommitments_on_workspace(
-          where: {status: {neq: "completed"}}
+          where: {status: {ne: "completed"}}
         ) {
           id
           title
@@ -131,7 +131,7 @@ query GetWorkspaceCore(
         }
 
         goals: goals_on_workspace(
-          where: {status: {neq: "completed"}}
+          where: {status: {ne: "completed"}}
         ) {
           id
           title
