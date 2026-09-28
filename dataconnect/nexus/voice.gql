@@ -1,0 +1,106 @@
+# Voice session accounting. Audio transport itself will use the realtime/voice
+# layer; PostgreSQL stores only durable session metadata and cost telemetry.
+
+mutation StartVoiceSession(
+  $workspaceId: UUID!
+  $conversationId: UUID
+  $provider: String!
+  $model: String
+  $metadata: Any
+) @auth(level: USER) @transaction {
+  query
+    @check(
+      expr: "response.query.memberships.size() == 1"
+      message: "No tienes acceso a este workspace."
+    )
+    @check(
+      expr: "vars.conversationId == null || response.query.conversations.size() == 1"
+      message: "La conversación no pertenece al workspace actual."
+    )
+    @redact {
+    memberships(
+      where: {
+        workspaceId: {eq: $workspaceId}
+        userUid: {eq_expr: "auth.uid"}
+        status: {eq: "active"}
+      }
+      limit: 1
+    ) {
+      role
+    }
+    conversations: aiConversations(
+      where: {
+        id: {eq: $conversationId}
+        workspaceId: {eq: $workspaceId}
+        userUid: {eq_expr: "auth.uid"}
+      }
+      limit: 1
+    ) {
+      id
+    }
+  }
+
+  voiceSession_insert(
+    data: {
+      workspaceId: $workspaceId
+      userUid_expr: "auth.uid"
+      conversationId: $conversationId
+      provider: $provider
+      model: $model
+      inputAudioSeconds: 0
+      outputAudioSeconds: 0
+      transcriptionChars: 0
+      synthesisChars: 0
+      costMicrosUsd: 0
+      metadata: $metadata
+    }
+  )
+}
+
+mutation FinishVoiceSession(
+  $workspaceId: UUID!
+  $voiceSessionId: UUID!
+  $inputAudioSeconds: Float!
+  $outputAudioSeconds: Float!
+  $transcriptionChars: Int!
+  $synthesisChars: Int!
+  $costMicrosUsd: Int64!
+  $metadata: Any
+) @auth(level: USER) @transaction {
+  query
+    @check(
+      expr: "response.query.memberships.size() == 1"
+      message: "No tienes acceso a este workspace."
+    )
+    @redact {
+    memberships(
+      where: {
+        workspaceId: {eq: $workspaceId}
+        userUid: {eq_expr: "auth.uid"}
+        status: {eq: "active"}
+      }
+      limit: 1
+    ) {
+      role
+    }
+  }
+
+  voiceSession_update(
+    first: {
+      where: {
+        id: {eq: $voiceSessionId}
+        workspaceId: {eq: $workspaceId}
+        userUid: {eq_expr: "auth.uid"}
+      }
+    }
+    data: {
+      endedAt_expr: "request.time"
+      inputAudioSeconds: $inputAudioSeconds
+      outputAudioSeconds: $outputAudioSeconds
+      transcriptionChars: $transcriptionChars
+      synthesisChars: $synthesisChars
+      costMicrosUsd: $costMicrosUsd
+      metadata: $metadata
+    }
+  )
+}
