@@ -142,7 +142,7 @@ mutation UpdateProjectProgress(
   $projectId: UUID!
   $progress: Float!
   $nextAction: String
-  $status: String
+  $status: String!
 ) @auth(level: USER) @transaction {
   query
     @check(
