@@ -11,20 +11,38 @@ export interface NexusAIAction {
   type:
     | "complete_task"
     | "create_task"
+    | "update_task"
+    | "delete_task"
     | "record_income"
     | "record_expense"
+    | "update_transaction"
+    | "delete_transaction"
     | "update_project_status"
     | "update_project_value"
+    | "update_project"
+    | "log_project_activity"
     | "create_event"
+    | "update_event"
+    | "delete_event"
     | "create_idea"
-    | "add_memory";
+    | "update_idea"
+    | "delete_idea"
+    | "add_memory"
+    | "update_memory"
+    | "delete_memory";
+  targetId: string | null;
   projectId: string | null;
   taskId: string | null;
+  transactionKind: "income" | "expense" | null;
   title: string | null;
   milestone: string | null;
   amount: number | null;
   value: number | null;
   status: ProjectStatus | null;
+  priority: "critical" | "high" | "medium" | "low" | null;
+  estimatedMinutes: number | null;
+  date: string | null;
+  dueDate: string | null;
   start: string | null;
   end: string | null;
   category:
@@ -36,8 +54,12 @@ export interface NexusAIAction {
     | "personal"
     | "deadline"
     | null;
+  itemCategory: string | null;
   description: string | null;
   content: string | null;
+  notes: string | null;
+  area: string | null;
+  client: string | null;
   reason: string;
 }
 
