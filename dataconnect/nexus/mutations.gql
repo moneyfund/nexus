@@ -7,6 +7,7 @@ mutation UpsertCurrentUser(
   $photoUrl: String
   $locale: String
   $timezone: String!
+  $preferences: Any
 ) @auth(level: USER) {
   appUser_upsert(
     data: {
@@ -16,6 +17,7 @@ mutation UpsertCurrentUser(
       photoUrl: $photoUrl
       locale: $locale
       timezone: $timezone
+      preferences: $preferences
       updatedAt_expr: "request.time"
     }
   ) {
@@ -29,6 +31,7 @@ mutation BootstrapPersonalWorkspace(
   $photoUrl: String
   $locale: String
   $timezone: String!
+  $preferences: Any
   $workspaceName: String!
   $workspaceSlug: String!
   $legacyId: String
@@ -41,6 +44,7 @@ mutation BootstrapPersonalWorkspace(
       photoUrl: $photoUrl
       locale: $locale
       timezone: $timezone
+      preferences: $preferences
       updatedAt_expr: "request.time"
     }
   )
