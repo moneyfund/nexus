@@ -19,13 +19,25 @@ const DEFAULT_MODEL = "gpt-6-luna";
 const ACTION_TYPES = [
   "complete_task",
   "create_task",
+  "update_task",
+  "delete_task",
   "record_income",
   "record_expense",
+  "update_transaction",
+  "delete_transaction",
   "update_project_status",
   "update_project_value",
+  "update_project",
+  "log_project_activity",
   "create_event",
+  "update_event",
+  "delete_event",
   "create_idea",
+  "update_idea",
+  "delete_idea",
   "add_memory",
+  "update_memory",
+  "delete_memory",
   "none",
 ];
 
@@ -40,8 +52,13 @@ const responseSchema = {
         type: "object",
         properties: {
           type: { type: "string", enum: ACTION_TYPES },
+          targetId: { type: ["string", "null"] },
           projectId: { type: ["string", "null"] },
           taskId: { type: ["string", "null"] },
+          transactionKind: {
+            type: ["string", "null"],
+            enum: ["income", "expense", null],
+          },
           title: { type: ["string", "null"] },
           milestone: { type: ["string", "null"] },
           amount: { type: ["number", "null"] },
@@ -50,6 +67,13 @@ const responseSchema = {
             type: ["string", "null"],
             enum: ["active", "waiting", "backlog", "completed", null],
           },
+          priority: {
+            type: ["string", "null"],
+            enum: ["critical", "high", "medium", "low", null],
+          },
+          estimatedMinutes: { type: ["number", "null"] },
+          date: { type: ["string", "null"] },
+          dueDate: { type: ["string", "null"] },
           start: { type: ["string", "null"] },
           end: { type: ["string", "null"] },
           category: {
@@ -65,24 +89,38 @@ const responseSchema = {
               null
             ],
           },
+          itemCategory: { type: ["string", "null"] },
           description: { type: ["string", "null"] },
           content: { type: ["string", "null"] },
+          notes: { type: ["string", "null"] },
+          area: { type: ["string", "null"] },
+          client: { type: ["string", "null"] },
           reason: { type: "string" },
         },
         required: [
           "type",
+          "targetId",
           "projectId",
           "taskId",
+          "transactionKind",
           "title",
           "milestone",
           "amount",
           "value",
           "status",
+          "priority",
+          "estimatedMinutes",
+          "date",
+          "dueDate",
           "start",
           "end",
           "category",
+          "itemCategory",
           "description",
           "content",
+          "notes",
+          "area",
+          "client",
           "reason",
         ],
         additionalProperties: false,
@@ -212,18 +250,23 @@ export const nexusAI = onCall(
         reasoning: { effort: model === "gpt-6-luna" ? "low" : "medium" },
         max_output_tokens: 2400,
         instructions:
-          "Eres NEXUS AI, el núcleo inteligente de un sistema operativo personal. " +
+          "Eres NEXUS AI, el núcleo inteligente y operativo de un sistema personal. " +
           "Habla en español claro, natural y directo salvo que el usuario pida otro idioma. " +
-          "Puedes razonar con conocimiento general, pero toda afirmación sobre los proyectos, dinero, agenda, documentos, recuerdos o tareas personales del usuario debe estar respaldada por el CONTEXTO NEXUS recibido. " +
-          "Nunca inventes importes, pagos, fechas, IDs, tareas o estados. Si falta un dato personal, dilo. " +
+          "Puedes razonar con conocimiento general, pero toda afirmación sobre proyectos, dinero, agenda, documentos, ideas, recuerdos o tareas personales debe estar respaldada por el CONTEXTO NEXUS recibido. " +
+          "Nunca inventes importes, fechas, IDs, pagos, registros, tareas o estados. Si falta un dato personal, dilo. " +
           "Cuando el usuario solo pide análisis, explicación, priorización o una respuesta, responde sin proponer cambios innecesarios. " +
           "Cuando el usuario expresa intención de cambiar NEXUS, devuelve la modificación como una acción propuesta; nunca digas que ya la ejecutaste. " +
-          "Usa complete_task si confirma que una tarea existente terminó. Usa create_task si pide crear una tarea. " +
-          "Usa record_income o record_expense únicamente si existe un importe explícito o inequívoco. " +
-          "Usa update_project_status o update_project_value solo cuando el proyecto y el nuevo valor/estado sean claros. " +
-          "Usa create_event cuando el usuario pida agendar, reservar o crear un evento y puedas determinar un inicio y fin concretos usando now y timezone del contexto. " +
-          "Usa create_idea cuando el usuario quiera guardar una idea. Usa add_memory solo cuando pida explícitamente recordar o conservar contexto estable. " +
-          "Si hay ambigüedad entre proyectos, tareas, fechas u horarios, pregunta antes de proponer la acción. " +
+          "Para editar o eliminar un registro existente debes usar exactamente su ID del contexto. Si no puedes identificar un único registro, pregunta antes de proponer la acción. " +
+          "Usa complete_task para terminar una tarea existente; update_task para editar título, prioridad, duración o hito; delete_task solo si el usuario pide eliminarla claramente. " +
+          "Usa record_income o record_expense para movimientos nuevos. Para corregir un movimiento existente usa update_transaction con targetId y transactionKind; para eliminarlo usa delete_transaction. " +
+          "Cuando el usuario diga cosas como 'el gasto de ayer', compara fecha, título, importe, proyecto y categoría de transactions; si hay más de un candidato razonable, pregunta cuál. " +
+          "Usa update_project para nombre, descripción, notas, prioridad, fecha, área o cliente; update_project_status y update_project_value para esos campos específicos. " +
+          "Si el usuario cuenta un avance realizado en un proyecto pero no corresponde claramente a una tarea existente, usa log_project_activity para conservarlo en el historial y notas del proyecto. " +
+          "Usa create_event, update_event o delete_event para agenda. Interpreta fechas relativas usando now y timezone del contexto y devuelve timestamps ISO en start/end. " +
+          "Usa create_idea, update_idea o delete_idea para ideas. Usa add_memory, update_memory o delete_memory solo para contexto estable que el usuario quiera conservar. " +
+          "Las acciones destructivas delete_* requieren intención explícita del usuario; nunca las infieras de frases ambiguas. " +
+          "Los campos que no cambian deben devolverse como null. " +
+          "Si hay ambigüedad entre proyectos, tareas, movimientos, eventos, ideas, memorias, fechas u horarios, pregunta antes de proponer la acción. " +
           "Prioriza respuestas útiles y concretas. No repitas todo el contexto.",
         input:
           "CONTEXTO NEXUS DEL USUARIO:\n" +
