@@ -45,8 +45,9 @@ export function SettingsView() {
   const email = profileDraft?.email ?? n.data.user.email;
   const [pendingImport, setPendingImport] = useState<unknown>(null);
   const [sqlMigrationPreview, setSqlMigrationPreview] = useState<ReturnType<typeof summarizeSqlMigrationPlan> | null>(null);
-  const [sqlWorkspace, setSqlWorkspace] = useState<SqlWorkspaceSummary | null>(null);
+  const [sqlWorkspaceOverride, setSqlWorkspaceOverride] = useState<SqlWorkspaceSummary | null>(null);
   const [sqlChecking, setSqlChecking] = useState(false);
+  const sqlWorkspace = sqlWorkspaceOverride ?? n.sqlWorkspace;
   const [aiStatus, setAIStatus] = useState<{
     configured: boolean;
     model: string;
@@ -473,7 +474,7 @@ export function SettingsView() {
                 </Button>
                 <Button
                   variant="secondary"
-                  disabled={!n.session || sqlChecking}
+                  disabled={!n.session || sqlChecking || n.sqlReady}
                   onClick={() =>
                     n.run(async () => {
                       if (!n.session)
@@ -486,7 +487,7 @@ export function SettingsView() {
                             timezone: prefs.timezone,
                             preferences: prefs,
                           });
-                        setSqlWorkspace(result.workspace);
+                        setSqlWorkspaceOverride(result.workspace);
                         return true;
                       } finally {
                         setSqlChecking(false);
@@ -497,7 +498,7 @@ export function SettingsView() {
                   <Database size={16} />
                   {sqlChecking
                     ? "Conectando PostgreSQL..."
-                    : sqlWorkspace
+                    : n.sqlReady || sqlWorkspace
                       ? "PostgreSQL conectado"
                       : "Inicializar PostgreSQL"}
                 </Button>
