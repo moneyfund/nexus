@@ -17,6 +17,7 @@ export interface SqlMigrationPlan {
     kind: "personal";
     currency: string;
     timezone: string;
+    preferences: Record<string, unknown>;
   };
   user: {
     uid: string;
@@ -431,6 +432,7 @@ export function buildSqlMigrationPlan(
       kind: "personal",
       currency: "USD",
       timezone,
+      preferences: structuredClone(workspace.user.preferences) as unknown as Record<string, unknown>,
     },
     user: {
       uid: firebaseUid,
