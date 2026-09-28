@@ -388,13 +388,10 @@ export function AIView() {
         case "add_memory": {
           const content = action.content?.trim();
           if (!content) throw new Error("La memoria propuesta está vacía.");
-          n.update((w) => {
-            w.memories.push({
-              ...entity(crypto.randomUUID(), "user", w.user.id),
-              content,
-              projectIds: action.projectId ? [action.projectId] : [],
-            });
-          });
+          n.actions.addMemory(
+            content,
+            action.projectId || undefined,
+          );
           break;
         }
         case "update_memory":
