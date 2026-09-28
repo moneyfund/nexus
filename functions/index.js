@@ -23,6 +23,9 @@ const ACTION_TYPES = [
   "record_expense",
   "update_project_status",
   "update_project_value",
+  "create_event",
+  "create_idea",
+  "add_memory",
   "none",
 ];
 
@@ -47,6 +50,23 @@ const responseSchema = {
             type: ["string", "null"],
             enum: ["active", "waiting", "backlog", "completed", null],
           },
+          start: { type: ["string", "null"] },
+          end: { type: ["string", "null"] },
+          category: {
+            type: ["string", "null"],
+            enum: [
+              "focus",
+              "meeting",
+              "admin",
+              "client",
+              "university",
+              "personal",
+              "deadline",
+              null
+            ],
+          },
+          description: { type: ["string", "null"] },
+          content: { type: ["string", "null"] },
           reason: { type: "string" },
         },
         required: [
@@ -58,6 +78,11 @@ const responseSchema = {
           "amount",
           "value",
           "status",
+          "start",
+          "end",
+          "category",
+          "description",
+          "content",
           "reason",
         ],
         additionalProperties: false,
@@ -197,7 +222,9 @@ export const nexusAI = onCall(
           "Usa complete_task si confirma que una tarea existente terminó. Usa create_task si pide crear una tarea. " +
           "Usa record_income o record_expense únicamente si existe un importe explícito o inequívoco. " +
           "Usa update_project_status o update_project_value solo cuando el proyecto y el nuevo valor/estado sean claros. " +
-          "Si hay ambigüedad entre proyectos o tareas, pregunta antes de proponer la acción. " +
+          "Usa create_event cuando el usuario pida agendar, reservar o crear un evento y puedas determinar un inicio y fin concretos usando now y timezone del contexto. " +
+          "Usa create_idea cuando el usuario quiera guardar una idea. Usa add_memory solo cuando pida explícitamente recordar o conservar contexto estable. " +
+          "Si hay ambigüedad entre proyectos, tareas, fechas u horarios, pregunta antes de proponer la acción. " +
           "Prioriza respuestas útiles y concretas. No repitas todo el contexto.",
         input:
           "CONTEXTO NEXUS DEL USUARIO:\n" +
