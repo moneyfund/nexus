@@ -221,6 +221,10 @@ export class LocalNotificationService implements NotificationService {
 }
 export interface NexusContext {
   userId: string;
+  userName: string;
+  timezone: string;
+  now: string;
+  currency: "USD";
   projects: Array<{
     id: string;
     name: string;
@@ -267,6 +271,10 @@ export class NexusContextBuilder {
     const c = w.user.preferences.aiContext;
     return {
       userId: w.user.id,
+      userName: w.user.name,
+      timezone: w.user.preferences.timezone,
+      now: new Date().toISOString(),
+      currency: "USD",
       projects: c.projects
         ? w.projects.map((project) => ({
             id: project.id,
@@ -337,6 +345,9 @@ export class NexusToolRegistry {
     { id: "task.propose", label: "Proponer una tarea", access: "confirm" },
     { id: "task.complete", label: "Completar tarea", access: "confirm" },
     { id: "finance.write", label: "Registrar movimiento", access: "confirm" },
+    { id: "calendar.write", label: "Crear evento", access: "confirm" },
+    { id: "idea.create", label: "Guardar idea", access: "confirm" },
+    { id: "memory.write", label: "Guardar memoria", access: "confirm" },
     { id: "project.update", label: "Actualizar proyecto", access: "confirm" },
   ];
 }
