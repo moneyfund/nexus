@@ -131,7 +131,16 @@ function useSystem() {
   const [sqlReady, setSqlReady] = useState(false);
   const [sqlWorkspace, setSqlWorkspace] = useState<SqlWorkspaceSummary | null>(null);
   const [sqlError, setSqlError] = useState("");
+  const [sqlSyncing, setSqlSyncing] = useState(false);
+  const [sqlLastSync, setSqlLastSync] = useState<number | null>(null);
+  const [sqlSyncSummary, setSqlSyncSummary] = useState<{
+    projectsCreated: number;
+    projectsUpdated: number;
+    tasksCreated: number;
+    tasksUpdated: number;
+  } | null>(null);
   const syncTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const sqlSyncTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [captureOpen, setCaptureOpen] = useState(false);
   const [captureType, setCaptureType] = useState<CaptureType>("idea");
@@ -154,6 +163,9 @@ function useSystem() {
     setSqlReady(false);
     setSqlWorkspace(null);
     setSqlError("");
+    setSqlSyncing(false);
+    setSqlLastSync(null);
+    setSqlSyncSummary(null);
 
     const nextStore = buildUserStore(next);
     setStore(nextStore);
@@ -181,6 +193,17 @@ function useSystem() {
         setSqlWorkspace(result.workspace);
         setSqlReady(true);
         setSqlError("");
+        setSqlSyncing(true);
+        return sqlConnectClient
+          .shadowSyncProjects({
+            workspace: nextStore.getSnapshot(),
+            sqlWorkspaceId: result.workspace.id,
+          })
+          .then((summary) => {
+            setSqlSyncSummary(summary);
+            setSqlLastSync(Date.now());
+          })
+          .finally(() => setSqlSyncing(false));
       })
       .catch((error) => {
         setSqlReady(false);
@@ -260,6 +283,38 @@ function useSystem() {
   }, [data, session, cloudReady, store]);
 
   useEffect(() => {
+    if (!session || !sqlReady || !sqlWorkspace || !store.ready) return;
+
+    if (sqlSyncTimer.current) clearTimeout(sqlSyncTimer.current);
+
+    sqlSyncTimer.current = setTimeout(() => {
+      setSqlSyncing(true);
+      void sqlConnectClient
+        .shadowSyncProjects({
+          workspace: store.getSnapshot(),
+          sqlWorkspaceId: sqlWorkspace.id,
+        })
+        .then((summary) => {
+          setSqlSyncSummary(summary);
+          setSqlLastSync(Date.now());
+          setSqlError("");
+        })
+        .catch((error) => {
+          setSqlError(
+            error instanceof Error
+              ? error.message
+              : "No se pudo actualizar PostgreSQL.",
+          );
+        })
+        .finally(() => setSqlSyncing(false));
+    }, 1800);
+
+    return () => {
+      if (sqlSyncTimer.current) clearTimeout(sqlSyncTimer.current);
+    };
+  }, [data, session, sqlReady, sqlWorkspace, store]);
+
+  useEffect(() => {
     document.documentElement.dataset.motion = reduceMotion ? "reduced" : "full";
     document.documentElement.dataset.accent = data.user.preferences.accent;
   }, [reduceMotion, data.user.preferences.accent]);
@@ -326,6 +381,7 @@ function useSystem() {
 
   const signOut = async () => {
     if (syncTimer.current) clearTimeout(syncTimer.current);
+    if (sqlSyncTimer.current) clearTimeout(sqlSyncTimer.current);
     await firebaseClient.signOut();
     clearGoogleWorkspaceGrant();
     setGoogleGrant(null);
@@ -377,6 +433,9 @@ function useSystem() {
     sqlReady,
     sqlWorkspace,
     sqlError,
+    sqlSyncing,
+    sqlLastSync,
+    sqlSyncSummary,
     googleWorkspace: {
       connected: googleConnected,
       expiresAt: googleGrant?.expiresAt,
