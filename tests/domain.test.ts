@@ -255,6 +255,66 @@ test("AI context omits disabled categories", () => {
     [[], [], [], []],
   );
 });
+
+
+test("AI context includes editable financial records with stable IDs", () => {
+  const { store, actions } = setup();
+  const expenseId = actions.capture({
+    type: "expense",
+    content: "Combustible Estelí",
+    amount: 18,
+    projectId: "tesis-civil",
+    category: "Transporte",
+  });
+  const context = new NexusContextBuilder().build(store.getSnapshot());
+  const expense = context.transactions.find((item) => item.id === expenseId);
+  assert.ok(expense);
+  assert.equal(expense?.kind, "expense");
+  assert.equal(expense?.amount, 18);
+  assert.equal(expense?.projectId, "tesis-civil");
+
+  store.update((w) => {
+    w.user.preferences.aiContext.finance = false;
+  });
+  const hidden = new NexusContextBuilder().build(store.getSnapshot());
+  assert.deepEqual(hidden.transactions, []);
+});
+
+test("AI-operable memories and project activity are persistent and auditable", () => {
+  const { store, actions } = setup();
+  const memoryId = actions.addMemory(
+    "Usar pagos por etapas con clientes.",
+    "nexus",
+  );
+  actions.updateMemory(
+    memoryId,
+    "Usar anticipo y pagos por etapas con clientes.",
+    "nexus",
+  );
+  actions.logProjectActivity("nexus", "Se habilitaron herramientas de edición por IA.");
+
+  const snapshot = store.getSnapshot();
+  assert.equal(
+    snapshot.memories.find((item) => item.id === memoryId)?.content,
+    "Usar anticipo y pagos por etapas con clientes.",
+  );
+  assert.match(
+    snapshot.projects.find((item) => item.id === "nexus")?.notes ?? "",
+    /herramientas de edición por IA/,
+  );
+  assert.ok(
+    snapshot.activity.some(
+      (item) => item.kind === "project-activity" && item.projectId === "nexus",
+    ),
+  );
+
+  actions.deleteMemory(memoryId);
+  assert.equal(
+    store.getSnapshot().memories.some((item) => item.id === memoryId),
+    false,
+  );
+});
+
 test("a new user starts with an isolated empty workspace", async () => {
   const storage = new MemoryWorkspaceStorage();
   const original = new WorkspaceStore(storage);
