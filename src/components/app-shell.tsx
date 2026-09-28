@@ -10,6 +10,7 @@ import { CommandPalette, NotificationCenter } from "./command-system";
 import { IdeaPanel } from "./idea-panel";
 import { PwaRegistration } from "./pwa-registration";
 import { AuthScreen } from "./auth-screen";
+import { NexusVoiceOrb } from "./nexus-voice-orb";
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const n = useNexus();
@@ -200,6 +201,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <NotificationCenter />
       <IdeaPanel />
       <PwaRegistration />
+      <NexusVoiceOrb />
       {n.toast && (
         <div
           className={"toast " + (n.toast.error ? "toast-error" : "")}
