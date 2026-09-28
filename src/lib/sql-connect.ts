@@ -20,7 +20,7 @@ const connectorConfig = {
 
 let dataConnect: DataConnect | null = null;
 
-function getSqlConnect() {
+async function getSqlConnect() {
   if (typeof window === "undefined")
     throw new Error("SQL Connect solo está disponible en el navegador.");
 
@@ -28,7 +28,10 @@ function getSqlConnect() {
   // Initializing modular Auth causes Data Connect to attach the persisted
   // Firebase identity for this app. The existing compat login uses the same
   // project/API key and browser persistence.
-  getAuth(app);
+  const auth = getAuth(app);
+  await auth.authStateReady();
+  if (!auth.currentUser)
+    throw new Error("Inicia sesión en NEXUS antes de usar PostgreSQL.");
 
   if (!dataConnect) dataConnect = getDataConnect(app, connectorConfig);
   return dataConnect;
@@ -46,7 +49,7 @@ export interface SqlWorkspaceSummary {
 }
 
 export async function getCurrentSqlUser() {
-  const dc = getSqlConnect();
+  const dc = await getSqlConnect();
   const result = await executeQuery(queryRef(dc, "GetCurrentUser"));
   return result.data as {
     appUser?: {
@@ -60,7 +63,7 @@ export async function getCurrentSqlUser() {
 }
 
 export async function getMySqlWorkspaces(): Promise<SqlWorkspaceSummary[]> {
-  const dc = getSqlConnect();
+  const dc = await getSqlConnect();
   const result = await executeQuery(queryRef(dc, "GetMyWorkspaces"));
   const data = result.data as {
     appUser?: {
@@ -84,7 +87,7 @@ export async function bootstrapPersonalSqlWorkspace(args: {
   timezone: string;
   preferences: unknown;
 }) {
-  const dc = getSqlConnect();
+  const dc = await getSqlConnect();
   const existing = await getMySqlWorkspaces();
   const personal = existing.find(
     (membership) =>
@@ -130,7 +133,7 @@ export async function getSqlWorkspaceCore(args: {
   from: Date;
   to: Date;
 }) {
-  const dc = getSqlConnect();
+  const dc = await getSqlConnect();
   const result = await executeQuery(
     queryRef(dc, "GetWorkspaceCore", {
       workspaceId: args.workspaceId,
