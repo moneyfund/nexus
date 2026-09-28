@@ -296,17 +296,17 @@ export class NexusActions {
   ) =>
     this.store.update((w) => {
       const p = w.projects.find((p) => p.id === projectId);
-      if (p) {
-        Object.assign(p, patch, { updatedAt: Date.now() });
-        if ("dueDate" in patch)
-          p.deadline = patch.dueDate
-            ? new Intl.DateTimeFormat("es-NI", {
-                day: "2-digit",
-                month: "short",
-                timeZone: "UTC",
-              }).format(new Date(patch.dueDate + "T12:00:00Z"))
-            : "SIN FECHA";
-      }
+      if (!p) throw new Error("Proyecto no encontrado.");
+      Object.assign(p, patch, { updatedAt: Date.now() });
+      if ("dueDate" in patch)
+        p.deadline = patch.dueDate
+          ? new Intl.DateTimeFormat("es-NI", {
+              day: "2-digit",
+              month: "short",
+              timeZone: "UTC",
+            }).format(new Date(patch.dueDate + "T12:00:00Z"))
+          : "SIN FECHA";
+      log(w, "Proyecto actualizado: " + p.name, "project", p.id);
     });
 
   addMilestone = (
@@ -517,7 +517,9 @@ export class NexusActions {
   ) =>
     this.store.update((w) => {
       const idea = w.ideas.find((i) => i.id === ideaId);
-      if (idea) Object.assign(idea, patch, { updatedAt: Date.now() });
+      if (!idea) throw new Error("Idea no encontrada.");
+      Object.assign(idea, patch, { updatedAt: Date.now() });
+      log(w, "Idea actualizada: " + idea.title, "idea", idea.projectIds[0]);
     });
   convertIdea = (ideaId: string) => {
     let projectId = "";
@@ -542,8 +544,11 @@ export class NexusActions {
   };
   deleteIdea = (ideaId: string) =>
     this.store.update((w) => {
+      const idea = w.ideas.find((item) => item.id === ideaId);
+      if (!idea) throw new Error("Idea no encontrada.");
       w.ideas = w.ideas.filter((i) => i.id !== ideaId);
       w.inbox = w.inbox.filter((i) => i.targetId !== ideaId);
+      log(w, "Idea eliminada: " + idea.title, "idea", idea.projectIds[0]);
     });
   scheduleReview = (ideaId: string, date: string) =>
     this.store.update((w) => {
@@ -640,8 +645,15 @@ export class NexusActions {
       )
         throw new Error("Revisa el título y las horas del bloque.");
       const i = w.events.findIndex((e) => e.id === event.id);
-      if (i < 0) w.events.push(event);
+      const created = i < 0;
+      if (created) w.events.push(event);
       else w.events[i] = { ...event, updatedAt: Date.now() };
+      log(
+        w,
+        (created ? "Evento creado: " : "Evento actualizado: ") + event.title,
+        "calendar",
+        event.projectId,
+      );
     });
   deleteEvent = (eventId: string) =>
     this.store.update((w) => {
@@ -650,6 +662,23 @@ export class NexusActions {
       w.events = w.events.filter((e) => e.id !== eventId);
       log(w, "Evento eliminado: " + event.title, "calendar", event.projectId);
     });
+
+  addMemory = (content: string, projectId?: string) => {
+    const memoryId = id();
+    this.store.update((w) => {
+      const clean = content.trim();
+      if (!clean) throw new Error("La memoria no puede quedar vacía.");
+      if (projectId && !w.projects.some((project) => project.id === projectId))
+        throw new Error("Proyecto no encontrado.");
+      w.memories.push({
+        ...entity(memoryId, "user", w.user.id),
+        content: clean,
+        projectIds: projectId ? [projectId] : [],
+      });
+      log(w, "Memoria guardada", "memory", projectId);
+    });
+    return memoryId;
+  };
 
   updateMemory = (memoryId: string, content: string, projectId?: string) =>
     this.store.update((w) => {
