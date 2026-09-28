@@ -64,7 +64,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     <item.icon size={17} strokeWidth={1.5} />
                     {item.label}
                     {item.href === "/ai" && (
-                      <span className="nav-index">SIM</span>
+                      <span className="nav-index">LOCAL</span>
+                    )}
+                    {item.href === "/settings" && n.sqlReady && (
+                      <span className="nav-index">SQL</span>
                     )}
                   </Link>
                 ))}
@@ -75,6 +78,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <div className="small muted" style={{ paddingLeft: 10 }}>
             <span className="status-tick" />
             FIREBASE · {n.cloudReady ? "SYNC" : "CONNECTING"}
+          </div>
+          <div className="small muted" style={{ paddingLeft: 10, marginTop: 6 }}>
+            <span className="status-tick" />
+            POSTGRES · {n.sqlReady ? (n.sqlSyncing ? "SYNCING" : "LIVE") : "CONNECTING"}
           </div>
           <Link href="/settings" className="profile-link">
             <span className="avatar">{n.data.user.initials}</span>
@@ -98,6 +105,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
           <div className="topbar-tools">
             <Badge>FIREBASE · {n.cloudReady ? "SYNC" : "CONNECTING"}</Badge>
+            <Badge active={n.sqlReady}>
+              POSTGRES · {n.sqlReady ? (n.sqlSyncing ? "SYNC" : "LIVE") : "CONNECTING"}
+            </Badge>
             <button
               className="search-trigger"
               onClick={() => n.setCommandOpen(true)}
