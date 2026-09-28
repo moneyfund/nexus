@@ -1,0 +1,244 @@
+# Financial operations use integer minor units (cents) to avoid float errors.
+
+mutation CreateFinancialAccount(
+  $workspaceId: UUID!
+  $legacyId: String
+  $name: String!
+  $type: String!
+  $currency: String!
+  $openingBalanceMinor: Int64!
+) @auth(level: USER) @transaction {
+  query
+    @check(
+      expr: "response.query.memberships.size() == 1"
+      message: "No tienes acceso a este workspace."
+    )
+    @redact {
+    memberships(
+      where: {
+        workspaceId: {eq: $workspaceId}
+        userUid: {eq_expr: "auth.uid"}
+        status: {eq: "active"}
+      }
+      limit: 1
+    ) {
+      role
+    }
+  }
+
+  financialAccount_insert(
+    data: {
+      workspaceId: $workspaceId
+      legacyId: $legacyId
+      name: $name
+      type: $type
+      currency: $currency
+      openingBalanceMinor: $openingBalanceMinor
+      archived: false
+    }
+  )
+}
+
+mutation RecordTransaction(
+  $workspaceId: UUID!
+  $accountId: UUID!
+  $legacyId: String
+  $projectId: UUID
+  $receivableId: UUID
+  $payableId: UUID
+  $kind: String!
+  $title: String!
+  $amountMinor: Int64!
+  $currency: String!
+  $date: Date!
+  $category: String!
+  $status: String!
+  $counterparty: String
+  $notes: String
+  $metadata: Any
+) @auth(level: USER) @transaction {
+  query
+    @check(
+      expr: "response.query.memberships.size() == 1"
+      message: "No tienes acceso a este workspace."
+    )
+    @check(
+      expr: "response.query.accounts.size() == 1"
+      message: "La cuenta financiera no pertenece a este workspace."
+    )
+    @redact {
+    memberships(
+      where: {
+        workspaceId: {eq: $workspaceId}
+        userUid: {eq_expr: "auth.uid"}
+        status: {eq: "active"}
+      }
+      limit: 1
+    ) {
+      role
+    }
+    accounts: financialAccounts(
+      where: {
+        id: {eq: $accountId}
+        workspaceId: {eq: $workspaceId}
+      }
+      limit: 1
+    ) {
+      id
+    }
+  }
+
+  transaction_insert(
+    data: {
+      workspaceId: $workspaceId
+      accountId: $accountId
+      projectId: $projectId
+      receivableId: $receivableId
+      payableId: $payableId
+      legacyId: $legacyId
+      kind: $kind
+      title: $title
+      amountMinor: $amountMinor
+      currency: $currency
+      date: $date
+      category: $category
+      status: $status
+      counterparty: $counterparty
+      notes: $notes
+      metadata: $metadata
+    }
+  )
+}
+
+mutation CreateReceivable(
+  $workspaceId: UUID!
+  $legacyId: String
+  $projectId: UUID
+  $contactId: UUID
+  $title: String!
+  $amountMinor: Int64!
+  $paidMinor: Int64!
+  $currency: String!
+  $dueDate: Date
+  $status: String!
+  $notes: String
+) @auth(level: USER) @transaction {
+  query
+    @check(
+      expr: "response.query.memberships.size() == 1"
+      message: "No tienes acceso a este workspace."
+    )
+    @redact {
+    memberships(
+      where: {
+        workspaceId: {eq: $workspaceId}
+        userUid: {eq_expr: "auth.uid"}
+        status: {eq: "active"}
+      }
+      limit: 1
+    ) {
+      role
+    }
+  }
+
+  receivable_insert(
+    data: {
+      workspaceId: $workspaceId
+      projectId: $projectId
+      contactId: $contactId
+      legacyId: $legacyId
+      title: $title
+      amountMinor: $amountMinor
+      paidMinor: $paidMinor
+      currency: $currency
+      dueDate: $dueDate
+      status: $status
+      notes: $notes
+    }
+  )
+}
+
+mutation UpdateReceivablePayment(
+  $workspaceId: UUID!
+  $receivableId: UUID!
+  $paidMinor: Int64!
+  $status: String!
+) @auth(level: USER) @transaction {
+  query
+    @check(
+      expr: "response.query.memberships.size() == 1"
+      message: "No tienes acceso a este workspace."
+    )
+    @redact {
+    memberships(
+      where: {
+        workspaceId: {eq: $workspaceId}
+        userUid: {eq_expr: "auth.uid"}
+        status: {eq: "active"}
+      }
+      limit: 1
+    ) {
+      role
+    }
+  }
+
+  receivable_update(
+    first: {
+      where: {
+        id: {eq: $receivableId}
+        workspaceId: {eq: $workspaceId}
+      }
+    }
+    data: {
+      paidMinor: $paidMinor
+      status: $status
+      updatedAt_expr: "request.time"
+    }
+  )
+}
+
+mutation CreateFinancialCommitment(
+  $workspaceId: UUID!
+  $legacyId: String
+  $projectId: UUID
+  $title: String!
+  $amountMinor: Int64!
+  $currency: String!
+  $dueDate: Date!
+  $category: String!
+  $status: String!
+  $notes: String
+) @auth(level: USER) @transaction {
+  query
+    @check(
+      expr: "response.query.memberships.size() == 1"
+      message: "No tienes acceso a este workspace."
+    )
+    @redact {
+    memberships(
+      where: {
+        workspaceId: {eq: $workspaceId}
+        userUid: {eq_expr: "auth.uid"}
+        status: {eq: "active"}
+      }
+      limit: 1
+    ) {
+      role
+    }
+  }
+
+  financialCommitment_insert(
+    data: {
+      workspaceId: $workspaceId
+      projectId: $projectId
+      legacyId: $legacyId
+      title: $title
+      amountMinor: $amountMinor
+      currency: $currency
+      dueDate: $dueDate
+      category: $category
+      status: $status
+      notes: $notes
+    }
+  )
+}
