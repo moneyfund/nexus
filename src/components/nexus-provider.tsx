@@ -27,6 +27,7 @@ import {
 import { RestFirebaseStorageProvider } from "@/services/firebase-storage";
 import { NexusOpenAIClient } from "@/services/openai";
 import { firebaseClient, type FirebaseSession } from "@/lib/firebase";
+import { sqlConnectClient, type SqlWorkspaceSummary } from "@/lib/sql-connect";
 import {
   clearGoogleWorkspaceGrant,
   readGoogleWorkspaceGrant,
@@ -127,6 +128,9 @@ function useSystem() {
   const [authReady, setAuthReady] = useState(false);
   const [cloudReady, setCloudReady] = useState(false);
   const [cloudError, setCloudError] = useState("");
+  const [sqlReady, setSqlReady] = useState(false);
+  const [sqlWorkspace, setSqlWorkspace] = useState<SqlWorkspaceSummary | null>(null);
+  const [sqlError, setSqlError] = useState("");
   const syncTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [captureOpen, setCaptureOpen] = useState(false);
@@ -147,6 +151,9 @@ function useSystem() {
   const activateSession = useCallback(async (next: FirebaseSession) => {
     setCloudReady(false);
     setCloudError("");
+    setSqlReady(false);
+    setSqlWorkspace(null);
+    setSqlError("");
 
     const nextStore = buildUserStore(next);
     setStore(nextStore);
@@ -163,6 +170,26 @@ function useSystem() {
       );
       throw error;
     }
+
+    void sqlConnectClient
+      .bootstrapPersonalWorkspace({
+        session: next,
+        timezone: nextStore.getSnapshot().user.preferences.timezone,
+        preferences: nextStore.getSnapshot().user.preferences,
+      })
+      .then((result) => {
+        setSqlWorkspace(result.workspace);
+        setSqlReady(true);
+        setSqlError("");
+      })
+      .catch((error) => {
+        setSqlReady(false);
+        setSqlError(
+          error instanceof Error
+            ? error.message
+            : "PostgreSQL todavía no está disponible.",
+        );
+      });
   }, []);
 
   useEffect(() => {
@@ -305,6 +332,9 @@ function useSystem() {
     setSession(null);
     setCloudReady(false);
     setCloudError("");
+    setSqlReady(false);
+    setSqlWorkspace(null);
+    setSqlError("");
     setStore(createLocalStore());
     notify("Sesión cerrada.");
   };
@@ -344,6 +374,9 @@ function useSystem() {
     session,
     authReady,
     cloudReady,
+    sqlReady,
+    sqlWorkspace,
+    sqlError,
     googleWorkspace: {
       connected: googleConnected,
       expiresAt: googleGrant?.expiresAt,
