@@ -396,7 +396,7 @@ type IntegrationConnection @table {
   updatedAt: Timestamp! @default(expr: "request.time")
 }
 
-type AIConversation @table {
+type AiConversation @table {
   legacyId: String
   workspace: Workspace!
   user: AppUser!
@@ -407,9 +407,9 @@ type AIConversation @table {
   updatedAt: Timestamp! @default(expr: "request.time")
 }
 
-type AIMessage @table {
+type AiMessage @table {
   legacyId: String
-  conversation: AIConversation!
+  conversation: AiConversation!
   role: String!
   content: String!
   contextIds: [String!]
@@ -421,7 +421,7 @@ type AIMessage @table {
   createdAt: Timestamp! @default(expr: "request.time")
 }
 
-type AIMemory @table {
+type AiMemory @table {
   legacyId: String
   workspace: Workspace!
   user: AppUser!
@@ -437,7 +437,7 @@ type AIMemory @table {
   updatedAt: Timestamp! @default(expr: "request.time")
 }
 
-type AIUsage @table {
+type AiUsage @table {
   legacyId: String
   workspace: Workspace!
   user: AppUser!
@@ -450,11 +450,11 @@ type AIUsage @table {
   createdAt: Timestamp! @default(expr: "request.time")
 }
 
-type AIToolAction @table {
+type AiToolAction @table {
   legacyId: String
   workspace: Workspace!
   user: AppUser!
-  conversation: AIConversation
+  conversation: AiConversation
   tool: String!
   action: String!
   status: String!
@@ -528,7 +528,7 @@ type VoiceSession @table {
   legacyId: String
   workspace: Workspace!
   user: AppUser!
-  conversation: AIConversation
+  conversation: AiConversation
   provider: String!
   model: String
   startedAt: Timestamp! @default(expr: "request.time")
