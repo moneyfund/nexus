@@ -4,7 +4,7 @@ import type {
   ProjectStatus,
 } from "@/domain/models";
 import { firebaseClient } from "@/lib/firebase";
-import type { AIProvider, NexusContext } from "@/services/providers";
+import { MockAIProvider, type AIProvider, type NexusContext } from "@/services/providers";
 
 export type NexusAIAction =
   | {
@@ -94,10 +94,10 @@ export class NexusOpenAIClient implements AIProvider {
   async status() {
     if (STATIC_GITHUB_PAGES)
       return {
-        configured: false,
-        model: "",
+        configured: true,
+        model: "NEXUS-LOCAL",
         error:
-          "NEXUS AI requiere backend y está desactivado en la copia temporal de GitHub Pages.",
+          "Modo local activo en GitHub Pages. La IA real se activa en un despliegue con backend seguro.",
       };
     const response = await fetch("/api/ai", { cache: "no-store" });
     if (!response.ok)
@@ -114,10 +114,16 @@ export class NexusOpenAIClient implements AIProvider {
     context: NexusContext,
     signal?: AbortSignal,
   ): Promise<NexusAIResponse> {
-    if (STATIC_GITHUB_PAGES)
-      throw new Error(
-        "NEXUS AI no puede ejecutarse en GitHub Pages porque requiere un backend seguro. El resto de NEXUS sigue disponible.",
-      );
+    if (STATIC_GITHUB_PAGES) {
+      const local = new MockAIProvider();
+      const message = await local.respond(prompt, context, signal);
+      return {
+        message,
+        actions: [],
+        model: "NEXUS-LOCAL",
+        usage: { inputTokens: 0, outputTokens: 0 },
+      };
+    }
     const idToken = await firebaseClient.getIdToken();
     const response = await fetch("/api/ai", {
       method: "POST",
