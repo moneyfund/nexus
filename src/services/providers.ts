@@ -367,11 +367,12 @@ export class NexusContextBuilder {
             .sort((a, b) => b.updatedAt - a.updatedAt)
             .slice(0, 100)
         : [],
-      ideas: w.ideas
-        .slice()
-        .sort((a, b) => b.updatedAt - a.updatedAt)
-        .slice(0, 60)
-        .map(
+      ideas: c.knowledge
+        ? w.ideas
+            .slice()
+            .sort((a, b) => b.updatedAt - a.updatedAt)
+            .slice(0, 60)
+            .map(
           ({
             id,
             title,
@@ -395,16 +396,19 @@ export class NexusContextBuilder {
             reviewDate,
             updatedAt,
           }),
-        ),
-      recentActivity: w.activity
-        .slice(0, 60)
-        .map(({ id, title, kind, projectId, createdAt }) => ({
-          id,
-          title,
-          kind,
-          projectId,
-          createdAt,
-        })),
+        )
+        : [],
+      recentActivity: c.projects
+        ? w.activity
+            .slice(0, 60)
+            .map(({ id, title, kind, projectId, createdAt }) => ({
+              id,
+              title,
+              kind,
+              projectId,
+              createdAt,
+            }))
+        : [],
       finance: c.finance
         ? w.projects.map((project) => {
             const finance = projectFinance(w, project);
