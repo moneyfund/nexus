@@ -19,6 +19,7 @@ import { useNexus } from "../nexus-provider";
 import { ModuleFrame, Button, Label, Badge } from "../ui/primitives";
 import { SYSTEM } from "@/config/system";
 import { nexusDataModeInfo } from "@/config/data-backend";
+import { buildSqlMigrationPlan, summarizeSqlMigrationPlan } from "@/migrations/sql-connect";
 const sections = [
   { id: "profile", label: "Profile", icon: UserRound },
   { id: "appearance", label: "Appearance", icon: Palette },
@@ -42,6 +43,7 @@ export function SettingsView() {
   const name = profileDraft?.name ?? n.data.user.name;
   const email = profileDraft?.email ?? n.data.user.email;
   const [pendingImport, setPendingImport] = useState<unknown>(null);
+  const [sqlMigrationPreview, setSqlMigrationPreview] = useState<ReturnType<typeof summarizeSqlMigrationPlan> | null>(null);
   const [aiStatus, setAIStatus] = useState<{
     configured: boolean;
     model: string;
@@ -451,6 +453,21 @@ export function SettingsView() {
                   <Upload size={16} />
                   Importar respaldo
                 </Button>
+                <Button
+                  variant="secondary"
+                  disabled={!n.session}
+                  onClick={() =>
+                    n.run(() => {
+                      if (!n.session) throw new Error("Inicia sesión para preparar la migración.");
+                      const plan = buildSqlMigrationPlan(n.data, n.session.uid);
+                      setSqlMigrationPreview(summarizeSqlMigrationPlan(plan));
+                      return true;
+                    }, "Previsualización SQL preparada.")
+                  }
+                >
+                  <Database size={16} />
+                  Previsualizar migración SQL
+                </Button>
                 <input
                   ref={fileRef}
                   type="file"
@@ -494,6 +511,36 @@ export function SettingsView() {
                       Cancelar
                     </Button>
                   </div>
+                </div>
+              )}
+              {sqlMigrationPreview && (
+                <div className="surface" style={{ marginTop: 18 }}>
+                  <Label>SQL MIGRATION / DRY RUN</Label>
+                  <div className="integration-row">
+                    <span>Proyectos / tareas / hitos</span>
+                    <strong>
+                      {sqlMigrationPreview.projects} / {sqlMigrationPreview.tasks} /{" "}
+                      {sqlMigrationPreview.milestones}
+                    </strong>
+                  </div>
+                  <div className="integration-row">
+                    <span>Finanzas / calendario / conocimiento</span>
+                    <strong>
+                      {sqlMigrationPreview.transactions} /{" "}
+                      {sqlMigrationPreview.calendarEvents} /{" "}
+                      {sqlMigrationPreview.knowledge}
+                    </strong>
+                  </div>
+                  <div className="integration-row">
+                    <span>Incidencias detectadas</span>
+                    <Badge active={sqlMigrationPreview.issues === 0}>
+                      {sqlMigrationPreview.issues}
+                    </Badge>
+                  </div>
+                  <p className="form-note">
+                    Esta revisión no escribe nada en PostgreSQL. Solo normaliza
+                    el workspace actual y cuenta qué registros se copiarían.
+                  </p>
                 </div>
               )}
               <div className="integration-row">
