@@ -47,6 +47,13 @@ export function SettingsView() {
   const [sqlMigrationPreview, setSqlMigrationPreview] = useState<ReturnType<typeof summarizeSqlMigrationPlan> | null>(null);
   const [sqlWorkspaceOverride, setSqlWorkspaceOverride] = useState<SqlWorkspaceSummary | null>(null);
   const [sqlChecking, setSqlChecking] = useState(false);
+  const [sqlSyncing, setSqlSyncing] = useState(false);
+  const [sqlSyncSummary, setSqlSyncSummary] = useState<{
+    projectsCreated: number;
+    projectsUpdated: number;
+    tasksCreated: number;
+    tasksUpdated: number;
+  } | null>(null);
   const sqlWorkspace = sqlWorkspaceOverride ?? n.sqlWorkspace;
   const [aiStatus, setAIStatus] = useState<{
     configured: boolean;
@@ -502,6 +509,33 @@ export function SettingsView() {
                       ? "PostgreSQL conectado"
                       : "Inicializar PostgreSQL"}
                 </Button>
+                <Button
+                  variant="secondary"
+                  disabled={!sqlWorkspace || sqlSyncing}
+                  onClick={() =>
+                    n.run(async () => {
+                      if (!sqlWorkspace)
+                        throw new Error("Inicializa PostgreSQL primero.");
+                      setSqlSyncing(true);
+                      try {
+                        const summary =
+                          await sqlConnectClient.shadowSyncProjects({
+                            workspace: n.data,
+                            sqlWorkspaceId: sqlWorkspace.id,
+                          });
+                        setSqlSyncSummary(summary);
+                        return true;
+                      } finally {
+                        setSqlSyncing(false);
+                      }
+                    }, "Proyectos y tareas sincronizados con PostgreSQL.")
+                  }
+                >
+                  <Database size={16} />
+                  {sqlSyncing
+                    ? "Sincronizando..."
+                    : "Sincronizar proyectos → PostgreSQL"}
+                </Button>
                 <input
                   ref={fileRef}
                   type="file"
@@ -545,6 +579,30 @@ export function SettingsView() {
                       Cancelar
                     </Button>
                   </div>
+                </div>
+              )}
+              {sqlSyncSummary && (
+                <div className="surface" style={{ marginTop: 18 }}>
+                  <Label>POSTGRESQL / SHADOW SYNC</Label>
+                  <div className="integration-row">
+                    <span>Proyectos creados / actualizados</span>
+                    <strong>
+                      {sqlSyncSummary.projectsCreated} /{" "}
+                      {sqlSyncSummary.projectsUpdated}
+                    </strong>
+                  </div>
+                  <div className="integration-row">
+                    <span>Tareas creadas / actualizadas</span>
+                    <strong>
+                      {sqlSyncSummary.tasksCreated} /{" "}
+                      {sqlSyncSummary.tasksUpdated}
+                    </strong>
+                  </div>
+                  <p className="form-note">
+                    Firestore sigue siendo la fuente principal. Esta copia
+                    permite validar PostgreSQL con tus datos reales sin cortar
+                    todavía el sistema actual.
+                  </p>
                 </div>
               )}
               {sqlWorkspace && (
