@@ -4185,3 +4185,71 @@ html[data-motion="reduced"] *:after {
     padding: 16px;
   }
 }
+
+
+/* NEXUS Today quick command deck */
+.nexus-command-deck {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 10px;
+  margin: 18px 0 26px;
+}
+.nexus-command-deck > button {
+  min-height: 94px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background:
+    radial-gradient(circle at 80% 0%, color-mix(in srgb, var(--accent-bright) 11%, transparent), transparent 45%),
+    rgba(10, 8, 13, 0.72);
+  color: var(--text);
+  display: grid;
+  grid-template-columns: 34px 1fr;
+  grid-template-rows: auto auto;
+  column-gap: 11px;
+  align-content: center;
+  text-align: left;
+  padding: 14px;
+  transition: transform .22s ease, border-color .22s ease, background .22s ease;
+}
+.nexus-command-deck > button:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--accent-bright) 45%, var(--line));
+  background:
+    radial-gradient(circle at 80% 0%, color-mix(in srgb, var(--accent-bright) 18%, transparent), transparent 50%),
+    rgba(13, 9, 17, 0.9);
+}
+.nexus-command-deck > button > span {
+  grid-row: 1 / 3;
+  align-self: center;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 11px;
+  color: var(--accent-bright);
+  border: 1px solid color-mix(in srgb, var(--accent-bright) 28%, transparent);
+  background: color-mix(in srgb, var(--accent-bright) 8%, transparent);
+}
+.nexus-command-deck strong {
+  font-size: .88rem;
+  letter-spacing: .01em;
+}
+.nexus-command-deck small {
+  color: var(--muted);
+  margin-top: 3px;
+  font-size: .72rem;
+}
+@media (max-width: 1180px) {
+  .nexus-command-deck {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@media (max-width: 650px) {
+  .nexus-command-deck {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin-top: 12px;
+  }
+  .nexus-command-deck > button {
+    min-height: 82px;
+  }
+}
