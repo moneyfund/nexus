@@ -106,6 +106,12 @@ export function AIView() {
         return "Cambiar estado · " + projectName + " → " + (action.status ?? "");
       case "update_project_value":
         return "Actualizar valor · " + projectName + " → $" + (action.value ?? 0);
+      case "create_event":
+        return "Crear evento · " + (action.title ?? "Evento");
+      case "create_idea":
+        return "Guardar idea · " + (action.title ?? action.content ?? "Nueva idea");
+      case "add_memory":
+        return "Guardar memoria · " + (action.content ?? "Contexto");
     }
   }
 
@@ -169,6 +175,50 @@ export function AIView() {
             throw new Error("Falta un valor válido para el proyecto.");
           n.actions.updateProject(action.projectId, { value: action.value });
           break;
+        case "create_event": {
+          if (!action.title?.trim() || !action.start || !action.end)
+            throw new Error("Faltan título, inicio o fin para el evento.");
+          const start = new Date(action.start);
+          const end = new Date(action.end);
+          if (
+            !Number.isFinite(+start) ||
+            !Number.isFinite(+end) ||
+            +end <= +start
+          )
+            throw new Error("El horario propuesto para el evento no es válido.");
+          n.actions.saveEvent({
+            ...entity(crypto.randomUUID(), "user", n.data.user.id),
+            title: action.title.trim(),
+            start: start.toISOString(),
+            end: end.toISOString(),
+            category: action.category ?? "personal",
+            projectId: action.projectId || undefined,
+            description: action.description || undefined,
+          });
+          break;
+        }
+        case "create_idea": {
+          const content = action.content?.trim() || action.title?.trim();
+          if (!content) throw new Error("La idea propuesta está vacía.");
+          n.actions.capture({
+            type: "idea",
+            content,
+            projectId: action.projectId || undefined,
+          });
+          break;
+        }
+        case "add_memory": {
+          const content = action.content?.trim();
+          if (!content) throw new Error("La memoria propuesta está vacía.");
+          n.update((w) => {
+            w.memories.push({
+              ...entity(crypto.randomUUID(), "user", w.user.id),
+              content,
+              projectIds: action.projectId ? [action.projectId] : [],
+            });
+          });
+          break;
+        }
       }
       return true;
     }, "Acción aplicada en NEXUS.");
