@@ -20,6 +20,7 @@ import { ModuleFrame, Button, Label, Badge } from "../ui/primitives";
 import { SYSTEM } from "@/config/system";
 import { nexusDataModeInfo } from "@/config/data-backend";
 import { buildSqlMigrationPlan, summarizeSqlMigrationPlan } from "@/migrations/sql-connect";
+import { sqlConnectClient, type SqlWorkspaceSummary } from "@/lib/sql-connect";
 const sections = [
   { id: "profile", label: "Profile", icon: UserRound },
   { id: "appearance", label: "Appearance", icon: Palette },
@@ -44,6 +45,8 @@ export function SettingsView() {
   const email = profileDraft?.email ?? n.data.user.email;
   const [pendingImport, setPendingImport] = useState<unknown>(null);
   const [sqlMigrationPreview, setSqlMigrationPreview] = useState<ReturnType<typeof summarizeSqlMigrationPlan> | null>(null);
+  const [sqlWorkspace, setSqlWorkspace] = useState<SqlWorkspaceSummary | null>(null);
+  const [sqlChecking, setSqlChecking] = useState(false);
   const [aiStatus, setAIStatus] = useState<{
     configured: boolean;
     model: string;
@@ -468,6 +471,36 @@ export function SettingsView() {
                   <Database size={16} />
                   Previsualizar migración SQL
                 </Button>
+                <Button
+                  variant="secondary"
+                  disabled={!n.session || sqlChecking}
+                  onClick={() =>
+                    n.run(async () => {
+                      if (!n.session)
+                        throw new Error("Inicia sesión para conectar PostgreSQL.");
+                      setSqlChecking(true);
+                      try {
+                        const result =
+                          await sqlConnectClient.bootstrapPersonalWorkspace({
+                            session: n.session,
+                            timezone: prefs.timezone,
+                            preferences: prefs,
+                          });
+                        setSqlWorkspace(result.workspace);
+                        return true;
+                      } finally {
+                        setSqlChecking(false);
+                      }
+                    }, "Workspace PostgreSQL verificado.")
+                  }
+                >
+                  <Database size={16} />
+                  {sqlChecking
+                    ? "Conectando PostgreSQL..."
+                    : sqlWorkspace
+                      ? "PostgreSQL conectado"
+                      : "Inicializar PostgreSQL"}
+                </Button>
                 <input
                   ref={fileRef}
                   type="file"
@@ -511,6 +544,30 @@ export function SettingsView() {
                       Cancelar
                     </Button>
                   </div>
+                </div>
+              )}
+              {sqlWorkspace && (
+                <div className="surface" style={{ marginTop: 18 }}>
+                  <Label>SQL CONNECT / LIVE</Label>
+                  <div className="integration-row">
+                    <span>Workspace</span>
+                    <strong>{sqlWorkspace.name}</strong>
+                  </div>
+                  <div className="integration-row">
+                    <span>PostgreSQL ID</span>
+                    <code>{sqlWorkspace.id}</code>
+                  </div>
+                  <div className="integration-row">
+                    <span>Rol / estado</span>
+                    <Badge active={sqlWorkspace.status === "active"}>
+                      {sqlWorkspace.role} · {sqlWorkspace.status}
+                    </Badge>
+                  </div>
+                  <p className="form-note">
+                    Esta comprobación crea únicamente tu usuario/workspace base
+                    si todavía no existen. Firestore sigue siendo la fuente
+                    principal hasta completar la migración.
+                  </p>
                 </div>
               )}
               {sqlMigrationPreview && (
