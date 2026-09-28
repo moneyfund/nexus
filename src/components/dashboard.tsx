@@ -12,11 +12,19 @@ import {
   Orbit,
   Database,
   Mic,
+  Wallet,
+  ListTodo,
+  Lightbulb,
+  CalendarPlus,
 } from "lucide-react";
 import { motion } from "motion/react";
 import { useNexus } from "./nexus-provider";
 import { Badge, Button, Empty, Label, SectionHeading } from "./ui/primitives";
 import { dateKey, money, projectFinance } from "@/domain/selectors";
+function ArrowDownRightIcon() {
+  return <ArrowRight size={18} style={{ transform: "rotate(45deg)" }} />;
+}
+
 const Galaxy = dynamic(
   () => import("./nexus-galaxy").then((m) => m.NexusGalaxy),
   {
@@ -120,6 +128,38 @@ export function Dashboard() {
           <span>FROM THOUGHT TO ACTION</span>
         </div>
       </section>
+      <motion.section {...reveal} className="nexus-command-deck">
+        <button type="button" onClick={() => n.openCapture("expense")}>
+          <span><Wallet size={18} /></span>
+          <strong>Gasto</strong>
+          <small>Registrar salida</small>
+        </button>
+        <button type="button" onClick={() => n.openCapture("income")}>
+          <span><ArrowDownRightIcon /></span>
+          <strong>Ingreso</strong>
+          <small>Registrar cobro</small>
+        </button>
+        <button type="button" onClick={() => n.openCapture("task")}>
+          <span><ListTodo size={18} /></span>
+          <strong>Tarea</strong>
+          <small>Nueva acción</small>
+        </button>
+        <button type="button" onClick={() => n.openCapture("idea")}>
+          <span><Lightbulb size={18} /></span>
+          <strong>Idea</strong>
+          <small>Capturar ahora</small>
+        </button>
+        <button type="button" onClick={() => router.push("/calendar")}>
+          <span><CalendarPlus size={18} /></span>
+          <strong>Planificar</strong>
+          <small>Bloquear tiempo</small>
+        </button>
+        <button type="button" onClick={() => router.push("/ai")}>
+          <span><Mic size={18} /></span>
+          <strong>NEXUS</strong>
+          <small>Hablar / preguntar</small>
+        </button>
+      </motion.section>
       <motion.section {...reveal} className="directive-band">
         <div className="directive-marker">
           <span />
