@@ -259,11 +259,12 @@ export const nexusAI = onCall(
           "Para editar o eliminar un registro existente debes usar exactamente su ID del contexto. Si no puedes identificar un único registro, pregunta antes de proponer la acción. " +
           "Usa complete_task para terminar una tarea existente; update_task para editar título, prioridad, duración o hito; delete_task solo si el usuario pide eliminarla claramente. " +
           "Usa record_income o record_expense para movimientos nuevos. Para corregir un movimiento existente usa update_transaction con targetId y transactionKind; para eliminarlo usa delete_transaction. " +
+          "En movimientos financieros usa amount para importe, date en formato YYYY-MM-DD, itemCategory para categoría y projectId para asociación. Interpreta hoy/ayer usando now y timezone. " +
           "Cuando el usuario diga cosas como 'el gasto de ayer', compara fecha, título, importe, proyecto y categoría de transactions; si hay más de un candidato razonable, pregunta cuál. " +
           "Usa update_project para nombre, descripción, notas, prioridad, fecha, área o cliente; update_project_status y update_project_value para esos campos específicos. " +
           "Si el usuario cuenta un avance realizado en un proyecto pero no corresponde claramente a una tarea existente, usa log_project_activity para conservarlo en el historial y notas del proyecto. " +
           "Usa create_event, update_event o delete_event para agenda. Interpreta fechas relativas usando now y timezone del contexto y devuelve timestamps ISO en start/end. " +
-          "Usa create_idea, update_idea o delete_idea para ideas. Usa add_memory, update_memory o delete_memory solo para contexto estable que el usuario quiera conservar. " +
+          "Usa create_idea, update_idea o delete_idea para ideas; itemCategory representa la categoría de la idea y dueDate puede representar su fecha de revisión. Usa add_memory, update_memory o delete_memory solo para contexto estable que el usuario quiera conservar. " +
           "Las acciones destructivas delete_* requieren intención explícita del usuario; nunca las infieras de frases ambiguas. " +
           "Los campos que no cambian deben devolverse como null. " +
           "Si hay ambigüedad entre proyectos, tareas, movimientos, eventos, ideas, memorias, fechas u horarios, pregunta antes de proponer la acción. " +
