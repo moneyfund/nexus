@@ -1,0 +1,188 @@
+# NEXUS AI persistence operations.
+# The model never receives authority through a client-supplied user id.
+
+mutation CreateAIConversation(
+  $workspaceId: UUID!
+  $title: String!
+  $channel: String!
+) @auth(level: USER) @transaction {
+  query
+    @check(
+      expr: "response.query.memberships.size() == 1"
+      message: "No tienes acceso a este workspace."
+    )
+    @redact {
+    memberships(
+      where: {
+        workspaceId: {eq: $workspaceId}
+        userUid: {eq_expr: "auth.uid"}
+        status: {eq: "active"}
+      }
+      limit: 1
+    ) {
+      role
+    }
+  }
+
+  aiConversation_insert(
+    data: {
+      workspaceId: $workspaceId
+      userUid_expr: "auth.uid"
+      title: $title
+      channel: $channel
+      archived: false
+    }
+  )
+}
+
+mutation AddAIMessage(
+  $workspaceId: UUID!
+  $conversationId: UUID!
+  $role: String!
+  $content: String!
+  $contextIds: [String!]
+  $simulated: Boolean
+  $model: String
+  $inputTokens: Int
+  $outputTokens: Int
+  $latencyMs: Int
+) @auth(level: USER) @transaction {
+  query
+    @check(
+      expr: "response.query.memberships.size() == 1"
+      message: "No tienes acceso a este workspace."
+    )
+    @check(
+      expr: "response.query.conversations.size() == 1"
+      message: "La conversación no pertenece al usuario y workspace actuales."
+    )
+    @redact {
+    memberships(
+      where: {
+        workspaceId: {eq: $workspaceId}
+        userUid: {eq_expr: "auth.uid"}
+        status: {eq: "active"}
+      }
+      limit: 1
+    ) {
+      role
+    }
+    conversations: aiConversations(
+      where: {
+        id: {eq: $conversationId}
+        workspaceId: {eq: $workspaceId}
+        userUid: {eq_expr: "auth.uid"}
+      }
+      limit: 1
+    ) {
+      id
+    }
+  }
+
+  aiMessage_insert(
+    data: {
+      conversationId: $conversationId
+      role: $role
+      content: $content
+      contextIds: $contextIds
+      simulated: $simulated
+      model: $model
+      inputTokens: $inputTokens
+      outputTokens: $outputTokens
+      latencyMs: $latencyMs
+    }
+  )
+}
+
+mutation SaveAIMemory(
+  $workspaceId: UUID!
+  $legacyId: String
+  $content: String!
+  $kind: String!
+  $importance: Float!
+  $sourceType: String
+  $sourceId: String
+  $projectIds: [String!]
+  $metadata: Any
+) @auth(level: USER) @transaction {
+  query
+    @check(
+      expr: "response.query.memberships.size() == 1"
+      message: "No tienes acceso a este workspace."
+    )
+    @redact {
+    memberships(
+      where: {
+        workspaceId: {eq: $workspaceId}
+        userUid: {eq_expr: "auth.uid"}
+        status: {eq: "active"}
+      }
+      limit: 1
+    ) {
+      role
+    }
+  }
+
+  aiMemory_insert(
+    data: {
+      workspaceId: $workspaceId
+      userUid_expr: "auth.uid"
+      legacyId: $legacyId
+      content: $content
+      kind: $kind
+      importance: $importance
+      sourceType: $sourceType
+      sourceId: $sourceId
+      projectIds: $projectIds
+      active: true
+      metadata: $metadata
+    }
+  )
+}
+
+mutation LogAIToolAction(
+  $workspaceId: UUID!
+  $conversationId: UUID
+  $tool: String!
+  $action: String!
+  $status: String!
+  $riskLevel: String!
+  $requiresConfirmation: Boolean!
+  $input: Any
+  $result: Any
+  $error: String
+) @auth(level: USER) @transaction {
+  query
+    @check(
+      expr: "response.query.memberships.size() == 1"
+      message: "No tienes acceso a este workspace."
+    )
+    @redact {
+    memberships(
+      where: {
+        workspaceId: {eq: $workspaceId}
+        userUid: {eq_expr: "auth.uid"}
+        status: {eq: "active"}
+      }
+      limit: 1
+    ) {
+      role
+    }
+  }
+
+  aiToolAction_insert(
+    data: {
+      workspaceId: $workspaceId
+      userUid_expr: "auth.uid"
+      conversationId: $conversationId
+      tool: $tool
+      action: $action
+      status: $status
+      riskLevel: $riskLevel
+      requiresConfirmation: $requiresConfirmation
+      input: $input
+      result: $result
+      error: $error
+    }
+  )
+}
