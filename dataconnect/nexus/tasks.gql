@@ -98,7 +98,7 @@ mutation SetTaskCompletion(
     }
     data: {
       completed: $completed
-      completedAt_expr: "$completed ? request.time : null"
+      completedAt_expr: "vars.completed ? request.time : null"
       updatedAt_expr: "request.time"
     }
   )
@@ -107,12 +107,12 @@ mutation SetTaskCompletion(
 mutation UpdateTask(
   $workspaceId: UUID!
   $taskId: UUID!
-  $title: String
+  $title: String!
   $description: String
-  $estimatedMinutes: Int
-  $priority: String
+  $estimatedMinutes: Int!
+  $priority: String!
   $dueDate: Date
-  $sortOrder: Int
+  $sortOrder: Int!
 ) @auth(level: USER) @transaction {
   query
     @check(
