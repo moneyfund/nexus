@@ -540,3 +540,30 @@ type VoiceSession @table {
   costMicrosUsd: Int64!
   metadata: Any
 }
+
+
+type AiToolPolicy @table(key: ["workspace", "role", "tool"]) {
+  workspace: Workspace!
+  role: String!
+  tool: String!
+  permission: String!
+  requiresConfirmation: Boolean!
+  riskLevel: String!
+  createdAt: Timestamp! @default(expr: "request.time")
+  updatedAt: Timestamp! @default(expr: "request.time")
+}
+
+type DeviceRegistration @table {
+  legacyId: String
+  workspace: Workspace!
+  user: AppUser!
+  name: String!
+  platform: String!
+  appVersion: String
+  pushProvider: String
+  pushSubscription: Any
+  notificationsEnabled: Boolean!
+  lastSeenAt: Timestamp! @default(expr: "request.time")
+  createdAt: Timestamp! @default(expr: "request.time")
+  updatedAt: Timestamp! @default(expr: "request.time")
+}
