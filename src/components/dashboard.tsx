@@ -10,6 +10,8 @@ import {
   Plus,
   ArrowDown,
   Orbit,
+  Database,
+  Mic,
 } from "lucide-react";
 import { motion } from "motion/react";
 import { useNexus } from "./nexus-provider";
@@ -301,11 +303,38 @@ export function Dashboard() {
             </p>
             <strong>{money(receivable)}</strong>
           </Link>
+          <div className="signal-row nexus-backend-signal">
+            <span className="signal-index">
+              <Database size={15} />
+            </span>
+            <p>
+              PostgreSQL / SQL Connect
+              <span className="small muted">
+                {" "}
+                {n.sqlReady
+                  ? "workspace personal conectado"
+                  : n.sqlError
+                    ? "pendiente de conexión"
+                    : "inicializando"}
+              </span>
+            </p>
+            <Badge active={n.sqlReady}>
+              {n.sqlReady ? "LIVE" : "SYNC"}
+            </Badge>
+          </div>
           <Link href="/ai" className="ai-invitation">
             <Orbit size={25} strokeWidth={1.2} />
             <div>
               <h3>Piensa con NEXUS.</h3>
               <p>Explora el contexto de tu sistema.</p>
+            </div>
+            <ArrowUpRight size={18} />
+          </Link>
+          <Link href="/capture" className="ai-invitation">
+            <Mic size={25} strokeWidth={1.2} />
+            <div>
+              <h3>Captura en segundos.</h3>
+              <p>Gastos, tareas, ingresos, ideas y notas desde móvil.</p>
             </div>
             <ArrowUpRight size={18} />
           </Link>
