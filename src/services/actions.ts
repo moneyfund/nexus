@@ -645,8 +645,51 @@ export class NexusActions {
     });
   deleteEvent = (eventId: string) =>
     this.store.update((w) => {
+      const event = w.events.find((item) => item.id === eventId);
+      if (!event) throw new Error("Evento no encontrado.");
       w.events = w.events.filter((e) => e.id !== eventId);
+      log(w, "Evento eliminado: " + event.title, "calendar", event.projectId);
     });
+
+  updateMemory = (memoryId: string, content: string, projectId?: string) =>
+    this.store.update((w) => {
+      const memory = w.memories.find((item) => item.id === memoryId);
+      if (!memory) throw new Error("Memoria no encontrada.");
+      const clean = content.trim();
+      if (!clean) throw new Error("La memoria no puede quedar vacía.");
+      if (projectId && !w.projects.some((project) => project.id === projectId))
+        throw new Error("Proyecto no encontrado.");
+      memory.content = clean;
+      memory.projectIds = projectId ? [projectId] : memory.projectIds;
+      memory.updatedAt = Date.now();
+      log(w, "Memoria actualizada", "memory", projectId);
+    });
+
+  deleteMemory = (memoryId: string) =>
+    this.store.update((w) => {
+      const memory = w.memories.find((item) => item.id === memoryId);
+      if (!memory) throw new Error("Memoria no encontrada.");
+      w.memories = w.memories.filter((item) => item.id !== memoryId);
+      log(w, "Memoria eliminada", "memory", memory.projectIds[0]);
+    });
+
+  logProjectActivity = (projectId: string, content: string) =>
+    this.store.update((w) => {
+      const project = w.projects.find((item) => item.id === projectId);
+      if (!project) throw new Error("Proyecto no encontrado.");
+      const clean = content.trim();
+      if (!clean) throw new Error("Describe el avance realizado.");
+      const date = new Intl.DateTimeFormat("en-CA", {
+        timeZone: w.user.preferences.timezone,
+      }).format(new Date());
+      const line = "[" + date + "] " + clean;
+      project.notes = project.notes?.trim()
+        ? project.notes.trimEnd() + "\n" + line
+        : line;
+      project.updatedAt = Date.now();
+      log(w, "Avance: " + clean, "project-activity", projectId);
+    });
+
   updatePreferences = (patch: Partial<UserPreferences>) =>
     this.store.update((w) => {
       Object.assign(w.user.preferences, patch);
