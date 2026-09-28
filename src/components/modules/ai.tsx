@@ -201,7 +201,7 @@ export function AIView() {
           provider: "openai",
           inputTokens: result.usage.inputTokens,
           outputTokens: result.usage.outputTokens,
-          costUSD: 0,
+          costUSD: result.costUSD,
           metadata: { model: result.model },
         });
       });
@@ -237,7 +237,7 @@ export function AIView() {
       action={
         <Badge active={!!aiStatus?.configured}>
           {aiStatus?.configured
-            ? "OPENAI · " + aiStatus.model.toUpperCase()
+            ? "OPENAI · " + aiStatus.model.toUpperCase() + " · LIVE"
             : aiStatus
               ? "OPENAI · CONFIGURACIÓN PENDIENTE"
               : "OPENAI · COMPROBANDO"}
@@ -281,7 +281,9 @@ export function AIView() {
               <article className={"ai-message " + m.role} key={m.id}>
                 <Label>
                   {m.role === "assistant"
-                    ? "NEXUS · OPENAI"
+                    ? m.simulated
+                      ? "NEXUS · LOCAL"
+                      : "NEXUS · OPENAI"
                     : n.data.user.name.toUpperCase()}
                 </Label>
                 <p>{m.content}</p>
@@ -345,11 +347,10 @@ export function AIView() {
           )}
           {aiStatus && !aiStatus.configured && (
             <div className="system-alert" style={{ marginBottom: 22 }}>
-              <strong>NEXUS AI está preparado, pero aún no tiene credencial.</strong>
+              <strong>NEXUS AI todavía no puede conectar con OpenAI.</strong>
               <p style={{ marginTop: 8 }}>
-                Añade OPENAI_API_KEY y NEXUS_OWNER_UID en las variables de
-                entorno de Vercel para activar respuestas reales solo para tu
-                cuenta. El resto del sistema sigue funcionando sin esas variables.
+                El backend seguro de Firebase Functions debe estar desplegado y
+                tener configurado el secreto OPENAI_API_KEY.
               </p>
             </div>
           )}
