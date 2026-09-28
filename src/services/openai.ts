@@ -3,7 +3,8 @@ import type {
   AIMessage,
   ProjectStatus,
 } from "@/domain/models";
-import { firebaseClient } from "@/lib/firebase";
+import { firebaseApp } from "@/lib/firebase";
+import { getFunctions, httpsCallable } from "firebase/functions";
 import { MockAIProvider, type AIProvider, type NexusContext } from "@/services/providers";
 
 export type NexusAIAction =
@@ -71,6 +72,7 @@ export interface NexusAIResponse {
     inputTokens: number;
     outputTokens: number;
   };
+  costUSD: number;
 }
 
 interface APIResponse {
@@ -79,34 +81,42 @@ interface APIResponse {
     actions?: Array<NexusAIAction | { type: "none"; reason: string }>;
   };
   model?: string;
+  provider?: string;
   usage?: {
     inputTokens?: number;
     outputTokens?: number;
   };
-  error?: string;
-  code?: string;
+  costUSD?: number;
 }
 
-const STATIC_GITHUB_PAGES =
-  process.env.NEXT_PUBLIC_DEPLOY_TARGET === "github-pages";
+const functions = getFunctions(firebaseApp, "us-east4");
+const callAI = httpsCallable<
+  { prompt: string; context: NexusContext; model?: string },
+  APIResponse
+>(functions, "nexusAI");
+const callAIStatus = httpsCallable<
+  Record<string, never>,
+  { configured: boolean; model: string; provider: string; mode: string }
+>(functions, "nexusAIStatus");
 
 export class NexusOpenAIClient implements AIProvider {
   async status() {
-    if (STATIC_GITHUB_PAGES)
+    try {
+      const response = await callAIStatus({});
       return {
-        configured: true,
-        model: "NEXUS-LOCAL",
-        error:
-          "Modo local activo en GitHub Pages. La IA real se activa en un despliegue con backend seguro.",
+        configured: response.data.configured,
+        model: response.data.model,
       };
-    const response = await fetch("/api/ai", { cache: "no-store" });
-    if (!response.ok)
-      return { configured: false, model: "", error: "NEXUS AI no responde." };
-    return (await response.json()) as {
-      configured: boolean;
-      model: string;
-      error?: string;
-    };
+    } catch (error) {
+      return {
+        configured: false,
+        model: "",
+        error:
+          error instanceof Error
+            ? error.message
+            : "NEXUS AI todavía no está disponible.",
+      };
+    }
   }
 
   async respondDetailed(
@@ -114,31 +124,12 @@ export class NexusOpenAIClient implements AIProvider {
     context: NexusContext,
     signal?: AbortSignal,
   ): Promise<NexusAIResponse> {
-    if (STATIC_GITHUB_PAGES) {
-      const local = new MockAIProvider();
-      const message = await local.respond(prompt, context, signal);
-      return {
-        message,
-        actions: [],
-        model: "NEXUS-LOCAL",
-        usage: { inputTokens: 0, outputTokens: 0 },
-      };
-    }
-    const idToken = await firebaseClient.getIdToken();
-    const response = await fetch("/api/ai", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: "Bearer " + idToken,
-      },
-      body: JSON.stringify({ prompt, context }),
-      signal,
-    });
+    if (signal?.aborted) throw new DOMException("Cancelado", "AbortError");
 
-    const body = (await response.json()) as APIResponse;
-    if (!response.ok)
-      throw new Error(body.error || "NEXUS AI no pudo responder.");
+    const response = await callAI({ prompt, context });
+    if (signal?.aborted) throw new DOMException("Cancelado", "AbortError");
 
+    const body = response.data;
     const answer = body.result?.answer?.trim();
     if (!answer) throw new Error("NEXUS AI devolvió una respuesta vacía.");
 
@@ -166,9 +157,9 @@ export class NexusOpenAIClient implements AIProvider {
         inputTokens: body.usage?.inputTokens ?? 0,
         outputTokens: body.usage?.outputTokens ?? 0,
       },
+      costUSD: body.costUSD ?? 0,
     };
   }
-
   async respond(
     prompt: string,
     context: NexusContext,
