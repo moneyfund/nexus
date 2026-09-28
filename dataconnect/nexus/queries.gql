@@ -1,0 +1,146 @@
+# NEXUS 2.0 bootstrap queries.
+# All client operations start from auth.uid instead of accepting a user id.
+
+query GetCurrentUser @auth(level: USER) {
+  appUser(key: {uid_expr: "auth.uid"}) {
+    uid
+    email
+    displayName
+    photoUrl
+    locale
+    timezone
+    createdAt
+    updatedAt
+  }
+}
+
+query GetMyWorkspaces @auth(level: USER) {
+  appUser(key: {uid_expr: "auth.uid"}) {
+    memberships: memberships_on_user {
+      role
+      status
+      workspace {
+        id
+        name
+        slug
+        kind
+        currency
+        timezone
+        archived
+        createdAt
+        updatedAt
+      }
+    }
+  }
+}
+
+query GetMyProjects @auth(level: USER) {
+  appUser(key: {uid_expr: "auth.uid"}) {
+    memberships: memberships_on_user {
+      role
+      status
+      workspace {
+        id
+        projects: projects_on_workspace {
+          id
+          name
+          area
+          clientName
+          description
+          progress
+          status
+          priority
+          stage
+          deadline
+          dueDate
+          valueMinor
+          paidMinor
+          currency
+          accent
+          nextAction
+          hours
+          notes
+          archived
+          createdAt
+          updatedAt
+        }
+      }
+    }
+  }
+}
+
+query GetMyFinancialOverview @auth(level: USER) {
+  appUser(key: {uid_expr: "auth.uid"}) {
+    memberships: memberships_on_user {
+      workspace {
+        id
+        name
+        accounts: financialAccounts_on_workspace {
+          id
+          name
+          type
+          currency
+          openingBalanceMinor
+          archived
+        }
+        receivables: receivables_on_workspace {
+          id
+          title
+          amountMinor
+          paidMinor
+          currency
+          dueDate
+          status
+        }
+        payables: payables_on_workspace {
+          id
+          title
+          amountMinor
+          paidMinor
+          currency
+          dueDate
+          status
+        }
+        commitments: financialCommitments_on_workspace {
+          id
+          title
+          amountMinor
+          currency
+          dueDate
+          category
+          status
+        }
+      }
+    }
+  }
+}
+
+query GetMyCalendar($from: Timestamp!, $to: Timestamp!) @auth(level: USER) {
+  appUser(key: {uid_expr: "auth.uid"}) {
+    memberships: memberships_on_user {
+      workspace {
+        id
+        events: calendarEvents_on_workspace(
+          where: {
+            start: {lt: $to}
+            end: {gt: $from}
+          }
+        ) {
+          id
+          title
+          start
+          end
+          category
+          description
+          provider
+          providerId
+          syncStatus
+          project {
+            id
+            name
+          }
+        }
+      }
+    }
+  }
+}
