@@ -522,3 +522,21 @@ type MigrationCheckpoint @table {
   issues: Any
   checksum: String
 }
+
+
+type VoiceSession @table {
+  legacyId: String
+  workspace: Workspace!
+  user: AppUser!
+  conversation: AIConversation
+  provider: String!
+  model: String
+  startedAt: Timestamp! @default(expr: "request.time")
+  endedAt: Timestamp
+  inputAudioSeconds: Float!
+  outputAudioSeconds: Float!
+  transcriptionChars: Int!
+  synthesisChars: Int!
+  costMicrosUsd: Int64!
+  metadata: Any
+}
