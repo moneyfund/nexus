@@ -44,7 +44,23 @@ export function AIView() {
   >([]);
   const endRef = useRef<HTMLDivElement>(null);
   const requestRef = useRef(false);
+  const voiceBootRef = useRef(false);
   const context = n.services.context.build(n.data);
+
+  useEffect(() => {
+    if (voiceBootRef.current || typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const voicePrompt = params.get("q")?.trim();
+    if (!voicePrompt) return;
+
+    voiceBootRef.current = true;
+    setPrompt(voicePrompt);
+    window.history.replaceState({}, "", window.location.pathname);
+
+    if (params.get("send") === "1") {
+      void send(voicePrompt);
+    }
+  }, []);
 
   useEffect(() => {
     let active = true;
