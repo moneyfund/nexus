@@ -27,8 +27,15 @@ echo "2/6 · Generating SQL Connect SDKs..."
 "${FIREBASE[@]}" dataconnect:sdk:generate --project "$PROJECT_ID"
 
 echo "3/6 · Showing database schema diff..."
-"${FIREBASE[@]}" dataconnect:sql:diff "$SERVICE_ID" --project "$PROJECT_ID"
+DIFF_FILE="/tmp/nexus-sql-diff.txt"
+"${FIREBASE[@]}" dataconnect:sql:diff "$SERVICE_ID" --project "$PROJECT_ID" | tee "$DIFF_FILE"
 
+if grep -Eiq '(^|[[:space:]])(DROP|TRUNCATE)[[:space:]]' "$DIFF_FILE"; then
+  echo "SAFETY STOP: The SQL diff contains DROP/TRUNCATE. No migration was applied."
+  exit 3
+fi
+
+echo "Safety check passed: no DROP/TRUNCATE detected."
 echo "4/6 · Applying PostgreSQL schema migration..."
 "${FIREBASE[@]}" dataconnect:sql:migrate --force "$SERVICE_ID" --project "$PROJECT_ID"
 
