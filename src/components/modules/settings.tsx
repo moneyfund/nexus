@@ -18,6 +18,7 @@ import {
 import { useNexus } from "../nexus-provider";
 import { ModuleFrame, Button, Label, Badge } from "../ui/primitives";
 import { SYSTEM } from "@/config/system";
+import { nexusDataModeInfo } from "@/config/data-backend";
 const sections = [
   { id: "profile", label: "Profile", icon: UserRound },
   { id: "appearance", label: "Appearance", icon: Palette },
@@ -32,6 +33,7 @@ const sections = [
 ];
 export function SettingsView() {
   const n = useNexus();
+  const dataMode = nexusDataModeInfo();
   const [section, setSection] = useState("profile");
   const [profileDraft, setProfileDraft] = useState<{
     name: string;
@@ -516,9 +518,9 @@ export function SettingsView() {
             <>
               <h2>Un espacio privado y sincronizado.</h2>
               <p>
-                NEXUS usa Firebase Authentication para el acceso, Firestore
-                para sincronizar tu workspace y Firebase Storage para archivos.
-                Cada workspace se guarda bajo el UID autenticado. Google
+                NEXUS usa Firebase Authentication para el acceso y Firebase Storage
+                para archivos. El cambio de Firestore a SQL Connect/PostgreSQL
+                se realiza por etapas; el modo activo es ${dataMode.mode}. Google
                 Calendar y Drive se autorizan mediante OAuth por sesión, y NEXUS
                 AI usa un endpoint de servidor protegido por el token de Firebase.
               </p>
@@ -542,7 +544,11 @@ export function SettingsView() {
               <h2>System diagnostics.</h2>
               {[
                 ["NEXUS", SYSTEM.version],
-                ["Data adapter", "BrowserWorkspaceStorage + Firestore sync"],
+                ["Data mode", dataMode.mode],
+                ["Primary read", dataMode.primaryRead],
+                ["Primary write", dataMode.primaryWrite],
+                ["Shadow write", dataMode.shadowWrite],
+                ["SQL Connect", "nexus-core · us-east4"],
                 ["User ID", n.data.user.id],
                 [
                   "Auth session",
@@ -571,7 +577,7 @@ export function SettingsView() {
                 ["Storage", "Firebase Storage"],
                 [
                   "Persistence",
-                  n.storageError || (n.cloudReady ? "Firestore synced" : "Connecting"),
+                  n.storageError || (n.cloudReady ? "Current source synced" : "Connecting"),
                 ],
               ].map(([key, value]) => (
                 <div className="integration-row" key={key}>
