@@ -1,0 +1,15 @@
+specVersion: "v1beta"
+serviceId: nexus-core
+location: us-east4
+
+schema:
+  source: ./schema
+  datasource:
+    postgresql:
+      database: nexus-core
+      cloudSql:
+        instanceId: nexus-core-instance
+        schemaValidation: "COMPATIBLE"
+
+connectorDirs:
+  - ./nexus
