@@ -20,9 +20,7 @@ mutation UpsertCurrentUser(
       preferences: $preferences
       updatedAt_expr: "request.time"
     }
-  ) {
-    uid
-  }
+  )
 }
 
 mutation BootstrapPersonalWorkspace(
