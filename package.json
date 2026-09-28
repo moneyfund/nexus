@@ -13,7 +13,8 @@
     "dataconnect:diff": "npx --yes firebase-tools@latest dataconnect:sql:diff --service nexus-core --location us-east4 --project nexus-96795",
     "dataconnect:migrate": "npx --yes firebase-tools@latest dataconnect:sql:migrate --service nexus-core --location us-east4 --force --project nexus-96795",
     "dataconnect:deploy": "npx --yes firebase-tools@latest deploy --only dataconnect --project nexus-96795",
-    "dataconnect:cloud-shell": "bash scripts/deploy-dataconnect-cloud-shell.sh"
+    "dataconnect:cloud-shell": "bash scripts/deploy-dataconnect-cloud-shell.sh",
+    "ai:deploy": "bash scripts/deploy-nexus-ai.sh"
   },
   "dependencies": {
     "lucide-react": "1.47.0",
