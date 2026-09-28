@@ -235,15 +235,52 @@ export interface NexusContext {
     dueDate?: string;
     progress: number;
     value?: number;
+    paid?: number;
+    client?: string;
+    description: string;
+    notes?: string;
+    stage?: Workspace["projects"][number]["stage"];
+    hours: number;
     tasks: Array<{
       id: string;
       title: string;
       completed: boolean;
       milestone: string;
       priority: Workspace["projects"][number]["tasks"][number]["priority"];
+      estimatedMinutes: number;
+      completedAt?: number;
     }>;
   }>;
   events: CalendarEvent[];
+  transactions: Array<{
+    id: string;
+    kind: "income" | "expense";
+    title: string;
+    amount: number;
+    date: string;
+    projectId?: string;
+    category: string;
+    updatedAt: number;
+  }>;
+  ideas: Array<{
+    id: string;
+    title: string;
+    description: string;
+    category: string;
+    status: Workspace["ideas"][number]["status"];
+    potential: Workspace["ideas"][number]["potential"];
+    projectIds: string[];
+    notes: string;
+    reviewDate?: string;
+    updatedAt: number;
+  }>;
+  recentActivity: Array<{
+    id: string;
+    title: string;
+    kind: string;
+    projectId?: string;
+    createdAt: number;
+  }>;
   finance: Array<{
     projectId: string;
     value?: number;
@@ -286,16 +323,88 @@ export class NexusContextBuilder {
             dueDate: project.dueDate,
             progress: project.progress,
             value: project.value,
+            paid: project.paid,
+            client: project.client,
+            description: project.description,
+            notes: project.notes,
+            stage: project.stage,
+            hours: project.hours,
             tasks: project.tasks.map((task) => ({
               id: task.id,
               title: task.title,
               completed: task.completed,
               milestone: task.milestone,
               priority: task.priority,
+              estimatedMinutes: task.estimatedMinutes,
+              completedAt: task.completedAt,
             })),
           }))
         : [],
       events: c.calendar ? w.events : [],
+      transactions: c.finance
+        ? [
+            ...w.incomes.map((record) => ({
+              id: record.id,
+              kind: "income" as const,
+              title: record.title,
+              amount: record.amount,
+              date: record.date,
+              projectId: record.projectId,
+              category: record.category,
+              updatedAt: record.updatedAt,
+            })),
+            ...w.expenses.map((record) => ({
+              id: record.id,
+              kind: "expense" as const,
+              title: record.title,
+              amount: record.amount,
+              date: record.date,
+              projectId: record.projectId,
+              category: record.category,
+              updatedAt: record.updatedAt,
+            })),
+          ]
+            .sort((a, b) => b.updatedAt - a.updatedAt)
+            .slice(0, 100)
+        : [],
+      ideas: w.ideas
+        .slice()
+        .sort((a, b) => b.updatedAt - a.updatedAt)
+        .slice(0, 60)
+        .map(
+          ({
+            id,
+            title,
+            description,
+            category,
+            status,
+            potential,
+            projectIds,
+            notes,
+            reviewDate,
+            updatedAt,
+          }) => ({
+            id,
+            title,
+            description,
+            category,
+            status,
+            potential,
+            projectIds,
+            notes,
+            reviewDate,
+            updatedAt,
+          }),
+        ),
+      recentActivity: w.activity
+        .slice(0, 60)
+        .map(({ id, title, kind, projectId, createdAt }) => ({
+          id,
+          title,
+          kind,
+          projectId,
+          createdAt,
+        })),
       finance: c.finance
         ? w.projects.map((project) => {
             const finance = projectFinance(w, project);
@@ -344,11 +453,22 @@ export class NexusToolRegistry {
     { id: "finance.read", label: "Consultar finanzas", access: "read" },
     { id: "task.propose", label: "Proponer una tarea", access: "confirm" },
     { id: "task.complete", label: "Completar tarea", access: "confirm" },
+    { id: "task.update", label: "Editar tarea", access: "confirm" },
+    { id: "task.delete", label: "Eliminar tarea", access: "confirm" },
     { id: "finance.write", label: "Registrar movimiento", access: "confirm" },
+    { id: "finance.update", label: "Editar movimiento", access: "confirm" },
+    { id: "finance.delete", label: "Eliminar movimiento", access: "confirm" },
     { id: "calendar.write", label: "Crear evento", access: "confirm" },
+    { id: "calendar.update", label: "Editar evento", access: "confirm" },
+    { id: "calendar.delete", label: "Eliminar evento", access: "confirm" },
     { id: "idea.create", label: "Guardar idea", access: "confirm" },
+    { id: "idea.update", label: "Editar idea", access: "confirm" },
+    { id: "idea.delete", label: "Eliminar idea", access: "confirm" },
     { id: "memory.write", label: "Guardar memoria", access: "confirm" },
+    { id: "memory.update", label: "Editar memoria", access: "confirm" },
+    { id: "memory.delete", label: "Eliminar memoria", access: "confirm" },
     { id: "project.update", label: "Actualizar proyecto", access: "confirm" },
+    { id: "project.activity", label: "Registrar avance", access: "confirm" },
   ];
 }
 export interface AIProvider {
