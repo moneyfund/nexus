@@ -520,7 +520,7 @@ export function SettingsView() {
               <p>
                 NEXUS usa Firebase Authentication para el acceso y Firebase Storage
                 para archivos. El cambio de Firestore a SQL Connect/PostgreSQL
-                se realiza por etapas; el modo activo es ${dataMode.mode}. Google
+                se realiza por etapas; el modo activo es <strong>{dataMode.mode}</strong>. Google
                 Calendar y Drive se autorizan mediante OAuth por sesión, y NEXUS
                 AI usa un endpoint de servidor protegido por el token de Firebase.
               </p>
