@@ -1,5 +1,5 @@
-# Safe bootstrap mutations. Broader workspace/project mutations will be added
-# after the schema compiles against the provisioned Cloud SQL instance.
+# NEXUS 2.0 bootstrap and first secure write operations.
+# User identity always comes from Firebase Auth (auth.uid), never from a client UID.
 
 mutation UpsertCurrentUser(
   $email: String!
@@ -21,4 +21,159 @@ mutation UpsertCurrentUser(
   ) {
     uid
   }
+}
+
+mutation BootstrapPersonalWorkspace(
+  $email: String!
+  $displayName: String
+  $photoUrl: String
+  $locale: String
+  $timezone: String!
+  $workspaceName: String!
+  $workspaceSlug: String!
+  $legacyId: String
+) @auth(level: USER) @transaction {
+  appUser_upsert(
+    data: {
+      uid_expr: "auth.uid"
+      email: $email
+      displayName: $displayName
+      photoUrl: $photoUrl
+      locale: $locale
+      timezone: $timezone
+      updatedAt_expr: "request.time"
+    }
+  )
+
+  workspace_insert(
+    data: {
+      ownerUid_expr: "auth.uid"
+      legacyId: $legacyId
+      name: $workspaceName
+      slug: $workspaceSlug
+      kind: "personal"
+      currency: "USD"
+      timezone: $timezone
+      archived: false
+    }
+  )
+
+  membership_insert(
+    data: {
+      workspaceId_expr: "response.workspace_insert.id"
+      userUid_expr: "auth.uid"
+      role: "owner"
+      status: "active"
+    }
+  )
+}
+
+mutation CreateProject(
+  $workspaceId: UUID!
+  $legacyId: String
+  $name: String!
+  $area: String!
+  $clientName: String
+  $description: String!
+  $progress: Float!
+  $status: String!
+  $priority: String!
+  $stage: String
+  $deadline: Date
+  $dueDate: Date
+  $valueMinor: Int64
+  $paidMinor: Int64
+  $currency: String!
+  $accent: String
+  $nextAction: String
+  $hours: Float!
+  $notes: String
+  $source: String!
+  $metadata: Any
+) @auth(level: USER) @transaction {
+  query
+    @check(
+      expr: "response.query.memberships.size() == 1"
+      message: "No tienes acceso a este workspace."
+    )
+    @redact {
+    memberships(
+      where: {
+        workspaceId: {eq: $workspaceId}
+        userUid: {eq_expr: "auth.uid"}
+        status: {eq: "active"}
+      }
+      limit: 1
+    ) {
+      role
+    }
+  }
+
+  project_insert(
+    data: {
+      workspaceId: $workspaceId
+      legacyId: $legacyId
+      name: $name
+      area: $area
+      clientName: $clientName
+      description: $description
+      progress: $progress
+      status: $status
+      priority: $priority
+      stage: $stage
+      deadline: $deadline
+      dueDate: $dueDate
+      valueMinor: $valueMinor
+      paidMinor: $paidMinor
+      currency: $currency
+      accent: $accent
+      nextAction: $nextAction
+      hours: $hours
+      notes: $notes
+      source: $source
+      metadata: $metadata
+      archived: false
+    }
+  )
+}
+
+mutation UpdateProjectProgress(
+  $workspaceId: UUID!
+  $projectId: UUID!
+  $progress: Float!
+  $nextAction: String
+  $status: String
+) @auth(level: USER) @transaction {
+  query
+    @check(
+      expr: "response.query.memberships.size() == 1"
+      message: "No tienes acceso a este workspace."
+    )
+    @redact {
+    memberships(
+      where: {
+        workspaceId: {eq: $workspaceId}
+        userUid: {eq_expr: "auth.uid"}
+        status: {eq: "active"}
+      }
+      limit: 1
+    ) {
+      role
+    }
+  }
+
+  project_update(
+    first: {
+      where: {
+        id: {eq: $projectId}
+        workspaceId: {eq: $workspaceId}
+      }
+    }
+    data: {
+      progress: $progress
+      nextAction: $nextAction
+      status: $status
+      updatedAt_expr: "request.time"
+    }
+  )
 }
