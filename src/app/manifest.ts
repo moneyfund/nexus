@@ -40,7 +40,7 @@ export default function manifest(): MetadataRoute.Manifest {
     shortcuts: [
       { name: "NEXUS AI", short_name: "AI", url: path("/ai") },
       { name: "Finance", short_name: "Dinero", url: path("/finance") },
-      { name: "Projects", short_name: "Proyectos", url: path("/projects") },
+      { name: "Captura rápida", short_name: "Capturar", url: path("/capture") },
     ],
   };
 }
