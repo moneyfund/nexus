@@ -1,0 +1,152 @@
+# Task operations scoped to an authenticated workspace membership.
+
+mutation CreateTask(
+  $workspaceId: UUID!
+  $projectId: UUID!
+  $legacyId: String
+  $milestoneId: UUID
+  $legacyMilestoneLabel: String
+  $title: String!
+  $description: String
+  $estimatedMinutes: Int!
+  $priority: String!
+  $dueDate: Date
+  $sortOrder: Int!
+  $source: String!
+  $metadata: Any
+) @auth(level: USER) @transaction {
+  query
+    @check(
+      expr: "response.query.memberships.size() == 1"
+      message: "No tienes acceso a este workspace."
+    )
+    @check(
+      expr: "response.query.projects.size() == 1"
+      message: "El proyecto no pertenece a este workspace."
+    )
+    @redact {
+    memberships(
+      where: {
+        workspaceId: {eq: $workspaceId}
+        userUid: {eq_expr: "auth.uid"}
+        status: {eq: "active"}
+      }
+      limit: 1
+    ) {
+      role
+    }
+    projects(
+      where: {
+        id: {eq: $projectId}
+        workspaceId: {eq: $workspaceId}
+      }
+      limit: 1
+    ) {
+      id
+    }
+  }
+
+  task_insert(
+    data: {
+      workspaceId: $workspaceId
+      projectId: $projectId
+      milestoneId: $milestoneId
+      legacyId: $legacyId
+      legacyMilestoneLabel: $legacyMilestoneLabel
+      title: $title
+      description: $description
+      completed: false
+      estimatedMinutes: $estimatedMinutes
+      priority: $priority
+      dueDate: $dueDate
+      sortOrder: $sortOrder
+      source: $source
+      metadata: $metadata
+    }
+  )
+}
+
+mutation SetTaskCompletion(
+  $workspaceId: UUID!
+  $taskId: UUID!
+  $completed: Boolean!
+) @auth(level: USER) @transaction {
+  query
+    @check(
+      expr: "response.query.memberships.size() == 1"
+      message: "No tienes acceso a este workspace."
+    )
+    @redact {
+    memberships(
+      where: {
+        workspaceId: {eq: $workspaceId}
+        userUid: {eq_expr: "auth.uid"}
+        status: {eq: "active"}
+      }
+      limit: 1
+    ) {
+      role
+    }
+  }
+
+  task_update(
+    first: {
+      where: {
+        id: {eq: $taskId}
+        workspaceId: {eq: $workspaceId}
+      }
+    }
+    data: {
+      completed: $completed
+      completedAt_expr: "vars.completed ? request.time : null"
+      updatedAt_expr: "request.time"
+    }
+  )
+}
+
+mutation UpdateTask(
+  $workspaceId: UUID!
+  $taskId: UUID!
+  $title: String!
+  $description: String
+  $estimatedMinutes: Int!
+  $priority: String!
+  $dueDate: Date
+  $sortOrder: Int!
+) @auth(level: USER) @transaction {
+  query
+    @check(
+      expr: "response.query.memberships.size() == 1"
+      message: "No tienes acceso a este workspace."
+    )
+    @redact {
+    memberships(
+      where: {
+        workspaceId: {eq: $workspaceId}
+        userUid: {eq_expr: "auth.uid"}
+        status: {eq: "active"}
+      }
+      limit: 1
+    ) {
+      role
+    }
+  }
+
+  task_update(
+    first: {
+      where: {
+        id: {eq: $taskId}
+        workspaceId: {eq: $workspaceId}
+      }
+    }
+    data: {
+      title: $title
+      description: $description
+      estimatedMinutes: $estimatedMinutes
+      priority: $priority
+      dueDate: $dueDate
+      sortOrder: $sortOrder
+      updatedAt_expr: "request.time"
+    }
+  )
+}

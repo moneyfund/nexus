@@ -44,7 +44,28 @@ export function AIView() {
   >([]);
   const endRef = useRef<HTMLDivElement>(null);
   const requestRef = useRef(false);
+  const voiceBootRef = useRef(false);
   const context = n.services.context.build(n.data);
+
+  useEffect(() => {
+    if (voiceBootRef.current || typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const voicePrompt = params.get("q")?.trim();
+    if (!voicePrompt) return;
+
+    voiceBootRef.current = true;
+    const shouldSend = params.get("send") === "1";
+    window.history.replaceState({}, "", window.location.pathname);
+
+    const timer = window.setTimeout(() => {
+      setPrompt(voicePrompt);
+      if (shouldSend) void send(voicePrompt);
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+    // The one-shot voice handoff is intentionally guarded by voiceBootRef.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     let active = true;

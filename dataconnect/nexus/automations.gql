@@ -1,0 +1,112 @@
+# Automation definitions are client-manageable, but execution will happen
+# server-side later. Runs themselves are not exposed through client mutations.
+
+query GetMyAutomations($workspaceId: UUID!) @auth(level: USER) {
+  appUser(key: {uid_expr: "auth.uid"}) {
+    memberships: memberships_on_user(
+      where: {
+        workspaceId: {eq: $workspaceId}
+        status: {eq: "active"}
+      }
+      limit: 1
+    ) {
+      workspace {
+        automations: automations_on_workspace {
+          id
+          name
+          description
+          triggerType
+          triggerConfig
+          actionType
+          actionConfig
+          enabled
+          lastRunAt
+          nextRunAt
+          createdAt
+          updatedAt
+        }
+      }
+    }
+  }
+}
+
+mutation CreateAutomation(
+  $workspaceId: UUID!
+  $name: String!
+  $description: String
+  $triggerType: String!
+  $triggerConfig: Any!
+  $actionType: String!
+  $actionConfig: Any!
+  $enabled: Boolean!
+) @auth(level: USER) @transaction {
+  query
+    @check(
+      expr: "response.query.memberships.size() == 1"
+      message: "No tienes acceso a este workspace."
+    )
+    @redact {
+    memberships(
+      where: {
+        workspaceId: {eq: $workspaceId}
+        userUid: {eq_expr: "auth.uid"}
+        status: {eq: "active"}
+      }
+      limit: 1
+    ) {
+      role
+    }
+  }
+
+  automation_insert(
+    data: {
+      workspaceId: $workspaceId
+      ownerUid_expr: "auth.uid"
+      name: $name
+      description: $description
+      triggerType: $triggerType
+      triggerConfig: $triggerConfig
+      actionType: $actionType
+      actionConfig: $actionConfig
+      enabled: $enabled
+    }
+  )
+}
+
+mutation SetAutomationEnabled(
+  $workspaceId: UUID!
+  $automationId: UUID!
+  $enabled: Boolean!
+) @auth(level: USER) @transaction {
+  query
+    @check(
+      expr: "response.query.memberships.size() == 1"
+      message: "No tienes acceso a este workspace."
+    )
+    @redact {
+    memberships(
+      where: {
+        workspaceId: {eq: $workspaceId}
+        userUid: {eq_expr: "auth.uid"}
+        status: {eq: "active"}
+      }
+      limit: 1
+    ) {
+      role
+    }
+  }
+
+  automation_update(
+    first: {
+      where: {
+        id: {eq: $automationId}
+        workspaceId: {eq: $workspaceId}
+        ownerUid: {eq_expr: "auth.uid"}
+      }
+    }
+    data: {
+      enabled: $enabled
+      updatedAt_expr: "request.time"
+    }
+  )
+}

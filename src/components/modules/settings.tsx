@@ -18,6 +18,9 @@ import {
 import { useNexus } from "../nexus-provider";
 import { ModuleFrame, Button, Label, Badge } from "../ui/primitives";
 import { SYSTEM } from "@/config/system";
+import { nexusDataModeInfo } from "@/config/data-backend";
+import { buildSqlMigrationPlan, summarizeSqlMigrationPlan } from "@/migrations/sql-connect";
+import { sqlConnectClient, type SqlWorkspaceSummary } from "@/lib/sql-connect";
 const sections = [
   { id: "profile", label: "Profile", icon: UserRound },
   { id: "appearance", label: "Appearance", icon: Palette },
@@ -32,6 +35,7 @@ const sections = [
 ];
 export function SettingsView() {
   const n = useNexus();
+  const dataMode = nexusDataModeInfo();
   const [section, setSection] = useState("profile");
   const [profileDraft, setProfileDraft] = useState<{
     name: string;
@@ -40,6 +44,17 @@ export function SettingsView() {
   const name = profileDraft?.name ?? n.data.user.name;
   const email = profileDraft?.email ?? n.data.user.email;
   const [pendingImport, setPendingImport] = useState<unknown>(null);
+  const [sqlMigrationPreview, setSqlMigrationPreview] = useState<ReturnType<typeof summarizeSqlMigrationPlan> | null>(null);
+  const [sqlWorkspaceOverride, setSqlWorkspaceOverride] = useState<SqlWorkspaceSummary | null>(null);
+  const [sqlChecking, setSqlChecking] = useState(false);
+  const [sqlSyncing, setSqlSyncing] = useState(false);
+  const [sqlSyncSummary, setSqlSyncSummary] = useState<{
+    projectsCreated: number;
+    projectsUpdated: number;
+    tasksCreated: number;
+    tasksUpdated: number;
+  } | null>(null);
+  const sqlWorkspace = sqlWorkspaceOverride ?? n.sqlWorkspace;
   const [aiStatus, setAIStatus] = useState<{
     configured: boolean;
     model: string;
@@ -449,6 +464,78 @@ export function SettingsView() {
                   <Upload size={16} />
                   Importar respaldo
                 </Button>
+                <Button
+                  variant="secondary"
+                  disabled={!n.session}
+                  onClick={() =>
+                    n.run(() => {
+                      if (!n.session) throw new Error("Inicia sesión para preparar la migración.");
+                      const plan = buildSqlMigrationPlan(n.data, n.session.uid);
+                      setSqlMigrationPreview(summarizeSqlMigrationPlan(plan));
+                      return true;
+                    }, "Previsualización SQL preparada.")
+                  }
+                >
+                  <Database size={16} />
+                  Previsualizar migración SQL
+                </Button>
+                <Button
+                  variant="secondary"
+                  disabled={!n.session || sqlChecking || n.sqlReady}
+                  onClick={() =>
+                    n.run(async () => {
+                      if (!n.session)
+                        throw new Error("Inicia sesión para conectar PostgreSQL.");
+                      setSqlChecking(true);
+                      try {
+                        const result =
+                          await sqlConnectClient.bootstrapPersonalWorkspace({
+                            session: n.session,
+                            timezone: prefs.timezone,
+                            preferences: prefs,
+                          });
+                        setSqlWorkspaceOverride(result.workspace);
+                        return true;
+                      } finally {
+                        setSqlChecking(false);
+                      }
+                    }, "Workspace PostgreSQL verificado.")
+                  }
+                >
+                  <Database size={16} />
+                  {sqlChecking
+                    ? "Conectando PostgreSQL..."
+                    : n.sqlReady || sqlWorkspace
+                      ? "PostgreSQL conectado"
+                      : "Inicializar PostgreSQL"}
+                </Button>
+                <Button
+                  variant="secondary"
+                  disabled={!sqlWorkspace || sqlSyncing}
+                  onClick={() =>
+                    n.run(async () => {
+                      if (!sqlWorkspace)
+                        throw new Error("Inicializa PostgreSQL primero.");
+                      setSqlSyncing(true);
+                      try {
+                        const summary =
+                          await sqlConnectClient.shadowSyncProjects({
+                            workspace: n.data,
+                            sqlWorkspaceId: sqlWorkspace.id,
+                          });
+                        setSqlSyncSummary(summary);
+                        return true;
+                      } finally {
+                        setSqlSyncing(false);
+                      }
+                    }, "Proyectos y tareas sincronizados con PostgreSQL.")
+                  }
+                >
+                  <Database size={16} />
+                  {sqlSyncing
+                    ? "Sincronizando..."
+                    : "Sincronizar proyectos → PostgreSQL"}
+                </Button>
                 <input
                   ref={fileRef}
                   type="file"
@@ -494,6 +581,84 @@ export function SettingsView() {
                   </div>
                 </div>
               )}
+              {sqlSyncSummary && (
+                <div className="surface" style={{ marginTop: 18 }}>
+                  <Label>POSTGRESQL / SHADOW SYNC</Label>
+                  <div className="integration-row">
+                    <span>Proyectos creados / actualizados</span>
+                    <strong>
+                      {sqlSyncSummary.projectsCreated} /{" "}
+                      {sqlSyncSummary.projectsUpdated}
+                    </strong>
+                  </div>
+                  <div className="integration-row">
+                    <span>Tareas creadas / actualizadas</span>
+                    <strong>
+                      {sqlSyncSummary.tasksCreated} /{" "}
+                      {sqlSyncSummary.tasksUpdated}
+                    </strong>
+                  </div>
+                  <p className="form-note">
+                    Firestore sigue siendo la fuente principal. Esta copia
+                    permite validar PostgreSQL con tus datos reales sin cortar
+                    todavía el sistema actual.
+                  </p>
+                </div>
+              )}
+              {sqlWorkspace && (
+                <div className="surface" style={{ marginTop: 18 }}>
+                  <Label>SQL CONNECT / LIVE</Label>
+                  <div className="integration-row">
+                    <span>Workspace</span>
+                    <strong>{sqlWorkspace.name}</strong>
+                  </div>
+                  <div className="integration-row">
+                    <span>PostgreSQL ID</span>
+                    <code>{sqlWorkspace.id}</code>
+                  </div>
+                  <div className="integration-row">
+                    <span>Rol / estado</span>
+                    <Badge active={sqlWorkspace.status === "active"}>
+                      {sqlWorkspace.role} · {sqlWorkspace.status}
+                    </Badge>
+                  </div>
+                  <p className="form-note">
+                    Esta comprobación crea únicamente tu usuario/workspace base
+                    si todavía no existen. Firestore sigue siendo la fuente
+                    principal hasta completar la migración.
+                  </p>
+                </div>
+              )}
+              {sqlMigrationPreview && (
+                <div className="surface" style={{ marginTop: 18 }}>
+                  <Label>SQL MIGRATION / DRY RUN</Label>
+                  <div className="integration-row">
+                    <span>Proyectos / tareas / hitos</span>
+                    <strong>
+                      {sqlMigrationPreview.projects} / {sqlMigrationPreview.tasks} /{" "}
+                      {sqlMigrationPreview.milestones}
+                    </strong>
+                  </div>
+                  <div className="integration-row">
+                    <span>Finanzas / calendario / conocimiento</span>
+                    <strong>
+                      {sqlMigrationPreview.transactions} /{" "}
+                      {sqlMigrationPreview.calendarEvents} /{" "}
+                      {sqlMigrationPreview.knowledge}
+                    </strong>
+                  </div>
+                  <div className="integration-row">
+                    <span>Incidencias detectadas</span>
+                    <Badge active={sqlMigrationPreview.issues === 0}>
+                      {sqlMigrationPreview.issues}
+                    </Badge>
+                  </div>
+                  <p className="form-note">
+                    Esta revisión no escribe nada en PostgreSQL. Solo normaliza
+                    el workspace actual y cuenta qué registros se copiarían.
+                  </p>
+                </div>
+              )}
               <div className="integration-row">
                 <span>Esquema</span>
                 <Badge>V{n.data.schemaVersion}</Badge>
@@ -516,9 +681,9 @@ export function SettingsView() {
             <>
               <h2>Un espacio privado y sincronizado.</h2>
               <p>
-                NEXUS usa Firebase Authentication para el acceso, Firestore
-                para sincronizar tu workspace y Firebase Storage para archivos.
-                Cada workspace se guarda bajo el UID autenticado. Google
+                NEXUS usa Firebase Authentication para el acceso y Firebase Storage
+                para archivos. El cambio de Firestore a SQL Connect/PostgreSQL
+                se realiza por etapas; el modo activo es <strong>{dataMode.mode}</strong>. Google
                 Calendar y Drive se autorizan mediante OAuth por sesión, y NEXUS
                 AI usa un endpoint de servidor protegido por el token de Firebase.
               </p>
@@ -542,7 +707,11 @@ export function SettingsView() {
               <h2>System diagnostics.</h2>
               {[
                 ["NEXUS", SYSTEM.version],
-                ["Data adapter", "BrowserWorkspaceStorage + Firestore sync"],
+                ["Data mode", dataMode.mode],
+                ["Primary read", dataMode.primaryRead],
+                ["Primary write", dataMode.primaryWrite],
+                ["Shadow write", dataMode.shadowWrite],
+                ["SQL Connect", "nexus-core · us-east4"],
                 ["User ID", n.data.user.id],
                 [
                   "Auth session",
@@ -571,7 +740,7 @@ export function SettingsView() {
                 ["Storage", "Firebase Storage"],
                 [
                   "Persistence",
-                  n.storageError || (n.cloudReady ? "Firestore synced" : "Connecting"),
+                  n.storageError || (n.cloudReady ? "Current source synced" : "Connecting"),
                 ],
               ].map(([key, value]) => (
                 <div className="integration-row" key={key}>

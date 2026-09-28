@@ -24,9 +24,9 @@ npm run build
 
 Today / NEXUS Core, Projects, Calendar, Flow, Ideas / Inbox, Goals, Finance, Analytics, Knowledge, Nexus AI y System. `Ctrl/Cmd+K` abre comandos y búsqueda global. `C` abre Capture fuera de campos; también `Ctrl/Cmd+Shift+Space`.
 
-Los seis proyectos iniciales y sus importes, fechas, horas y avances se conservan como **demostración**. Tus capturas se identifican como registros propios. Firebase, Auth, Google Calendar, Drive, OpenAI y MCP permanecen **desconectados**. NEXUS AI usa respuestas simuladas. Los archivos guardan únicamente metadatos hasta conectar Storage.
+NEXUS ya usa Firebase Authentication, Firestore y Firebase Storage en producción. La rama 2.0 incorpora Firebase SQL Connect con PostgreSQL para el núcleo relacional, manteniendo un corte por etapas para evitar pérdida de datos.
 
-Los datos de `nexus-os-v01` se migran sin borrar la clave anterior. Los datos nuevos se guardan por perfil en este navegador. Exporta/importa respaldos desde System → Data. El perfil local no es autenticación; no hay sincronización multiusuario aún.
+Los datos actuales siguen usando Firestore como fuente principal mientras PostgreSQL se valida. Desde System → Data se puede inicializar el workspace SQL, ejecutar una previsualización de migración sin escritura y comprobar el estado del nuevo backend. La arquitectura ya queda preparada para multiusuario, voz, automatizaciones y NEXUS AI con herramientas auditables.
 
 Ver [auditoría inicial](docs/AUDIT.md), [arquitectura y límites](docs/ARCHITECTURE.md) y [verificación](docs/QA.md).
 

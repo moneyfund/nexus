@@ -1,0 +1,164 @@
+# Calendar operations scoped to the authenticated user's workspace membership.
+
+mutation CreateCalendarEvent(
+  $workspaceId: UUID!
+  $legacyId: String
+  $projectId: UUID
+  $title: String!
+  $start: Timestamp!
+  $end: Timestamp!
+  $category: String!
+  $description: String
+  $provider: String
+  $providerId: String
+  $syncStatus: String
+  $metadata: Any
+) @auth(level: USER) @transaction {
+  query
+    @check(
+      expr: "response.query.memberships.size() == 1"
+      message: "No tienes acceso a este workspace."
+    )
+    @check(
+      expr: "vars.projectId == null || response.query.projects.size() == 1"
+      message: "El proyecto indicado no pertenece a este workspace."
+    )
+    @redact {
+    memberships(
+      where: {
+        workspaceId: {eq: $workspaceId}
+        userUid: {eq_expr: "auth.uid"}
+        status: {eq: "active"}
+      }
+      limit: 1
+    ) {
+      role
+    }
+    projects(
+      where: {
+        id: {eq: $projectId}
+        workspaceId: {eq: $workspaceId}
+      }
+      limit: 1
+    ) {
+      id
+    }
+  }
+
+  calendarEvent_insert(
+    data: {
+      workspaceId: $workspaceId
+      projectId: $projectId
+      legacyId: $legacyId
+      title: $title
+      start: $start
+      end: $end
+      category: $category
+      description: $description
+      provider: $provider
+      providerId: $providerId
+      syncStatus: $syncStatus
+      metadata: $metadata
+    }
+  )
+}
+
+mutation UpdateCalendarEvent(
+  $workspaceId: UUID!
+  $eventId: UUID!
+  $projectId: UUID
+  $title: String!
+  $start: Timestamp!
+  $end: Timestamp!
+  $category: String!
+  $description: String
+  $provider: String
+  $providerId: String
+  $syncStatus: String
+  $metadata: Any
+) @auth(level: USER) @transaction {
+  query
+    @check(
+      expr: "response.query.memberships.size() == 1"
+      message: "No tienes acceso a este workspace."
+    )
+    @check(
+      expr: "vars.projectId == null || response.query.projects.size() == 1"
+      message: "El proyecto indicado no pertenece a este workspace."
+    )
+    @redact {
+    memberships(
+      where: {
+        workspaceId: {eq: $workspaceId}
+        userUid: {eq_expr: "auth.uid"}
+        status: {eq: "active"}
+      }
+      limit: 1
+    ) {
+      role
+    }
+    projects(
+      where: {
+        id: {eq: $projectId}
+        workspaceId: {eq: $workspaceId}
+      }
+      limit: 1
+    ) {
+      id
+    }
+  }
+
+  calendarEvent_update(
+    first: {
+      where: {
+        id: {eq: $eventId}
+        workspaceId: {eq: $workspaceId}
+      }
+    }
+    data: {
+      projectId: $projectId
+      title: $title
+      start: $start
+      end: $end
+      category: $category
+      description: $description
+      provider: $provider
+      providerId: $providerId
+      syncStatus: $syncStatus
+      metadata: $metadata
+      updatedAt_expr: "request.time"
+    }
+  )
+}
+
+mutation DeleteCalendarEvent(
+  $workspaceId: UUID!
+  $eventId: UUID!
+) @auth(level: USER) @transaction {
+  query
+    @check(
+      expr: "response.query.memberships.size() == 1"
+      message: "No tienes acceso a este workspace."
+    )
+    @redact {
+    memberships(
+      where: {
+        workspaceId: {eq: $workspaceId}
+        userUid: {eq_expr: "auth.uid"}
+        status: {eq: "active"}
+      }
+      limit: 1
+    ) {
+      role
+    }
+  }
+
+  calendarEvent_delete(
+    first: {
+      where: {
+        id: {eq: $eventId}
+        workspaceId: {eq: $workspaceId}
+      }
+    }
+  )
+}

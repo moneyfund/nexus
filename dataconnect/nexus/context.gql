@@ -1,0 +1,164 @@
+# High-value read models for the NEXUS dashboard and AI context builder.
+# Access is scoped by walking from auth.uid -> membership -> workspace.
+
+query GetWorkspaceCore(
+  $workspaceId: UUID!
+  $from: Timestamp!
+  $to: Timestamp!
+) @auth(level: USER) {
+  appUser(key: {uid_expr: "auth.uid"}) {
+    uid
+    displayName
+    timezone
+    preferences
+    memberships: memberships_on_user(
+      where: {
+        workspaceId: {eq: $workspaceId}
+        status: {eq: "active"}
+      }
+      limit: 1
+    ) {
+      role
+      workspace {
+        id
+        name
+        slug
+        kind
+        currency
+        timezone
+
+        projects: projects_on_workspace(
+          where: {archived: {eq: false}}
+        ) {
+          id
+          legacyId
+          name
+          area
+          clientName
+          description
+          progress
+          status
+          priority
+          stage
+          deadline
+          dueDate
+          valueMinor
+          paidMinor
+          currency
+          nextAction
+          hours
+          notes
+          tasks: tasks_on_project {
+            id
+            legacyId
+            title
+            description
+            completed
+            estimatedMinutes
+            priority
+            dueDate
+            completedAt
+            sortOrder
+          }
+        }
+
+        events: calendarEvents_on_workspace(
+          where: {
+            start: {lt: $to}
+            end: {gt: $from}
+          }
+        ) {
+          id
+          title
+          start
+          end
+          category
+          description
+          provider
+          providerId
+          syncStatus
+          project {
+            id
+            name
+          }
+        }
+
+        receivables: receivables_on_workspace(
+          where: {status: {ne: "paid"}}
+        ) {
+          id
+          title
+          amountMinor
+          paidMinor
+          currency
+          dueDate
+          status
+          notes
+          project {
+            id
+            name
+          }
+        }
+
+        payables: payables_on_workspace(
+          where: {status: {ne: "paid"}}
+        ) {
+          id
+          title
+          amountMinor
+          paidMinor
+          currency
+          dueDate
+          status
+          notes
+          project {
+            id
+            name
+          }
+        }
+
+        commitments: financialCommitments_on_workspace(
+          where: {status: {ne: "completed"}}
+        ) {
+          id
+          title
+          amountMinor
+          currency
+          dueDate
+          category
+          status
+          notes
+        }
+
+        goals: goals_on_workspace(
+          where: {status: {ne: "completed"}}
+        ) {
+          id
+          title
+          targetDate
+          status
+          milestones: goalMilestones_on_goal {
+            id
+            title
+            completed
+            sortOrder
+          }
+        }
+
+        knowledge: knowledgeItems_on_workspace {
+          id
+          title
+          type
+          content
+          url
+          category
+          tags
+          project {
+            id
+            name
+          }
+        }
+      }
+    }
+  }
+}

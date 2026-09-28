@@ -13,7 +13,26 @@ jobs:
         with:
           node-version: 24
           cache: npm
+      - name: Refresh lockfile for Firebase SQL runtime
+        run: npm install --package-lock-only
+      - name: Upload refreshed package lock
+        uses: actions/upload-artifact@v4
+        with:
+          name: package-lock-refresh
+          path: package-lock.json
+          if-no-files-found: error
+          retention-days: 1
       - run: npm ci
+      - run: npm run dataconnect:generate
+      - name: Upload generated SQL Connect SDKs
+        uses: actions/upload-artifact@v4
+        with:
+          name: dataconnect-generated
+          path: |
+            src/dataconnect-generated
+            src/dataconnect-admin
+          if-no-files-found: error
+          retention-days: 3
       - run: npm test
       - run: npm run typecheck
       - run: npm run lint

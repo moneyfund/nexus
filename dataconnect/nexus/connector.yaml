@@ -1,0 +1,10 @@
+connectorId: nexus
+generate:
+  javascriptSdk:
+    outputDir: ../../src/dataconnect-generated
+    package: "@nexus/dataconnect"
+    packageJsonDir: ../..
+  adminNodeSdk:
+    outputDir: ../../src/dataconnect-admin
+    package: "@nexus/dataconnect-admin"
+    packageJsonDir: ../..

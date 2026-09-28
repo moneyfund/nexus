@@ -1,0 +1,185 @@
+# Knowledge metadata lives in PostgreSQL; file bytes remain in Firebase Storage.
+
+mutation CreateKnowledgeItem(
+  $workspaceId: UUID!
+  $legacyId: String
+  $projectId: UUID
+  $title: String!
+  $type: String!
+  $content: String!
+  $url: String
+  $category: String!
+  $tags: [String!]
+  $searchableText: String
+  $metadata: Any
+) @auth(level: USER) @transaction {
+  query
+    @check(
+      expr: "response.query.memberships.size() == 1"
+      message: "No tienes acceso a este workspace."
+    )
+    @check(
+      expr: "vars.projectId == null || response.query.projects.size() == 1"
+      message: "El proyecto indicado no pertenece a este workspace."
+    )
+    @redact {
+    memberships(
+      where: {
+        workspaceId: {eq: $workspaceId}
+        userUid: {eq_expr: "auth.uid"}
+        status: {eq: "active"}
+      }
+      limit: 1
+    ) {
+      role
+    }
+    projects(
+      where: {
+        id: {eq: $projectId}
+        workspaceId: {eq: $workspaceId}
+      }
+      limit: 1
+    ) {
+      id
+    }
+  }
+
+  knowledgeItem_insert(
+    data: {
+      workspaceId: $workspaceId
+      projectId: $projectId
+      legacyId: $legacyId
+      title: $title
+      type: $type
+      content: $content
+      url: $url
+      category: $category
+      tags: $tags
+      searchableText: $searchableText
+      metadata: $metadata
+    }
+  )
+}
+
+mutation CreateAttachmentMetadata(
+  $workspaceId: UUID!
+  $legacyId: String
+  $projectId: UUID
+  $knowledgeItemId: UUID
+  $name: String!
+  $mimeType: String!
+  $sizeBytes: Int64!
+  $provider: String!
+  $storagePath: String
+  $externalId: String
+  $checksum: String
+) @auth(level: USER) @transaction {
+  query
+    @check(
+      expr: "response.query.memberships.size() == 1"
+      message: "No tienes acceso a este workspace."
+    )
+    @check(
+      expr: "vars.projectId == null || response.query.projects.size() == 1"
+      message: "El proyecto indicado no pertenece a este workspace."
+    )
+    @check(
+      expr: "vars.knowledgeItemId == null || response.query.knowledge.size() == 1"
+      message: "El elemento de conocimiento no pertenece a este workspace."
+    )
+    @redact {
+    memberships(
+      where: {
+        workspaceId: {eq: $workspaceId}
+        userUid: {eq_expr: "auth.uid"}
+        status: {eq: "active"}
+      }
+      limit: 1
+    ) {
+      role
+    }
+    projects(
+      where: {
+        id: {eq: $projectId}
+        workspaceId: {eq: $workspaceId}
+      }
+      limit: 1
+    ) {
+      id
+    }
+    knowledge: knowledgeItems(
+      where: {
+        id: {eq: $knowledgeItemId}
+        workspaceId: {eq: $workspaceId}
+      }
+      limit: 1
+    ) {
+      id
+    }
+  }
+
+  attachment_insert(
+    data: {
+      workspaceId: $workspaceId
+      projectId: $projectId
+      knowledgeItemId: $knowledgeItemId
+      legacyId: $legacyId
+      name: $name
+      mimeType: $mimeType
+      sizeBytes: $sizeBytes
+      provider: $provider
+      storagePath: $storagePath
+      externalId: $externalId
+      checksum: $checksum
+    }
+  )
+}
+
+mutation UpdateKnowledgeItem(
+  $workspaceId: UUID!
+  $knowledgeItemId: UUID!
+  $title: String!
+  $content: String!
+  $url: String
+  $category: String!
+  $tags: [String!]
+  $searchableText: String
+  $metadata: Any
+) @auth(level: USER) @transaction {
+  query
+    @check(
+      expr: "response.query.memberships.size() == 1"
+      message: "No tienes acceso a este workspace."
+    )
+    @redact {
+    memberships(
+      where: {
+        workspaceId: {eq: $workspaceId}
+        userUid: {eq_expr: "auth.uid"}
+        status: {eq: "active"}
+      }
+      limit: 1
+    ) {
+      role
+    }
+  }
+
+  knowledgeItem_update(
+    first: {
+      where: {
+        id: {eq: $knowledgeItemId}
+        workspaceId: {eq: $workspaceId}
+      }
+    }
+    data: {
+      title: $title
+      content: $content
+      url: $url
+      category: $category
+      tags: $tags
+      searchableText: $searchableText
+      metadata: $metadata
+      updatedAt_expr: "request.time"
+    }
+  )
+}

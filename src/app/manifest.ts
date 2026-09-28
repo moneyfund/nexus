@@ -38,9 +38,9 @@ export default function manifest(): MetadataRoute.Manifest {
       },
     ],
     shortcuts: [
-      { name: "Flow", url: path("/flow") },
-      { name: "Ideas", url: path("/ideas") },
-      { name: "Projects", url: path("/projects") },
+      { name: "NEXUS AI", short_name: "AI", url: path("/ai") },
+      { name: "Finance", short_name: "Dinero", url: path("/finance") },
+      { name: "Captura rápida", short_name: "Capturar", url: path("/capture") },
     ],
   };
 }
