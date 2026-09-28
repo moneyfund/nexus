@@ -2,7 +2,7 @@ name: NEXUS GitHub Pages Fallback
 
 on:
   push:
-    branches: [main]
+    branches: [main, nexus-2-sql-connect]
   workflow_dispatch:
 
 permissions:
