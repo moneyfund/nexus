@@ -93,25 +93,72 @@ export function AIView() {
   function actionLabel(action: NexusAIAction) {
     const project = n.projects.find((item) => item.id === action.projectId);
     const projectName = project?.name ?? "Proyecto";
+    const transaction =
+      action.targetId && action.transactionKind
+        ? (action.transactionKind === "income"
+            ? n.data.incomes
+            : n.data.expenses
+          ).find((item) => item.id === action.targetId)
+        : undefined;
+    const event = action.targetId
+      ? n.data.events.find((item) => item.id === action.targetId)
+      : undefined;
+    const idea = action.targetId
+      ? n.data.ideas.find((item) => item.id === action.targetId)
+      : undefined;
+    const memory = action.targetId
+      ? n.data.memories.find((item) => item.id === action.targetId)
+      : undefined;
+    const task =
+      action.projectId && action.taskId
+        ? n.projects
+            .find((item) => item.id === action.projectId)
+            ?.tasks.find((item) => item.id === action.taskId)
+        : undefined;
+
     switch (action.type) {
       case "complete_task":
-        return "Completar · " + (action.title ?? "tarea") + " · " + projectName;
+        return "Completar · " + (task?.title ?? action.title ?? "tarea") + " · " + projectName;
       case "create_task":
         return "Crear tarea · " + (action.title ?? "Nueva tarea") + " · " + projectName;
+      case "update_task":
+        return "Editar tarea · " + (task?.title ?? action.title ?? "tarea") + " · " + projectName;
+      case "delete_task":
+        return "Eliminar tarea · " + (task?.title ?? action.title ?? "tarea") + " · " + projectName;
       case "record_income":
         return "Registrar ingreso · $" + (action.amount ?? 0) + " · " + projectName;
       case "record_expense":
         return "Registrar gasto · $" + (action.amount ?? 0) + " · " + projectName;
+      case "update_transaction":
+        return "Editar " + (action.transactionKind === "income" ? "ingreso" : "gasto") + " · " + (transaction?.title ?? action.title ?? "movimiento");
+      case "delete_transaction":
+        return "Eliminar " + (action.transactionKind === "income" ? "ingreso" : "gasto") + " · " + (transaction?.title ?? action.title ?? "movimiento");
       case "update_project_status":
         return "Cambiar estado · " + projectName + " → " + (action.status ?? "");
       case "update_project_value":
         return "Actualizar valor · " + projectName + " → $" + (action.value ?? 0);
+      case "update_project":
+        return "Editar proyecto · " + projectName;
+      case "log_project_activity":
+        return "Registrar avance · " + projectName + " · " + (action.content ?? "actividad");
       case "create_event":
         return "Crear evento · " + (action.title ?? "Evento");
+      case "update_event":
+        return "Editar evento · " + (event?.title ?? action.title ?? "Evento");
+      case "delete_event":
+        return "Eliminar evento · " + (event?.title ?? action.title ?? "Evento");
       case "create_idea":
         return "Guardar idea · " + (action.title ?? action.content ?? "Nueva idea");
+      case "update_idea":
+        return "Editar idea · " + (idea?.title ?? action.title ?? "Idea");
+      case "delete_idea":
+        return "Eliminar idea · " + (idea?.title ?? action.title ?? "Idea");
       case "add_memory":
         return "Guardar memoria · " + (action.content ?? "Contexto");
+      case "update_memory":
+        return "Editar memoria · " + (memory?.content ?? action.content ?? "Contexto");
+      case "delete_memory":
+        return "Eliminar memoria · " + (memory?.content ?? "Contexto");
     }
   }
 
@@ -137,34 +184,77 @@ export function AIView() {
             content: action.title,
             projectId: action.projectId,
           });
-          const project = n.projects.find(
-            (item) => item.id === action.projectId,
-          );
-          if (
-            action.milestone &&
-            project?.milestones.some(
-              (milestone) => milestone.title === action.milestone,
-            )
-          )
-            n.actions.updateTask(action.projectId, taskId, {
-              milestone: action.milestone,
-            });
+          n.actions.updateTask(action.projectId, taskId, {
+            ...(action.milestone ? { milestone: action.milestone } : {}),
+            ...(action.priority ? { priority: action.priority } : {}),
+            ...(action.estimatedMinutes != null
+              ? { estimatedMinutes: action.estimatedMinutes }
+              : {}),
+          });
           break;
         }
+        case "update_task": {
+          if (!action.projectId || !action.taskId)
+            throw new Error("La IA no identificó la tarea que debe editarse.");
+          n.actions.updateTask(action.projectId, action.taskId, {
+            ...(action.title?.trim() ? { title: action.title.trim() } : {}),
+            ...(action.milestone ? { milestone: action.milestone } : {}),
+            ...(action.priority ? { priority: action.priority } : {}),
+            ...(action.estimatedMinutes != null
+              ? { estimatedMinutes: action.estimatedMinutes }
+              : {}),
+          });
+          break;
+        }
+        case "delete_task":
+          if (!action.projectId || !action.taskId)
+            throw new Error("La IA no identificó la tarea que debe eliminarse.");
+          n.actions.deleteTask(action.projectId, action.taskId);
+          break;
         case "record_income":
         case "record_expense": {
           if (!action.amount || action.amount <= 0)
             throw new Error("La propuesta no contiene un importe válido.");
-          n.actions.capture({
-            type: action.type === "record_income" ? "income" : "expense",
+          const kind =
+            action.type === "record_income" ? "income" : "expense";
+          const recordId = n.actions.capture({
+            type: kind,
             content:
               action.title?.trim() ||
-              (action.type === "record_income" ? "Ingreso" : "Gasto"),
+              (kind === "income" ? "Ingreso" : "Gasto"),
             amount: action.amount,
             projectId: action.projectId || undefined,
+            category: action.itemCategory || undefined,
+          });
+          if (action.date || action.itemCategory) {
+            n.actions.updateMoneyRecord(kind, recordId, {
+              ...(action.date ? { date: action.date } : {}),
+              ...(action.itemCategory
+                ? { category: action.itemCategory }
+                : {}),
+            });
+          }
+          break;
+        }
+        case "update_transaction": {
+          if (!action.targetId || !action.transactionKind)
+            throw new Error("La IA no identificó el movimiento que debe editarse.");
+          n.actions.updateMoneyRecord(action.transactionKind, action.targetId, {
+            ...(action.title?.trim() ? { title: action.title.trim() } : {}),
+            ...(action.amount != null ? { amount: action.amount } : {}),
+            ...(action.date ? { date: action.date } : {}),
+            ...(action.projectId ? { projectId: action.projectId } : {}),
+            ...(action.itemCategory
+              ? { category: action.itemCategory }
+              : {}),
           });
           break;
         }
+        case "delete_transaction":
+          if (!action.targetId || !action.transactionKind)
+            throw new Error("La IA no identificó el movimiento que debe eliminarse.");
+          n.actions.deleteMoneyRecord(action.transactionKind, action.targetId);
+          break;
         case "update_project_status":
           if (!action.projectId || !action.status)
             throw new Error("Falta proyecto o estado.");
@@ -174,6 +264,27 @@ export function AIView() {
           if (!action.projectId || action.value == null || action.value < 0)
             throw new Error("Falta un valor válido para el proyecto.");
           n.actions.updateProject(action.projectId, { value: action.value });
+          break;
+        case "update_project":
+          if (!action.projectId)
+            throw new Error("La IA no identificó el proyecto que debe editarse.");
+          n.actions.updateProject(action.projectId, {
+            ...(action.title?.trim() ? { name: action.title.trim() } : {}),
+            ...(action.description != null
+              ? { description: action.description }
+              : {}),
+            ...(action.notes != null ? { notes: action.notes } : {}),
+            ...(action.priority ? { priority: action.priority } : {}),
+            ...(action.dueDate ? { dueDate: action.dueDate } : {}),
+            ...(action.value != null ? { value: action.value } : {}),
+            ...(action.area?.trim() ? { area: action.area.trim() } : {}),
+            ...(action.client?.trim() ? { client: action.client.trim() } : {}),
+          });
+          break;
+        case "log_project_activity":
+          if (!action.projectId || !action.content?.trim())
+            throw new Error("Falta proyecto o descripción del avance.");
+          n.actions.logProjectActivity(action.projectId, action.content);
           break;
         case "create_event": {
           if (!action.title?.trim() || !action.start || !action.end)
@@ -197,16 +308,83 @@ export function AIView() {
           });
           break;
         }
-        case "create_idea": {
-          const content = action.content?.trim() || action.title?.trim();
-          if (!content) throw new Error("La idea propuesta está vacía.");
-          n.actions.capture({
-            type: "idea",
-            content,
-            projectId: action.projectId || undefined,
+        case "update_event": {
+          if (!action.targetId)
+            throw new Error("La IA no identificó el evento que debe editarse.");
+          const current = n.data.events.find(
+            (item) => item.id === action.targetId,
+          );
+          if (!current) throw new Error("El evento propuesto ya no existe.");
+          const nextStart = action.start
+            ? new Date(action.start).toISOString()
+            : current.start;
+          const nextEnd = action.end
+            ? new Date(action.end).toISOString()
+            : current.end;
+          n.actions.saveEvent({
+            ...current,
+            title: action.title?.trim() || current.title,
+            start: nextStart,
+            end: nextEnd,
+            category: action.category ?? current.category,
+            projectId: action.projectId || current.projectId,
+            description:
+              action.description != null
+                ? action.description
+                : current.description,
           });
           break;
         }
+        case "delete_event":
+          if (!action.targetId)
+            throw new Error("La IA no identificó el evento que debe eliminarse.");
+          n.actions.deleteEvent(action.targetId);
+          break;
+        case "create_idea": {
+          const content = action.content?.trim() || action.title?.trim();
+          if (!content) throw new Error("La idea propuesta está vacía.");
+          const ideaId = n.actions.capture({
+            type: "idea",
+            content,
+            projectId: action.projectId || undefined,
+            category: action.itemCategory || undefined,
+          });
+          if (
+            action.description != null ||
+            action.notes != null ||
+            action.itemCategory
+          )
+            n.actions.updateIdea(ideaId, {
+              ...(action.description != null
+                ? { description: action.description }
+                : {}),
+              ...(action.notes != null ? { notes: action.notes } : {}),
+              ...(action.itemCategory
+                ? { category: action.itemCategory }
+                : {}),
+            });
+          break;
+        }
+        case "update_idea":
+          if (!action.targetId)
+            throw new Error("La IA no identificó la idea que debe editarse.");
+          n.actions.updateIdea(action.targetId, {
+            ...(action.title?.trim() ? { title: action.title.trim() } : {}),
+            ...(action.description != null
+              ? { description: action.description }
+              : {}),
+            ...(action.notes != null ? { notes: action.notes } : {}),
+            ...(action.itemCategory
+              ? { category: action.itemCategory }
+              : {}),
+            ...(action.dueDate ? { reviewDate: action.dueDate } : {}),
+          });
+          break;
+        case "delete_idea":
+          if (!action.targetId)
+            throw new Error("La IA no identificó la idea que debe eliminarse.");
+          n.actions.deleteIdea(action.targetId);
+          break;
         case "add_memory": {
           const content = action.content?.trim();
           if (!content) throw new Error("La memoria propuesta está vacía.");
@@ -219,6 +397,20 @@ export function AIView() {
           });
           break;
         }
+        case "update_memory":
+          if (!action.targetId || !action.content?.trim())
+            throw new Error("Falta memoria o contenido actualizado.");
+          n.actions.updateMemory(
+            action.targetId,
+            action.content,
+            action.projectId || undefined,
+          );
+          break;
+        case "delete_memory":
+          if (!action.targetId)
+            throw new Error("La IA no identificó la memoria que debe eliminarse.");
+          n.actions.deleteMemory(action.targetId);
+          break;
       }
       return true;
     }, "Acción aplicada en NEXUS.");
@@ -226,6 +418,7 @@ export function AIView() {
     if (applied)
       setPendingActions((items) => items.filter((item) => item.id !== id));
   }
+
   async function send(text: string) {
     if (!text.trim() || requestRef.current) return;
     requestRef.current = true;
