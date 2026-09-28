@@ -90,6 +90,10 @@ export function AIView() {
     };
   }, [n.services.ai]);
 
+  function isDestructive(action: NexusAIAction) {
+    return action.type.startsWith("delete_");
+  }
+
   function actionLabel(action: NexusAIAction) {
     const project = n.projects.find((item) => item.id === action.projectId);
     const projectName = project?.name ?? "Proyecto";
@@ -562,7 +566,10 @@ export function AIView() {
               {pendingActions.map(({ id, action }) => (
                 <div className="ai-action-card" key={id}>
                   <div>
-                    <strong>{actionLabel(action)}</strong>
+                    <div className="row wrap">
+                      <strong>{actionLabel(action)}</strong>
+                      {isDestructive(action) && <Badge>ELIMINACIÓN</Badge>}
+                    </div>
                     <p>{action.reason}</p>
                   </div>
                   <div className="row">
@@ -576,9 +583,12 @@ export function AIView() {
                     >
                       Descartar
                     </Button>
-                    <Button onClick={() => applyAction(id, action)}>
+                    <Button
+                      variant={isDestructive(action) ? "danger" : "primary"}
+                      onClick={() => applyAction(id, action)}
+                    >
                       <Check size={14} />
-                      Aplicar
+                      {isDestructive(action) ? "Eliminar" : "Aplicar"}
                     </Button>
                   </div>
                 </div>
@@ -652,6 +662,8 @@ export function AIView() {
           <div className="context-counts">
             <span>{context.projects.length} proyectos</span>
             <span>{context.events.length} bloques</span>
+            <span>{context.transactions.length} movimientos</span>
+            <span>{context.ideas.length} ideas</span>
             <span>{context.knowledge.length} referencias</span>
             <span>{context.memories.length} memorias</span>
           </div>
