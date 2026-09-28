@@ -5,7 +5,7 @@ import type {
 } from "@/domain/models";
 import { firebaseApp } from "@/lib/firebase";
 import { getFunctions, httpsCallable } from "firebase/functions";
-import { MockAIProvider, type AIProvider, type NexusContext } from "@/services/providers";
+import type { AIProvider, NexusContext } from "@/services/providers";
 
 export type NexusAIAction =
   | {
