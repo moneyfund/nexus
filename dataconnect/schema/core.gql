@@ -1,0 +1,477 @@
+# NEXUS 2.0 — relational core for Firebase SQL Connect / PostgreSQL
+# This schema is intentionally multi-user and workspace-first even while NEXUS
+# is still being used by one person. Client access will be exposed only through
+# authenticated connector operations.
+
+type AppUser @table(key: "uid") {
+  uid: String!
+  email: String!
+  displayName: String
+  photoUrl: String
+  locale: String
+  timezone: String!
+  createdAt: Timestamp! @default(expr: "request.time")
+  updatedAt: Timestamp! @default(expr: "request.time")
+}
+
+type Workspace @table {
+  owner: AppUser!
+  name: String!
+  slug: String! @unique
+  kind: String!
+  currency: String!
+  timezone: String!
+  archived: Boolean!
+  createdAt: Timestamp! @default(expr: "request.time")
+  updatedAt: Timestamp! @default(expr: "request.time")
+}
+
+type Membership @table(key: ["workspace", "user"]) {
+  workspace: Workspace!
+  user: AppUser!
+  role: String!
+  status: String!
+  createdAt: Timestamp! @default(expr: "request.time")
+  updatedAt: Timestamp! @default(expr: "request.time")
+}
+
+type Project @table {
+  workspace: Workspace!
+  name: String!
+  area: String!
+  clientName: String
+  description: String!
+  progress: Float!
+  status: String!
+  priority: String!
+  stage: String
+  deadline: Date
+  dueDate: Date
+  valueMinor: Int64
+  paidMinor: Int64
+  currency: String!
+  accent: String
+  nextAction: String
+  hours: Float!
+  notes: String
+  source: String!
+  metadata: Any
+  archived: Boolean!
+  createdAt: Timestamp! @default(expr: "request.time")
+  updatedAt: Timestamp! @default(expr: "request.time")
+}
+
+type Milestone @table {
+  project: Project!
+  title: String!
+  weight: Float!
+  progress: Float!
+  baselineProgress: Float
+  sortOrder: Int!
+  createdAt: Timestamp! @default(expr: "request.time")
+  updatedAt: Timestamp! @default(expr: "request.time")
+}
+
+type Task @table {
+  workspace: Workspace!
+  project: Project!
+  milestone: Milestone
+  title: String!
+  description: String
+  completed: Boolean!
+  estimatedMinutes: Int!
+  priority: String!
+  dueDate: Date
+  completedAt: Timestamp
+  sortOrder: Int!
+  source: String!
+  metadata: Any
+  createdAt: Timestamp! @default(expr: "request.time")
+  updatedAt: Timestamp! @default(expr: "request.time")
+}
+
+type TaskDependency @table(key: ["task", "dependsOnTask"]) {
+  task: Task!
+  dependsOnTask: Task!
+  createdAt: Timestamp! @default(expr: "request.time")
+}
+
+type FlowSession @table {
+  workspace: Workspace!
+  project: Project!
+  task: Task
+  title: String!
+  projectName: String!
+  durationMinutes: Int!
+  startedAt: Timestamp!
+  pausedAt: Timestamp
+  pausedMs: Int64!
+  endedAt: Timestamp
+  elapsedSeconds: Int
+  completed: Boolean!
+  createdAt: Timestamp! @default(expr: "request.time")
+  updatedAt: Timestamp! @default(expr: "request.time")
+}
+
+type InboxItem @table {
+  workspace: Workspace!
+  type: String!
+  content: String!
+  targetId: String
+  processed: Boolean!
+  createdAt: Timestamp! @default(expr: "request.time")
+  updatedAt: Timestamp! @default(expr: "request.time")
+}
+
+type Idea @table {
+  workspace: Workspace!
+  title: String!
+  category: String!
+  description: String!
+  status: String!
+  potential: String!
+  notes: String
+  reviewDate: Date
+  createdAt: Timestamp! @default(expr: "request.time")
+  updatedAt: Timestamp! @default(expr: "request.time")
+}
+
+type IdeaProject @table(key: ["idea", "project"]) {
+  idea: Idea!
+  project: Project!
+  createdAt: Timestamp! @default(expr: "request.time")
+}
+
+type Goal @table {
+  workspace: Workspace!
+  title: String!
+  targetDate: Date
+  status: String!
+  createdAt: Timestamp! @default(expr: "request.time")
+  updatedAt: Timestamp! @default(expr: "request.time")
+}
+
+type GoalProject @table(key: ["goal", "project"]) {
+  goal: Goal!
+  project: Project!
+  createdAt: Timestamp! @default(expr: "request.time")
+}
+
+type GoalMilestone @table {
+  goal: Goal!
+  title: String!
+  completed: Boolean!
+  sortOrder: Int!
+  createdAt: Timestamp! @default(expr: "request.time")
+  updatedAt: Timestamp! @default(expr: "request.time")
+}
+
+type Contact @table {
+  workspace: Workspace!
+  name: String!
+  email: String
+  phone: String
+  company: String
+  notes: String
+  createdAt: Timestamp! @default(expr: "request.time")
+  updatedAt: Timestamp! @default(expr: "request.time")
+}
+
+type ProjectContact @table(key: ["project", "contact"]) {
+  project: Project!
+  contact: Contact!
+  relation: String
+  createdAt: Timestamp! @default(expr: "request.time")
+}
+
+type FinancialAccount @table {
+  workspace: Workspace!
+  name: String!
+  type: String!
+  currency: String!
+  openingBalanceMinor: Int64!
+  archived: Boolean!
+  createdAt: Timestamp! @default(expr: "request.time")
+  updatedAt: Timestamp! @default(expr: "request.time")
+}
+
+type Receivable @table {
+  workspace: Workspace!
+  project: Project
+  contact: Contact
+  title: String!
+  amountMinor: Int64!
+  paidMinor: Int64!
+  currency: String!
+  dueDate: Date
+  status: String!
+  notes: String
+  createdAt: Timestamp! @default(expr: "request.time")
+  updatedAt: Timestamp! @default(expr: "request.time")
+}
+
+type Payable @table {
+  workspace: Workspace!
+  project: Project
+  contact: Contact
+  title: String!
+  amountMinor: Int64!
+  paidMinor: Int64!
+  currency: String!
+  dueDate: Date
+  status: String!
+  notes: String
+  createdAt: Timestamp! @default(expr: "request.time")
+  updatedAt: Timestamp! @default(expr: "request.time")
+}
+
+type FinancialCommitment @table {
+  workspace: Workspace!
+  project: Project
+  title: String!
+  amountMinor: Int64!
+  currency: String!
+  dueDate: Date!
+  category: String!
+  status: String!
+  notes: String
+  createdAt: Timestamp! @default(expr: "request.time")
+  updatedAt: Timestamp! @default(expr: "request.time")
+}
+
+type Transaction @table {
+  workspace: Workspace!
+  account: FinancialAccount!
+  project: Project
+  receivable: Receivable
+  payable: Payable
+  kind: String!
+  title: String!
+  amountMinor: Int64!
+  currency: String!
+  date: Date!
+  category: String!
+  status: String!
+  counterparty: String
+  notes: String
+  metadata: Any
+  createdAt: Timestamp! @default(expr: "request.time")
+  updatedAt: Timestamp! @default(expr: "request.time")
+}
+
+type FinancialGoal @table {
+  workspace: Workspace!
+  title: String!
+  targetMinor: Int64!
+  savedMinor: Int64!
+  currency: String!
+  kind: String!
+  targetDate: Date
+  createdAt: Timestamp! @default(expr: "request.time")
+  updatedAt: Timestamp! @default(expr: "request.time")
+}
+
+type CalendarEvent @table {
+  workspace: Workspace!
+  project: Project
+  title: String!
+  start: Timestamp!
+  end: Timestamp!
+  category: String!
+  description: String
+  provider: String
+  providerId: String
+  syncStatus: String
+  metadata: Any
+  createdAt: Timestamp! @default(expr: "request.time")
+  updatedAt: Timestamp! @default(expr: "request.time")
+}
+
+type DailyPlan @table {
+  workspace: Workspace!
+  date: Date!
+  directiveProject: Project
+  summary: String
+  createdAt: Timestamp! @default(expr: "request.time")
+  updatedAt: Timestamp! @default(expr: "request.time")
+}
+
+type DailyPlanTask @table(key: ["dailyPlan", "task"]) {
+  dailyPlan: DailyPlan!
+  task: Task!
+  sortOrder: Int!
+  createdAt: Timestamp! @default(expr: "request.time")
+}
+
+type KnowledgeItem @table {
+  workspace: Workspace!
+  project: Project
+  title: String!
+  type: String!
+  content: String!
+  url: String
+  category: String!
+  tags: [String!]
+  searchableText: String
+  metadata: Any
+  createdAt: Timestamp! @default(expr: "request.time")
+  updatedAt: Timestamp! @default(expr: "request.time")
+}
+
+type Attachment @table {
+  workspace: Workspace!
+  project: Project
+  knowledgeItem: KnowledgeItem
+  name: String!
+  mimeType: String!
+  sizeBytes: Int64!
+  provider: String!
+  storagePath: String
+  externalId: String
+  checksum: String
+  createdAt: Timestamp! @default(expr: "request.time")
+  updatedAt: Timestamp! @default(expr: "request.time")
+}
+
+type Notification @table {
+  workspace: Workspace!
+  kind: String!
+  title: String!
+  body: String!
+  href: String
+  read: Boolean!
+  scheduledFor: Timestamp
+  deliveredAt: Timestamp
+  createdAt: Timestamp! @default(expr: "request.time")
+  updatedAt: Timestamp! @default(expr: "request.time")
+}
+
+type ActivityEvent @table {
+  workspace: Workspace!
+  project: Project
+  actor: AppUser
+  kind: String!
+  title: String!
+  entityType: String
+  entityId: String
+  payload: Any
+  createdAt: Timestamp! @default(expr: "request.time")
+}
+
+type IntegrationConnection @table {
+  workspace: Workspace!
+  user: AppUser!
+  provider: String!
+  status: String!
+  externalAccountId: String
+  scopes: [String!]
+  metadata: Any
+  lastSyncedAt: Timestamp
+  createdAt: Timestamp! @default(expr: "request.time")
+  updatedAt: Timestamp! @default(expr: "request.time")
+}
+
+type AIConversation @table {
+  workspace: Workspace!
+  user: AppUser!
+  title: String!
+  channel: String!
+  archived: Boolean!
+  createdAt: Timestamp! @default(expr: "request.time")
+  updatedAt: Timestamp! @default(expr: "request.time")
+}
+
+type AIMessage @table {
+  conversation: AIConversation!
+  role: String!
+  content: String!
+  contextIds: [String!]
+  model: String
+  inputTokens: Int
+  outputTokens: Int
+  latencyMs: Int
+  createdAt: Timestamp! @default(expr: "request.time")
+}
+
+type AIMemory @table {
+  workspace: Workspace!
+  user: AppUser!
+  content: String!
+  kind: String!
+  importance: Float!
+  sourceType: String
+  sourceId: String
+  projectIds: [String!]
+  active: Boolean!
+  metadata: Any
+  createdAt: Timestamp! @default(expr: "request.time")
+  updatedAt: Timestamp! @default(expr: "request.time")
+}
+
+type AIUsage @table {
+  workspace: Workspace!
+  user: AppUser!
+  provider: String!
+  model: String!
+  inputTokens: Int!
+  outputTokens: Int!
+  costMicrosUsd: Int64!
+  operation: String
+  createdAt: Timestamp! @default(expr: "request.time")
+}
+
+type AIToolAction @table {
+  workspace: Workspace!
+  user: AppUser!
+  conversation: AIConversation
+  tool: String!
+  action: String!
+  status: String!
+  riskLevel: String!
+  requiresConfirmation: Boolean!
+  confirmedAt: Timestamp
+  executedAt: Timestamp
+  input: Any
+  result: Any
+  error: String
+  createdAt: Timestamp! @default(expr: "request.time")
+  updatedAt: Timestamp! @default(expr: "request.time")
+}
+
+type Automation @table {
+  workspace: Workspace!
+  owner: AppUser!
+  name: String!
+  description: String
+  triggerType: String!
+  triggerConfig: Any!
+  actionType: String!
+  actionConfig: Any!
+  enabled: Boolean!
+  lastRunAt: Timestamp
+  nextRunAt: Timestamp
+  createdAt: Timestamp! @default(expr: "request.time")
+  updatedAt: Timestamp! @default(expr: "request.time")
+}
+
+type AutomationRun @table {
+  automation: Automation!
+  status: String!
+  startedAt: Timestamp! @default(expr: "request.time")
+  finishedAt: Timestamp
+  result: Any
+  error: String
+}
+
+type AuditLog @table {
+  workspace: Workspace!
+  actor: AppUser
+  actorType: String!
+  action: String!
+  entityType: String!
+  entityId: String
+  before: Any
+  after: Any
+  metadata: Any
+  createdAt: Timestamp! @default(expr: "request.time")
+}
