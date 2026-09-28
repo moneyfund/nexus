@@ -259,6 +259,9 @@ test("AI context omits disabled categories", () => {
 
 test("AI context includes editable financial records with stable IDs", () => {
   const { store, actions } = setup();
+  store.update((w) => {
+    w.user.preferences.aiContext.finance = true;
+  });
   const expenseId = actions.capture({
     type: "expense",
     content: "Combustible Estelí",
