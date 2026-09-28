@@ -3984,3 +3984,135 @@ html[data-motion="reduced"] *:after {
     width: 100%;
   }
 }
+
+
+/* NEXUS Voice — mobile-first push-to-talk shell */
+.nexus-voice-dock {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 55;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+}
+.nexus-voice-orb {
+  position: relative;
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  border: 1px solid #f0abfc66;
+  color: #fff;
+  background:
+    radial-gradient(circle at 38% 30%, #f0abfc55, transparent 28%),
+    radial-gradient(circle at 50% 52%, #a92bbfcc, #26102d 68%, #08050b 100%);
+  box-shadow:
+    0 0 0 1px #ffffff08 inset,
+    0 0 35px #dc52ed38,
+    0 16px 50px #0009;
+  overflow: visible;
+}
+.nexus-voice-orb:hover {
+  transform: translateY(-2px) scale(1.03);
+  border-color: #f0abfcb0;
+}
+.nexus-voice-orb.listening {
+  background:
+    radial-gradient(circle at 50% 40%, #fff8, transparent 20%),
+    radial-gradient(circle, #ef73f4, #9b2bb5 55%, #1b071f);
+  box-shadow:
+    0 0 0 1px #ffffff22 inset,
+    0 0 50px #dc52ed8a,
+    0 16px 55px #000a;
+}
+.voice-orb-ring {
+  position: absolute;
+  inset: -8px;
+  border: 1px solid #dc52ed32;
+  border-radius: 50%;
+  pointer-events: none;
+}
+.nexus-voice-orb.listening .voice-orb-ring {
+  animation: nexus-voice-pulse 1.45s ease-out infinite;
+}
+.nexus-voice-panel {
+  width: min(340px, calc(100vw - 32px));
+  padding: 15px 16px 16px;
+  border: 1px solid #d946ef40;
+  border-radius: 16px;
+  background:
+    radial-gradient(circle at 90% 0%, #c13bd21a, transparent 42%),
+    #0b0710eb;
+  backdrop-filter: blur(24px);
+  box-shadow: 0 20px 70px #000a;
+}
+.nexus-voice-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--accent-bright);
+  font-family: var(--font-display);
+  font-size: 0.62rem;
+  letter-spacing: 0.13em;
+}
+.nexus-voice-panel-head > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.nexus-voice-panel-head button {
+  border: 0;
+  background: none;
+  color: var(--muted);
+  padding: 2px;
+}
+.nexus-voice-panel strong {
+  display: block;
+  margin-top: 13px;
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 0.96rem;
+  line-height: 1.45;
+  color: #fff;
+}
+.nexus-voice-panel small {
+  display: block;
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 0.68rem;
+  line-height: 1.5;
+}
+@keyframes nexus-voice-pulse {
+  0% {
+    opacity: 0.9;
+    transform: scale(0.92);
+  }
+  70% {
+    opacity: 0;
+    transform: scale(1.35);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.35);
+  }
+}
+@media (max-width: 760px) {
+  .nexus-voice-dock {
+    right: 18px;
+    bottom: calc(82px + env(safe-area-inset-bottom));
+  }
+  .nexus-voice-dock.compact {
+    bottom: calc(82px + env(safe-area-inset-bottom));
+  }
+  .nexus-voice-orb {
+    width: 54px;
+    height: 54px;
+  }
+  .nexus-voice-panel {
+    width: min(330px, calc(100vw - 36px));
+  }
+}
