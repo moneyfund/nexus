@@ -45,8 +45,8 @@ type Project @table {
   clientName: String
   description: String!
   progress: Float!
-  status: String!
-  priority: String!
+  status: String! @index
+  priority: String! @index
   stage: String
   deadline: Date
   dueDate: Date
@@ -87,7 +87,7 @@ type Task @table {
   completed: Boolean!
   estimatedMinutes: Int!
   priority: String!
-  dueDate: Date
+  dueDate: Date @index
   completedAt: Timestamp
   sortOrder: Int!
   source: String!
@@ -218,7 +218,7 @@ type Receivable @table {
   paidMinor: Int64!
   currency: String!
   dueDate: Date
-  status: String!
+  status: String! @index
   notes: String
   createdAt: Timestamp! @default(expr: "request.time")
   updatedAt: Timestamp! @default(expr: "request.time")
@@ -233,8 +233,8 @@ type Payable @table {
   amountMinor: Int64!
   paidMinor: Int64!
   currency: String!
-  dueDate: Date
-  status: String!
+  dueDate: Date @index
+  status: String! @index
   notes: String
   createdAt: Timestamp! @default(expr: "request.time")
   updatedAt: Timestamp! @default(expr: "request.time")
@@ -247,9 +247,9 @@ type FinancialCommitment @table {
   title: String!
   amountMinor: Int64!
   currency: String!
-  dueDate: Date!
+  dueDate: Date! @index
   category: String!
-  status: String!
+  status: String! @index
   notes: String
   createdAt: Timestamp! @default(expr: "request.time")
   updatedAt: Timestamp! @default(expr: "request.time")
@@ -266,9 +266,9 @@ type Transaction @table {
   title: String!
   amountMinor: Int64!
   currency: String!
-  date: Date!
+  date: Date! @index
   category: String!
-  status: String!
+  status: String! @index
   counterparty: String
   notes: String
   metadata: Any
@@ -294,8 +294,8 @@ type CalendarEvent @table {
   workspace: Workspace!
   project: Project
   title: String!
-  start: Timestamp!
-  end: Timestamp!
+  start: Timestamp! @index
+  end: Timestamp! @index
   category: String!
   description: String
   provider: String
@@ -333,7 +333,7 @@ type KnowledgeItem @table {
   url: String
   category: String!
   tags: [String!]
-  searchableText: String
+  searchableText: String @searchable
   metadata: Any
   createdAt: Timestamp! @default(expr: "request.time")
   updatedAt: Timestamp! @default(expr: "request.time")
@@ -362,8 +362,8 @@ type Notification @table {
   title: String!
   body: String!
   href: String
-  read: Boolean!
-  scheduledFor: Timestamp
+  read: Boolean! @index
+  scheduledFor: Timestamp @index
   deliveredAt: Timestamp
   createdAt: Timestamp! @default(expr: "request.time")
   updatedAt: Timestamp! @default(expr: "request.time")
@@ -425,7 +425,7 @@ type AiMemory @table {
   legacyId: String
   workspace: Workspace!
   user: AppUser!
-  content: String!
+  content: String! @searchable
   kind: String!
   importance: Float!
   sourceType: String
@@ -479,9 +479,9 @@ type Automation @table {
   triggerConfig: Any!
   actionType: String!
   actionConfig: Any!
-  enabled: Boolean!
+  enabled: Boolean! @index
   lastRunAt: Timestamp
-  nextRunAt: Timestamp
+  nextRunAt: Timestamp @index
   createdAt: Timestamp! @default(expr: "request.time")
   updatedAt: Timestamp! @default(expr: "request.time")
 }
