@@ -4,3 +4,10 @@ generate:
     outputDir: ../../src/dataconnect-generated
     package: "@nexus/dataconnect"
     packageJsonDir: ../..
+    clientCache:
+      maxAge: 5s
+      storage: memory
+  adminNodeSdk:
+    outputDir: ../../src/dataconnect-admin
+    package: "@nexus/dataconnect-admin"
+    packageJsonDir: ../..
