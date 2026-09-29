@@ -37,6 +37,13 @@ export function AIView() {
   const [aiStatus, setAIStatus] = useState<{
     configured: boolean;
     model: string;
+    quota?: {
+      dailyUsed: number;
+      dailyLimit: number;
+      monthlyUsed: number;
+      monthlyLimit: number;
+      monthCostUSD: number;
+    };
     error?: string;
   } | null>(null);
   const [pendingActions, setPendingActions] = useState<
@@ -659,6 +666,19 @@ export function AIView() {
               />
             </label>
           ))}
+          {aiStatus?.quota && (
+            <div className="context-counts">
+              <span>
+                IA hoy {aiStatus.quota.dailyUsed}/{aiStatus.quota.dailyLimit}
+              </span>
+              <span>
+                Mes {aiStatus.quota.monthlyUsed}/{aiStatus.quota.monthlyLimit}
+              </span>
+              <span>
+                Costo mes ${aiStatus.quota.monthCostUSD.toFixed(4)}
+              </span>
+            </div>
+          )}
           <div className="context-counts">
             <span>{context.projects.length} proyectos</span>
             <span>{context.events.length} bloques</span>
