@@ -15,6 +15,9 @@ setGlobalOptions({
 
 const OPENAI_API_KEY = defineSecret("OPENAI_API_KEY");
 const DEFAULT_MODEL = "gpt-6-luna";
+const AI_HOURLY_LIMIT = 30;
+const AI_DAILY_LIMIT = 60;
+const AI_MONTHLY_LIMIT = 600;
 
 const ACTION_TYPES = [
   "complete_task",
@@ -149,32 +152,135 @@ function estimateCost(model, usage) {
   );
 }
 
-async function enforceSoftRateLimit(uid) {
+function quotaKeys() {
+  const iso = new Date().toISOString();
+  return {
+    hour: iso.slice(0, 13),
+    day: iso.slice(0, 10),
+    month: iso.slice(0, 7),
+  };
+}
+
+async function getAiQuota(uid) {
   const db = getFirestore();
-  const now = Date.now();
-  const hour = new Date(now).toISOString().slice(0, 13);
-  const ref = db.collection("nexus_ai_limits").doc(uid + ":" + hour);
+  const { day, month } = quotaKeys();
+  const [daily, monthly] = await Promise.all([
+    db.collection("nexus_ai_quota_daily").doc(uid + ":" + day).get(),
+    db.collection("nexus_ai_quota_monthly").doc(uid + ":" + month).get(),
+  ]);
+  return {
+    dailyUsed: Number(daily.data()?.requests || 0),
+    dailyLimit: AI_DAILY_LIMIT,
+    monthlyUsed: Number(monthly.data()?.requests || 0),
+    monthlyLimit: AI_MONTHLY_LIMIT,
+    monthCostUSD: Number(monthly.data()?.costMicrosUsd || 0) / 1_000_000,
+  };
+}
+
+async function reserveAiRequest(uid) {
+  const db = getFirestore();
+  const { hour, day, month } = quotaKeys();
+  const hourlyRef = db.collection("nexus_ai_limits").doc(uid + ":" + hour);
+  const dailyRef = db.collection("nexus_ai_quota_daily").doc(uid + ":" + day);
+  const monthlyRef = db
+    .collection("nexus_ai_quota_monthly")
+    .doc(uid + ":" + month);
 
   await db.runTransaction(async (tx) => {
-    const snapshot = await tx.get(ref);
-    const count = Number(snapshot.data()?.count || 0);
-    if (count >= 60) {
+    const [hourly, daily, monthly] = await Promise.all([
+      tx.get(hourlyRef),
+      tx.get(dailyRef),
+      tx.get(monthlyRef),
+    ]);
+
+    const hourlyCount = Number(hourly.data()?.count || 0);
+    const dailyCount = Number(daily.data()?.requests || 0);
+    const monthlyCount = Number(monthly.data()?.requests || 0);
+
+    if (hourlyCount >= AI_HOURLY_LIMIT)
       throw new HttpsError(
         "resource-exhausted",
-        "Has alcanzado el límite temporal de NEXUS AI. Inténtalo nuevamente en unos minutos.",
+        "Has alcanzado el límite horario de NEXUS AI. Inténtalo más tarde.",
       );
-    }
+    if (dailyCount >= AI_DAILY_LIMIT)
+      throw new HttpsError(
+        "resource-exhausted",
+        "Has alcanzado el límite beta de " +
+          AI_DAILY_LIMIT +
+          " consultas diarias de NEXUS AI.",
+      );
+    if (monthlyCount >= AI_MONTHLY_LIMIT)
+      throw new HttpsError(
+        "resource-exhausted",
+        "Has alcanzado el límite beta mensual de NEXUS AI.",
+      );
+
+    const now = FieldValue.serverTimestamp();
     tx.set(
-      ref,
+      hourlyRef,
+      { uid, hour, count: hourlyCount + 1, updatedAt: now },
+      { merge: true },
+    );
+    tx.set(
+      dailyRef,
       {
         uid,
-        hour,
-        count: count + 1,
-        updatedAt: FieldValue.serverTimestamp(),
+        day,
+        requests: dailyCount + 1,
+        updatedAt: now,
+      },
+      { merge: true },
+    );
+    tx.set(
+      monthlyRef,
+      {
+        uid,
+        month,
+        requests: monthlyCount + 1,
+        updatedAt: now,
       },
       { merge: true },
     );
   });
+}
+
+async function recordAiUsage(uid, model, usage, costUSD) {
+  const db = getFirestore();
+  const { day, month } = quotaKeys();
+  const dailyRef = db.collection("nexus_ai_quota_daily").doc(uid + ":" + day);
+  const monthlyRef = db
+    .collection("nexus_ai_quota_monthly")
+    .doc(uid + ":" + month);
+  const costMicrosUsd = Math.round(costUSD * 1_000_000);
+
+  await Promise.all([
+    dailyRef.set(
+      {
+        inputTokens: FieldValue.increment(usage.inputTokens || 0),
+        outputTokens: FieldValue.increment(usage.outputTokens || 0),
+        costMicrosUsd: FieldValue.increment(costMicrosUsd),
+        updatedAt: FieldValue.serverTimestamp(),
+      },
+      { merge: true },
+    ),
+    monthlyRef.set(
+      {
+        inputTokens: FieldValue.increment(usage.inputTokens || 0),
+        outputTokens: FieldValue.increment(usage.outputTokens || 0),
+        costMicrosUsd: FieldValue.increment(costMicrosUsd),
+        updatedAt: FieldValue.serverTimestamp(),
+      },
+      { merge: true },
+    ),
+    db.collection("nexus_ai_usage_events").add({
+      uid,
+      model,
+      inputTokens: usage.inputTokens || 0,
+      outputTokens: usage.outputTokens || 0,
+      costMicrosUsd,
+      createdAt: FieldValue.serverTimestamp(),
+    }),
+  ]);
 }
 
 function normalizeContext(value) {
@@ -195,11 +301,13 @@ export const nexusAIStatus = onCall(
     if (!request.auth)
       throw new HttpsError("unauthenticated", "Inicia sesión en NEXUS.");
 
+    const quota = await getAiQuota(request.auth.uid);
     return {
       configured: Boolean(OPENAI_API_KEY.value()),
       model: DEFAULT_MODEL,
       provider: "openai",
       mode: "realtime-context",
+      quota,
     };
   },
 );
@@ -228,14 +336,11 @@ export const nexusAI = onCall(
       );
 
     const context = normalizeContext(request.data?.context);
-    await enforceSoftRateLimit(request.auth.uid);
+    await reserveAiRequest(request.auth.uid);
 
-    const model =
-      request.data?.model === "gpt-6-astra" ||
-      request.data?.model === "gpt-6-sol" ||
-      request.data?.model === "gpt-6-luna"
-        ? request.data.model
-        : DEFAULT_MODEL;
+    // Beta accounts are intentionally pinned to Luna so one user cannot
+    // escalate model cost by crafting a callable request manually.
+    const model = DEFAULT_MODEL;
 
     const openAIResponse = await fetch("https://api.openai.com/v1/responses", {
       method: "POST",
@@ -316,12 +421,16 @@ export const nexusAI = onCall(
       outputTokens: payload.usage?.output_tokens || 0,
     };
 
+    const costUSD = estimateCost(model, usage);
+    await recordAiUsage(request.auth.uid, model, usage, costUSD);
+
     return {
       result,
       model,
       provider: "openai",
       usage,
-      costUSD: estimateCost(model, usage),
+      costUSD,
+      quota: await getAiQuota(request.auth.uid),
     };
   },
 );
