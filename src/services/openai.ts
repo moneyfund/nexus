@@ -10,6 +10,7 @@ import type { AIProvider, NexusContext } from "@/services/providers";
 export interface NexusAIAction {
   type:
     | "complete_task"
+    | "create_project"
     | "create_task"
     | "update_task"
     | "delete_task"
