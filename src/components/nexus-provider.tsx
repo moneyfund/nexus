@@ -35,7 +35,6 @@ import {
   type GoogleWorkspaceGrant,
 } from "@/lib/google-workspace";
 import { interfaceSound } from "@/services/sound";
-import { SYSTEM } from "@/config/system";
 import type { CaptureType, FlowSession, Workspace } from "@/domain/models";
 
 function buildUserStore(session: FirebaseSession) {
