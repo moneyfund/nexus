@@ -455,6 +455,7 @@ export class NexusToolRegistry {
     { id: "projects.read", label: "Consultar proyectos", access: "read" },
     { id: "calendar.read", label: "Consultar calendario", access: "read" },
     { id: "finance.read", label: "Consultar finanzas", access: "read" },
+    { id: "project.create", label: "Crear proyecto", access: "confirm" },
     { id: "task.propose", label: "Proponer una tarea", access: "confirm" },
     { id: "task.complete", label: "Completar tarea", access: "confirm" },
     { id: "task.update", label: "Editar tarea", access: "confirm" },
