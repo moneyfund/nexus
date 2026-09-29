@@ -224,7 +224,7 @@ export function Dashboard() {
               <div key={p.id} className="outcome-row">
                 <span className="outcome-number">0{index + 1}</span>
                 <div>
-                  <Link href={"/projects/" + p.id} className="small muted">
+                  <Link href={"/project?id=" + encodeURIComponent(p.id)} className="small muted">
                     {p.name}
                   </Link>
                   <h3>{t.title}</h3>
@@ -320,7 +320,7 @@ export function Dashboard() {
         />
         <div className="project-ledger">
           {active.map((p, index) => (
-            <Link key={p.id} href={"/projects/" + p.id} className="ledger-row">
+            <Link key={p.id} href={"/project?id=" + encodeURIComponent(p.id)} className="ledger-row">
               <span className="ledger-index">0{index + 1}</span>
               <div>
                 <h3>{p.name}</h3>
