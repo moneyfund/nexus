@@ -84,7 +84,7 @@ export function CommandPalette() {
       title: p.name,
       type: "Proyecto",
       icon: Layers3,
-      run: () => go("/projects/" + p.id),
+      run: () => go("/project?id=" + encodeURIComponent(p.id)),
     })),
     ...n.data.ideas
       .filter((i) => i.status !== "archived")
