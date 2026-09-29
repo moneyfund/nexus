@@ -5,7 +5,7 @@ import type { Project } from "@/domain/models";
 import { Badge, ProgressRing } from "./ui/primitives";
 export function ProjectCard({ project: p }: { project: Project }) {
   return (
-    <Link href={"/projects/" + p.id} className="project-card">
+    <Link href={"/project?id=" + encodeURIComponent(p.id)} className="project-card">
       <div className="row between">
         <Badge active={p.status === "active"}>{p.status.toUpperCase()}</Badge>
         <ArrowUpRight size={17} />
