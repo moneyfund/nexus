@@ -13,7 +13,6 @@ import {
 } from "lucide-react";
 import { useNexus } from "./nexus-provider";
 import type { CaptureType } from "@/domain/models";
-import { CATEGORIES } from "@/config/system";
 import { Button, Modal } from "./ui/primitives";
 import { interfaceSound } from "@/services/sound";
 const options = [
@@ -32,7 +31,19 @@ function CaptureForm() {
   const [type, setType] = useState<CaptureType>(n.captureType);
   const [content, setContent] = useState("");
   const [projectId, setProjectId] = useState(n.captureProject);
-  const [category, setCategory] = useState("Ideas");
+  const [category, setCategory] = useState("General");
+  const categoryOptions = Array.from(
+    new Set([
+      "General",
+      "Personal",
+      "Trabajo",
+      "Estudio",
+      "Finanzas",
+      ...n.projects.map((project) => project.area),
+      ...n.data.ideas.map((idea) => idea.category),
+      ...n.data.knowledge.map((item) => item.category),
+    ].map((value) => value.trim()).filter(Boolean)),
+  );
   const [amount, setAmount] = useState("");
   const [url, setUrl] = useState("");
   const [file, setFile] = useState<File | null>(null);
@@ -127,7 +138,9 @@ function CaptureForm() {
         <label className="field">
           {type === "idea"
             ? "¿Qué acaba de cruzar tu mente?"
-            : "Nombre o descripción"}
+            : type === "project"
+              ? "Nombre del proyecto"
+              : "Nombre o descripción"}
           <textarea
             autoFocus
             value={content}
@@ -138,31 +151,36 @@ function CaptureForm() {
           />
         </label>
         <div className="form-grid">
+          {type !== "project" && (
+            <label className="field">
+              Proyecto {type === "task" ? "" : "(opcional)"}
+              <select
+                value={projectId}
+                onChange={(e) => setProjectId(e.target.value)}
+                required={type === "task"}
+              >
+                <option value="">Sin proyecto</option>
+                {n.projects.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
           <label className="field">
-            Proyecto {type === "task" ? "" : "(opcional)"}
-            <select
-              value={projectId}
-              onChange={(e) => setProjectId(e.target.value)}
-              required={type === "task"}
-            >
-              <option value="">Sin proyecto</option>
-              {n.projects.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="field">
-            Órbita / categoría
-            <select
+            {type === "project" ? "Área" : "Órbita / categoría"}
+            <input
+              list="nexus-category-options"
               value={category}
               onChange={(e) => setCategory(e.target.value)}
-            >
-              {CATEGORIES.map((c) => (
-                <option key={c}>{c}</option>
+              placeholder="Escribe tu propia categoría"
+            />
+            <datalist id="nexus-category-options">
+              {categoryOptions.map((item) => (
+                <option key={item} value={item} />
               ))}
-            </select>
+            </datalist>
           </label>
         </div>
         {(type === "income" || type === "expense") && (
