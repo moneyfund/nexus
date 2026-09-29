@@ -170,12 +170,15 @@ export class NexusActions {
             notes: "",
           });
           break;
-        case "project":
-          w.projects.unshift({
+        case "project": {
+          const project = {
             ...newProject(content, w.user.id),
             id: targetId,
-          });
+          };
+          project.area = input.category?.trim() || "General";
+          w.projects.unshift(project);
           break;
+        }
         case "task": {
           const p = w.projects.find((p) => p.id === input.projectId);
           if (p) {
