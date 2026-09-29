@@ -134,7 +134,7 @@ export function ProjectsView() {
             {visible.map((p, index) => (
               <Link
                 key={p.id}
-                href={"/projects/" + p.id}
+                href={"/project?id=" + encodeURIComponent(p.id)}
                 className="portfolio-node"
               >
                 <span className="portfolio-node-index">
@@ -170,7 +170,7 @@ export function ProjectsView() {
                 .filter((p) => p.status === s.value)
                 .map((p) => (
                   <div className="status-project" key={p.id}>
-                    <Link href={"/projects/" + p.id}>
+                    <Link href={"/project?id=" + encodeURIComponent(p.id)}>
                       <h3>{p.name}</h3>
                       <p>{p.nextAction}</p>
                     </Link>
@@ -210,7 +210,7 @@ export function ProjectsView() {
             .map((p) => (
               <Link
                 key={p.id}
-                href={"/projects/" + p.id}
+                href={"/project?id=" + encodeURIComponent(p.id)}
                 className="ledger-row"
               >
                 <span className="ledger-index">
