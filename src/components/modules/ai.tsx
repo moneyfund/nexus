@@ -130,6 +130,8 @@ export function AIView() {
     switch (action.type) {
       case "complete_task":
         return "Completar · " + (task?.title ?? action.title ?? "tarea") + " · " + projectName;
+      case "create_project":
+        return "Crear proyecto · " + (action.title ?? "Nuevo proyecto");
       case "create_task":
         return "Crear tarea · " + (action.title ?? "Nueva tarea") + " · " + projectName;
       case "update_task":
@@ -185,6 +187,28 @@ export function AIView() {
           if (!task) throw new Error("La tarea propuesta ya no existe.");
           if (!task.completed)
             n.actions.toggleTask(action.projectId, action.taskId);
+          break;
+        }
+        case "create_project": {
+          if (!action.title?.trim())
+            throw new Error("Falta el nombre del proyecto.");
+          const projectId = n.actions.capture({
+            type: "project",
+            content: action.title.trim(),
+            category: action.area?.trim() || action.itemCategory?.trim() || "General",
+          });
+          n.actions.updateProject(projectId, {
+            ...(action.description != null
+              ? { description: action.description }
+              : {}),
+            ...(action.priority ? { priority: action.priority } : {}),
+            ...(action.dueDate ? { dueDate: action.dueDate } : {}),
+            ...(action.value != null ? { value: action.value } : {}),
+            ...(action.area?.trim() ? { area: action.area.trim() } : {}),
+            ...(action.client?.trim() ? { client: action.client.trim() } : {}),
+          });
+          if (action.status && action.status !== "backlog")
+            n.actions.setStatus(projectId, action.status);
           break;
         }
         case "create_task": {
