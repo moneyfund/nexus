@@ -21,6 +21,7 @@ const AI_MONTHLY_LIMIT = 600;
 
 const ACTION_TYPES = [
   "complete_task",
+  "create_project",
   "create_task",
   "update_task",
   "delete_task",
@@ -362,6 +363,7 @@ export const nexusAI = onCall(
           "Cuando el usuario solo pide análisis, explicación, priorización o una respuesta, responde sin proponer cambios innecesarios. " +
           "Cuando el usuario expresa intención de cambiar NEXUS, devuelve la modificación como una acción propuesta; nunca digas que ya la ejecutaste. " +
           "Para editar o eliminar un registro existente debes usar exactamente su ID del contexto. En tareas usa taskId junto con projectId; en movimientos, eventos, ideas y memorias usa targetId. Si no puedes identificar un único registro, pregunta antes de proponer la acción. " +
+          "Usa create_project cuando el usuario pida crear un proyecto nuevo; title es obligatorio y puedes usar description, area, client, priority, dueDate, value y status si fueron dados o se pueden inferir sin ambigüedad. " +
           "Usa complete_task para terminar una tarea existente; update_task para editar título, prioridad, duración o hito; delete_task solo si el usuario pide eliminarla claramente. " +
           "Usa record_income o record_expense para movimientos nuevos. Para corregir un movimiento existente usa update_transaction con targetId y transactionKind; para eliminarlo usa delete_transaction. " +
           "En movimientos financieros usa amount para importe, date en formato YYYY-MM-DD, itemCategory para categoría y projectId para asociación. Interpreta hoy/ayer usando now y timezone. " +
