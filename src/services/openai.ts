@@ -93,9 +93,23 @@ const callAI = httpsCallable<
   { prompt: string; context: NexusContext; model?: string },
   APIResponse
 >(functions, "nexusAI");
+export interface NexusAIQuota {
+  dailyUsed: number;
+  dailyLimit: number;
+  monthlyUsed: number;
+  monthlyLimit: number;
+  monthCostUSD: number;
+}
+
 const callAIStatus = httpsCallable<
   Record<string, never>,
-  { configured: boolean; model: string; provider: string; mode: string }
+  {
+    configured: boolean;
+    model: string;
+    provider: string;
+    mode: string;
+    quota: NexusAIQuota;
+  }
 >(functions, "nexusAIStatus");
 
 export class NexusOpenAIClient implements AIProvider {
@@ -105,6 +119,7 @@ export class NexusOpenAIClient implements AIProvider {
       return {
         configured: response.data.configured,
         model: response.data.model,
+        quota: response.data.quota,
       };
     } catch (error) {
       return {
