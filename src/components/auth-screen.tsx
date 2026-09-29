@@ -55,7 +55,7 @@ export function AuthScreen() {
           </span>
           <span>
             <span className="brand-name">NEXUS</span>
-            <div className="brand-subtitle">PRIVATE INTELLIGENCE</div>
+            <div className="brand-subtitle">PRIVATE INTELLIGENCE · BETA</div>
           </span>
         </div>
 
@@ -64,10 +64,26 @@ export function AuthScreen() {
           <strong>Accede a tu universo</strong>
         </div>
 
-        <p className="muted" style={{ marginBottom: 22 }}>
-          Tus proyectos, ideas, finanzas y conocimiento se sincronizan de forma
-          privada con Firebase.
+        <p className="muted" style={{ marginBottom: 16 }}>
+          Tu cuenta crea un espacio independiente para proyectos, ideas,
+          finanzas, calendario y NEXUS AI.
         </p>
+        <div
+          className="surface"
+          style={{
+            padding: 14,
+            marginBottom: 22,
+            background: "rgba(255,255,255,.025)",
+          }}
+        >
+          <div className="row" style={{ gap: 10 }}>
+            <LockKeyhole size={15} className="accent" />
+            <small className="muted">
+              Tus datos están aislados por cuenta. Otros usuarios no pueden ver
+              ni modificar tu workspace.
+            </small>
+          </div>
+        </div>
 
         <button
           className="button button-primary"
