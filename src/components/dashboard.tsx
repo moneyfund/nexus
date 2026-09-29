@@ -128,6 +128,29 @@ export function Dashboard() {
           <span>FROM THOUGHT TO ACTION</span>
         </div>
       </section>
+      {n.projects.length === 0 && (
+        <motion.section {...reveal} className="surface" style={{ margin: "18px 0 26px", padding: 24 }}>
+          <div className="row wrap" style={{ justifyContent: "space-between", gap: 18 }}>
+            <div style={{ maxWidth: 620 }}>
+              <Label>NUEVO WORKSPACE / PRIVADO</Label>
+              <h2 style={{ marginTop: 10 }}>Construye tu primer sistema personal.</h2>
+              <p className="muted" style={{ marginTop: 8 }}>
+                Empieza con un proyecto real. Después NEXUS puede ayudarte a
+                organizar tareas, registrar dinero, planificar y razonar con tu contexto.
+              </p>
+            </div>
+            <Button onClick={() => n.openCapture("project")}>
+              <Plus size={15} />
+              Crear primer proyecto
+            </Button>
+          </div>
+          <div className="row wrap" style={{ gap: 10, marginTop: 18 }}>
+            <Badge active>1 · PROYECTO</Badge>
+            <Badge>2 · TAREAS Y DINERO</Badge>
+            <Badge>3 · NEXUS AI</Badge>
+          </div>
+        </motion.section>
+      )}
       <motion.section {...reveal} className="nexus-command-deck">
         <button type="button" onClick={() => n.openCapture("expense")}>
           <span><Wallet size={18} /></span>
