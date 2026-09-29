@@ -15,7 +15,6 @@ import {
   BrowserWorkspaceStorage,
   WorkspaceStore,
   reassignWorkspaceUser,
-  syncKnownPortfolio,
 } from "@/repositories/workspace";
 import { createRepositories } from "@/repositories/contracts";
 import { NexusActions } from "@/services/actions";
@@ -46,14 +45,6 @@ function buildUserStore(session: FirebaseSession) {
   return store;
 }
 
-function readLocalMigrationSource() {
-  try {
-    return new BrowserWorkspaceStorage().read(SYSTEM.localUserId);
-  } catch {
-    return null;
-  }
-}
-
 async function hydrateAuthenticatedStore(
   store: WorkspaceStore,
   session: FirebaseSession,
@@ -61,29 +52,23 @@ async function hydrateAuthenticatedStore(
   const remote = await firebaseClient.readWorkspace();
 
   if (remote) {
-    const normalized = syncKnownPortfolio(
-      reassignWorkspaceUser(remote, session.uid, {
-        displayName: session.displayName,
-        email: session.email,
-      }),
-      session.uid,
-    );
+    const normalized = reassignWorkspaceUser(remote, session.uid, {
+      displayName: session.displayName,
+      email: session.email,
+    });
     store.import(normalized);
     await firebaseClient.writeWorkspace(normalized);
-
     return;
   }
 
+  // A brand-new authenticated account must start from its own isolated
+  // workspace. Never inherit the legacy anonymous workspace or another UID.
   const userLocal = new BrowserWorkspaceStorage().read(session.uid);
-  const previousLocal = readLocalMigrationSource();
-  const source = userLocal ?? previousLocal ?? store.getSnapshot();
-  const normalized = syncKnownPortfolio(
-    reassignWorkspaceUser(source, session.uid, {
-      displayName: session.displayName,
-      email: session.email,
-    }),
-    session.uid,
-  );
+  const source = userLocal ?? store.getSnapshot();
+  const normalized = reassignWorkspaceUser(source, session.uid, {
+    displayName: session.displayName,
+    email: session.email,
+  });
 
   store.import(normalized);
   await firebaseClient.writeWorkspace(normalized);
