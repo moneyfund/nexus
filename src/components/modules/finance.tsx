@@ -532,14 +532,15 @@ export function FinanceView() {
     >
       <div className="finance-headline">
         <div>
-          <Label>CASHFLOW / DESDE EL CORTE</Label>
+          <Label>LIQUIDEZ / DISPONIBLE ACTUAL</Label>
           <div className="finance-net">
-            {money(currentIncome - expense)}
+            {money(cut.currentAvailableUSD)}
             <span>USD</span>
           </div>
           <p>
-            Movimientos posteriores al corte. Los cobros históricos confirmados
-            no se mezclan con el dinero disponible actual.
+            Suma de tus cuentas financieras disponibles. Equivale a{" "}
+            {cordobas(cut.currentAvailableUSD * rate)} al tipo de cambio de
+            referencia configurado en NEXUS.
           </p>
         </div>
         <label className="field">
@@ -552,6 +553,26 @@ export function FinanceView() {
             <option value="user">Solo mis registros</option>
           </select>
         </label>
+      </div>
+      <div className="data-band finance-cut-band">
+        <DataMetric
+          label="Disponible actual"
+          value={money(cut.currentAvailableUSD)}
+          meta="Saldo real agregado de efectivo, banco, tarjeta y wallet"
+        />
+        <DataMetric
+          label="Último corte"
+          value={money(cut.lastCutAvailableUSD)}
+          meta={"Saldo reconstruido al " + cut.cutDate}
+        />
+        <DataMetric
+          label="Después del corte"
+          value={
+            (cut.changeSinceCutUSD >= 0 ? "+" : "−") +
+            money(Math.abs(cut.changeSinceCutUSD))
+          }
+          meta="Variación real de cuentas desde el último corte"
+        />
       </div>
       <div className="finance-view-tabs">
         <Tabs
