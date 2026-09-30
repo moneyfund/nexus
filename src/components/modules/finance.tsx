@@ -83,6 +83,34 @@ function activityNumber(
   return typeof value === "number" ? value : undefined;
 }
 
+function financeTypeLabel(type: FinanceStreamItem["type"]) {
+  const labels: Record<FinanceStreamItem["type"], string> = {
+    income: "INGRESO",
+    expense: "GASTO",
+    debt_payment: "PAGO DE DEUDA",
+    debt_created: "DEUDA",
+    debt_updated: "DEUDA ACTUALIZADA",
+    debt_settled: "DEUDA PAGADA",
+    debt_reconciled: "DEUDA CONCILIADA",
+    income_updated: "INGRESO EDITADO",
+    expense_updated: "GASTO EDITADO",
+    income_deleted: "INGRESO ELIMINADO",
+    expense_deleted: "GASTO ELIMINADO",
+  };
+  return labels[type];
+}
+
+function financeTypeDirection(type: FinanceStreamItem["type"]) {
+  if (type === "income") return "in";
+  if (
+    type === "expense" ||
+    type === "debt_payment" ||
+    type === "debt_settled"
+  )
+    return "out";
+  return "neutral";
+}
+
 function TransactionEditor({
   record,
   close,
@@ -877,44 +905,99 @@ export function FinanceView() {
         <>
           <section className="section">
             <SectionHeading
-              label="TRANSACTION STREAM"
-              title="Cada movimiento cuenta."
+              label="FINANCIAL LEDGER"
+              title="Historial completo de movimientos."
+              action={<Badge>{movementStream.length} REGISTROS</Badge>}
             />
-            {records.slice(0, 30).map((r) => (
-              <div key={r.id} className="transaction-row">
-                <span className="transaction-icon">
-                  {r.kind === "income" ? (
-                    <ArrowDownLeft size={18} />
-                  ) : (
-                    <Out size={18} />
-                  )}
-                </span>
-                <div>
-                  <h3>{r.title}</h3>
-                  <span className="small muted">
-                    {r.date} ·{" "}
-                    {n.projects.find((p) => p.id === r.projectId)?.name ??
-                      r.category}
-                    {r.source === "demo" ? " · Demo" : ""}
-                  </span>
-                </div>
-                <strong>
-                  {r.kind === "expense" ? "−" : "+"}
-                  {formatNative(r.amount, r.currency)}
-                </strong>
-                <button
-                  className="icon-button"
-                  aria-label={"Editar movimiento " + r.title}
-                  onClick={() => setEditingRecord(r)}
-                >
-                  <Pencil size={14} />
-                </button>
+            <p className="form-note finance-ledger-note">
+              Aquí quedan ingresos, gastos, pagos, deudas, conciliaciones,
+              ediciones y eliminaciones. Las deudas registradas no reducen tu
+              disponible hasta que exista un pago desde una cuenta.
+            </p>
+            {movementGroups.map(([month, items]) => (
+              <div className="finance-movement-month" key={month}>
+                <Label>
+                  {new Date(month + "-01T12:00:00Z")
+                    .toLocaleDateString("es-NI", {
+                      month: "long",
+                      year: "numeric",
+                      timeZone: "UTC",
+                    })
+                    .toUpperCase()}
+                </Label>
+                {items.map((item) => {
+                  const direction = financeTypeDirection(item.type);
+                  const account = accounts.find(
+                    (candidate) => candidate.id === item.accountId,
+                  );
+                  const project = n.projects.find(
+                    (candidate) => candidate.id === item.projectId,
+                  );
+                  return (
+                    <div key={item.id} className="transaction-row">
+                      <span
+                        className={
+                          "transaction-icon transaction-" + direction
+                        }
+                      >
+                        {direction === "in" ? (
+                          <ArrowDownLeft size={18} />
+                        ) : direction === "out" ? (
+                          <Out size={18} />
+                        ) : item.type.startsWith("debt") ? (
+                          <ReceiptText size={17} />
+                        ) : (
+                          <WalletCards size={17} />
+                        )}
+                      </span>
+                      <div>
+                        <div className="row wrap">
+                          <h3>{item.title}</h3>
+                          <Badge>{financeTypeLabel(item.type)}</Badge>
+                        </div>
+                        <span className="small muted">
+                          {item.date}
+                          {account ? " · " + account.name : ""}
+                          {project ? " · " + project.name : ""}
+                          {item.detail ? " · " + item.detail : ""}
+                        </span>
+                      </div>
+                      <strong
+                        className={
+                          direction === "neutral"
+                            ? "transaction-neutral"
+                            : undefined
+                        }
+                      >
+                        {item.amount != null && item.currency
+                          ? (direction === "in"
+                              ? "+"
+                              : direction === "out"
+                                ? "−"
+                                : "") +
+                            formatNative(item.amount, item.currency)
+                          : "—"}
+                      </strong>
+                      {item.record ? (
+                        <button
+                          className="icon-button"
+                          aria-label={"Editar movimiento " + item.title}
+                          onClick={() => setEditingRecord(item.record!)}
+                        >
+                          <Pencil size={14} />
+                        </button>
+                      ) : (
+                        <span className="transaction-audit-mark">AUDIT</span>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             ))}
-            {!records.length && (
+            {!movementStream.length && (
               <Empty
                 title="Tu historia financiera empieza aquí."
-                text="Registra un ingreso o un gasto para comenzar."
+                text="Registra un ingreso, gasto o deuda para comenzar."
                 onAction={() => n.openCapture("income")}
               />
             )}
