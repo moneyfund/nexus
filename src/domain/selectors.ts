@@ -36,13 +36,23 @@ export function projectFinance(w: Workspace, p: Project) {
   const expenses = w.expenses
     .filter((e) => e.projectId === p.id)
     .reduce((s, e) => s + e.amount, 0);
+  const explicitReceivable =
+    typeof p.metadata?.receivableUSD === "number"
+      ? p.metadata.receivableUSD
+      : undefined;
+  const receivable =
+    explicitReceivable ?? Math.max(0, (p.value ?? 0) - paid);
   return {
     paid,
     expenses,
-    receivable: Math.max(0, (p.value ?? 0) - paid),
+    receivable,
+    overdue:
+      typeof p.metadata?.overdueUSD === "number"
+        ? p.metadata.overdueUSD
+        : 0,
     profit: paid - expenses,
     revenueHour: p.hours ? paid / p.hours : 0,
-    contractedHour: p.hours ? (p.value ?? 0) / p.hours : 0,
+    contractedHour: p.hours && p.value ? p.value / p.hours : 0,
   };
 }
 export function financialScope(w: Workspace, scope: "all" | "user") {
