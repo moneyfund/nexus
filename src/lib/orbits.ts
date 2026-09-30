@@ -45,10 +45,39 @@ export function galaxyBudget(
   width: number,
 ) {
   const mobile = width < 600;
+  if (quality === "low")
+    return {
+      particles: 320,
+      dpr: 1,
+      fps: 20,
+      interactionFps: 30,
+      ringCount: 10,
+      armSamples: 42,
+    };
+  if (mobile)
+    return {
+      particles: 520,
+      dpr: 1.1,
+      fps: 24,
+      interactionFps: 30,
+      ringCount: 10,
+      armSamples: 48,
+    };
+  if (quality === "high")
+    return {
+      particles: 1600,
+      dpr: 1.5,
+      fps: 40,
+      interactionFps: 60,
+      ringCount: 16,
+      armSamples: 64,
+    };
   return {
-    particles:
-      quality === "low" ? 420 : mobile ? 760 : quality === "high" ? 2600 : 1900,
-    dpr: quality === "low" ? 1 : mobile ? 1.25 : quality === "high" ? 2 : 1.5,
-    fps: quality === "low" || mobile ? 30 : 60,
+    particles: 980,
+    dpr: 1.25,
+    fps: 30,
+    interactionFps: 45,
+    ringCount: 12,
+    armSamples: 52,
   };
 }
