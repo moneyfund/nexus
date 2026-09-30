@@ -179,7 +179,7 @@ export function NexusAudioPlayer() {
         const raw = window.localStorage.getItem(AUDIO_POSITION_KEY);
         if (!raw) return;
         const saved = JSON.parse(raw) as { x?: number; y?: number };
-        if (!Number.isFinite(saved.x) || !Number.isFinite(saved.y)) return;
+        if (typeof saved.x !== "number" || typeof saved.y !== "number") return;
 
         const rect = panel.getBoundingClientRect();
         const maxX = Math.max(8, window.innerWidth - rect.width - 8);
