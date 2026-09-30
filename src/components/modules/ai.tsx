@@ -379,13 +379,20 @@ export function AIView() {
             throw new Error("La propuesta no contiene un importe válido.");
           const kind =
             action.type === "record_income" ? "income" : "expense";
+          const selectedAccount = action.accountId
+            ? (n.data.financialAccounts ?? []).find(
+                (item) => item.id === action.accountId,
+              )
+            : undefined;
+          if (action.accountId && !selectedAccount)
+            throw new Error("La IA indicó una cuenta financiera que ya no existe.");
           const recordId = n.actions.capture({
             type: kind,
             content:
               action.title?.trim() ||
               (kind === "income" ? "Ingreso" : "Gasto"),
             amount: action.amount,
-            currency: action.currency ?? "USD",
+            currency: action.currency ?? selectedAccount?.currency ?? "USD",
             accountId: action.accountId || undefined,
             projectId: action.projectId || undefined,
             category: action.itemCategory || undefined,
