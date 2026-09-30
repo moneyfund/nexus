@@ -177,8 +177,14 @@ export function AIView() {
         return "Registrar ingreso · " + (action.currency ?? "USD") + " " + (action.amount ?? 0) + " · " + projectName;
       case "record_expense":
         return "Registrar gasto · " + (action.currency ?? "USD") + " " + (action.amount ?? 0) + " · " + projectName;
+      case "create_debt":
+        return "Crear deuda · " + (action.creditor ?? action.title ?? "Deuda") + " · " + (action.currency ?? "USD") + " " + (action.amount ?? 0);
+      case "update_debt":
+        return "Editar deuda · " + (debt?.creditor ?? action.creditor ?? "Deuda");
       case "pay_debt":
-        return "Pagar deuda · " + (debt?.creditor ?? "Deuda") + " · " + (action.currency ?? debt?.currency ?? "USD") + " " + (action.amount ?? 0);
+        return "Registrar pago · " + (debt?.creditor ?? "Deuda") + " · " + (action.currency ?? debt?.currency ?? "USD") + " " + (action.amount ?? 0);
+      case "mark_debt_paid":
+        return "Marcar pagada · " + (debt?.creditor ?? "Deuda");
       case "update_transaction":
         return "Editar " + (action.transactionKind === "income" ? "ingreso" : "gasto") + " · " + (transaction?.title ?? action.title ?? "movimiento");
       case "delete_transaction":
@@ -310,6 +316,44 @@ export function AIView() {
           }
           break;
         }
+        case "create_debt": {
+          if (!action.amount || action.amount <= 0)
+            throw new Error("Falta un importe válido para la deuda.");
+          const creditor =
+            action.creditor?.trim() || action.title?.trim() || "";
+          if (!creditor)
+            throw new Error("Falta el acreedor o concepto de la deuda.");
+          n.actions.createDebt({
+            creditor,
+            title: action.title?.trim() || creditor,
+            amount: action.amount,
+            balance:
+              action.balance != null && action.balance >= 0
+                ? action.balance
+                : undefined,
+            currency: action.currency ?? "USD",
+            dueDate: action.dueDate || undefined,
+            notes: action.notes || undefined,
+            projectId: action.projectId || undefined,
+          });
+          break;
+        }
+        case "update_debt": {
+          if (!action.debtId)
+            throw new Error("La IA no identificó la deuda que debe editarse.");
+          n.actions.updateDebt(action.debtId, {
+            ...(action.creditor?.trim()
+              ? { creditor: action.creditor.trim() }
+              : {}),
+            ...(action.title?.trim() ? { title: action.title.trim() } : {}),
+            ...(action.amount != null ? { originalAmount: action.amount } : {}),
+            ...(action.balance != null ? { balance: action.balance } : {}),
+            ...(action.dueDate ? { dueDate: action.dueDate } : {}),
+            ...(action.notes != null ? { notes: action.notes } : {}),
+            ...(action.projectId ? { projectId: action.projectId } : {}),
+          });
+          break;
+        }
         case "pay_debt": {
           if (!action.debtId || !action.amount || action.amount <= 0)
             throw new Error("Falta una deuda o un importe válido.");
@@ -318,6 +362,12 @@ export function AIView() {
             action.amount,
             action.accountId || undefined,
           );
+          break;
+        }
+        case "mark_debt_paid": {
+          if (!action.debtId)
+            throw new Error("La IA no identificó la deuda.");
+          n.actions.markDebtPaid(action.debtId);
           break;
         }
         case "update_transaction": {
