@@ -277,6 +277,7 @@ export interface NexusContext {
     id: string;
     creditor: string;
     title: string;
+    projectId?: string;
     balance: number;
     originalAmount: number;
     currency: "USD" | "NIO";
@@ -427,6 +428,7 @@ export class NexusContextBuilder {
               id,
               creditor,
               title,
+              projectId,
               balance,
               originalAmount,
               currency,
@@ -436,6 +438,7 @@ export class NexusContextBuilder {
               id,
               creditor,
               title,
+              projectId,
               balance,
               originalAmount,
               currency,
@@ -571,7 +574,10 @@ export class NexusToolRegistry {
     { id: "finance.write", label: "Registrar movimiento", access: "confirm" },
     { id: "finance.update", label: "Editar movimiento", access: "confirm" },
     { id: "finance.delete", label: "Eliminar movimiento", access: "confirm" },
-    { id: "finance.debt.pay", label: "Pagar deuda", access: "confirm" },
+    { id: "finance.debt.create", label: "Crear deuda", access: "confirm" },
+    { id: "finance.debt.update", label: "Editar deuda", access: "confirm" },
+    { id: "finance.debt.pay", label: "Registrar pago de deuda", access: "confirm" },
+    { id: "finance.debt.reconcile", label: "Marcar deuda pagada", access: "confirm" },
     { id: "calendar.write", label: "Crear evento", access: "confirm" },
     { id: "calendar.update", label: "Editar evento", access: "confirm" },
     { id: "calendar.delete", label: "Eliminar evento", access: "confirm" },

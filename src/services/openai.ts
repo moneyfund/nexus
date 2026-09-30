@@ -16,7 +16,10 @@ export interface NexusAIAction {
     | "delete_task"
     | "record_income"
     | "record_expense"
+    | "create_debt"
+    | "update_debt"
     | "pay_debt"
+    | "mark_debt_paid"
     | "update_transaction"
     | "delete_transaction"
     | "update_project_status"
@@ -39,9 +42,11 @@ export interface NexusAIAction {
   currency: "USD" | "NIO" | null;
   accountId: string | null;
   debtId: string | null;
+  creditor: string | null;
   title: string | null;
   milestone: string | null;
   amount: number | null;
+  balance: number | null;
   value: number | null;
   status: ProjectStatus | null;
   priority: "critical" | "high" | "medium" | "low" | null;

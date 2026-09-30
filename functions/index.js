@@ -27,7 +27,10 @@ const ACTION_TYPES = [
   "delete_task",
   "record_income",
   "record_expense",
+  "create_debt",
+  "update_debt",
   "pay_debt",
+  "mark_debt_paid",
   "update_transaction",
   "delete_transaction",
   "update_project_status",
@@ -70,9 +73,11 @@ const responseSchema = {
           },
           accountId: { type: ["string", "null"] },
           debtId: { type: ["string", "null"] },
+          creditor: { type: ["string", "null"] },
           title: { type: ["string", "null"] },
           milestone: { type: ["string", "null"] },
           amount: { type: ["number", "null"] },
+          balance: { type: ["number", "null"] },
           value: { type: ["number", "null"] },
           status: {
             type: ["string", "null"],
@@ -117,9 +122,11 @@ const responseSchema = {
           "currency",
           "accountId",
           "debtId",
+          "creditor",
           "title",
           "milestone",
           "amount",
+          "balance",
           "value",
           "status",
           "priority",
@@ -377,7 +384,10 @@ export const nexusAI = onCall(
           "Usa complete_task para terminar una tarea existente; update_task para editar título, prioridad, duración o hito; delete_task solo si el usuario pide eliminarla claramente. " +
           "Usa record_income o record_expense para movimientos nuevos. Para corregir un movimiento existente usa update_transaction con targetId y transactionKind; para eliminarlo usa delete_transaction. " +
           "En movimientos financieros usa amount para importe, currency para USD o NIO, accountId cuando el usuario indique de qué cuenta sale o entra el dinero, date en formato YYYY-MM-DD, itemCategory para categoría y projectId para asociación. Nunca conviertas el importe si el usuario ya dio una moneda explícita. " +
-          "Usa pay_debt cuando el usuario diga que pagó una deuda existente: usa debtId exacto del contexto, amount en la moneda de la deuda y accountId si especifica o puede identificarse una única cuenta compatible. Nunca marques una deuda como pagada sin una confirmación explícita del usuario. " +
+          "Usa create_debt cuando el usuario pida registrar una obligación nueva: amount es el importe original, balance el saldo pendiente si difiere, creditor el acreedor, title el concepto, currency la moneda, dueDate el vencimiento, notes las notas y projectId la relación con un proyecto cuando corresponda. " +
+          "Usa update_debt para corregir una deuda existente usando debtId exacto; amount cambia el importe original y balance cambia el saldo pendiente. " +
+          "Usa pay_debt cuando el usuario diga que realizó un pago real de una deuda existente: usa debtId exacto del contexto, amount en la moneda de la deuda y accountId si especifica o puede identificarse una única cuenta compatible; esta acción registra el gasto. " +
+          "Usa mark_debt_paid únicamente cuando el usuario pida explícitamente marcar o conciliar una deuda como pagada sin registrar un nuevo movimiento de caja. Nunca marques una deuda como pagada sin confirmación explícita. " +
           "Interpreta hoy/ayer usando now y timezone. " +
           "Cuando el usuario diga cosas como 'el gasto de ayer', compara fecha, título, importe, proyecto y categoría de transactions; si hay más de un candidato razonable, pregunta cuál. " +
           "Usa update_project para nombre, descripción, notas, prioridad, fecha, área o cliente; update_project_status y update_project_value para esos campos específicos. " +
