@@ -525,6 +525,7 @@ export class NexusToolRegistry {
     { id: "finance.write", label: "Registrar movimiento", access: "confirm" },
     { id: "finance.update", label: "Editar movimiento", access: "confirm" },
     { id: "finance.delete", label: "Eliminar movimiento", access: "confirm" },
+    { id: "finance.debt.pay", label: "Pagar deuda", access: "confirm" },
     { id: "calendar.write", label: "Crear evento", access: "confirm" },
     { id: "calendar.update", label: "Editar evento", access: "confirm" },
     { id: "calendar.delete", label: "Eliminar evento", access: "confirm" },
