@@ -11,6 +11,7 @@ import {
   ArrowDown,
   Orbit,
   Database,
+  Mic,
   Wallet,
   ListTodo,
 } from "lucide-react";
