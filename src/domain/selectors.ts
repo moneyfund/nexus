@@ -26,16 +26,35 @@ export const dateKey = (
     month: "2-digit",
     day: "2-digit",
   }).format(date);
+export function exchangeRate(w: Workspace) {
+  return typeof w.user.metadata?.exchangeRateNIOPerUSD === "number"
+    ? w.user.metadata.exchangeRateNIOPerUSD
+    : 36.6243;
+}
+export function amountToUSD(
+  w: Workspace,
+  amount: number,
+  currency: "USD" | "NIO",
+) {
+  return currency === "USD" ? amount : amount / exchangeRate(w);
+}
+export function amountToNIO(
+  w: Workspace,
+  amount: number,
+  currency: "USD" | "NIO",
+) {
+  return currency === "NIO" ? amount : amount * exchangeRate(w);
+}
 export function projectPaid(w: Workspace, projectId: string) {
   return w.incomes
     .filter((i) => i.projectId === projectId)
-    .reduce((sum, i) => sum + i.amount, 0);
+    .reduce((sum, i) => sum + amountToUSD(w, i.amount, i.currency), 0);
 }
 export function projectFinance(w: Workspace, p: Project) {
   const paid = projectPaid(w, p.id);
   const expenses = w.expenses
     .filter((e) => e.projectId === p.id)
-    .reduce((s, e) => s + e.amount, 0);
+    .reduce((s, e) => s + amountToUSD(w, e.amount, e.currency), 0);
   const explicitReceivable =
     typeof p.metadata?.receivableUSD === "number"
       ? p.metadata.receivableUSD
