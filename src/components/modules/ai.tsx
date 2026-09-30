@@ -679,6 +679,7 @@ export function AIView() {
           onNew={newConversation}
           onProject={openProjectConversation}
           onDelete={deleteConversation}
+          disabled={busy}
         />
         <section className="ai-conversation">
           <div className="ai-thread-head">
@@ -700,6 +701,7 @@ export function AIView() {
                 className="ai-thread-head-delete"
                 aria-label="Eliminar conversación actual"
                 onClick={() => deleteConversation(activeConversation.id)}
+                disabled={busy}
               >
                 <Trash2 size={14} />
               </button>
@@ -729,6 +731,7 @@ export function AIView() {
                   className="ai-message-delete"
                   aria-label="Eliminar mensaje"
                   onClick={() => deleteMessage(m.id)}
+                  disabled={busy}
                 >
                   <Trash2 size={12} />
                 </button>
