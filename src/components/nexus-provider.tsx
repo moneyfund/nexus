@@ -331,6 +331,26 @@ function useSystem() {
     }
   };
 
+  const syncNow = async () => {
+    if (!session || !store.ready) return;
+    if (syncTimer.current) {
+      clearTimeout(syncTimer.current);
+      syncTimer.current = null;
+    }
+    try {
+      await firebaseClient.writeWorkspace(store.getSnapshot());
+      setCloudReady(true);
+      setCloudError("");
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "No se pudo sincronizar con Firebase.";
+      setCloudError(message);
+      throw new Error(message);
+    }
+  };
+
   const signInWithGoogle = async () => {
     const next = await firebaseClient.signInWithGoogle();
     await activateSession(next);
@@ -448,6 +468,7 @@ function useSystem() {
     setToast,
     notify,
     run,
+    syncNow,
     startFlow,
     endFlow,
     toggleTask: (projectId: string, taskId: string) =>
