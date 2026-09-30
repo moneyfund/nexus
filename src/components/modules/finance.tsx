@@ -9,6 +9,8 @@ import {
   ArrowUpRight as Out,
   Pencil,
   Trash2,
+  ReceiptText,
+  WalletCards,
 } from "lucide-react";
 import { useNexus } from "../nexus-provider";
 import {
@@ -28,14 +30,86 @@ import {
   amountToUSD,
   dateKey,
   exchangeRate,
+  financeCutSummary,
   financialScope,
   money,
+  monthlyFinanceSeries,
   projectFinance,
 } from "@/domain/selectors";
 import { entity } from "@/domain/seed";
 import type { Currency, Debt, MoneyRecord } from "@/domain/models";
 
 type EditableRecord = MoneyRecord & { kind: "income" | "expense" };
+
+
+type FinanceStreamItem = {
+  id: string;
+  title: string;
+  date: string;
+  sortTime: number;
+  type:
+    | "income"
+    | "expense"
+    | "debt_payment"
+    | "debt_created"
+    | "debt_updated"
+    | "debt_settled"
+    | "debt_reconciled"
+    | "income_updated"
+    | "expense_updated"
+    | "income_deleted"
+    | "expense_deleted";
+  amount?: number;
+  currency?: Currency;
+  accountId?: string;
+  projectId?: string;
+  detail?: string;
+  record?: EditableRecord;
+};
+
+function activityString(
+  metadata: Record<string, string | number | boolean> | undefined,
+  key: string,
+) {
+  const value = metadata?.[key];
+  return typeof value === "string" ? value : "";
+}
+
+function activityNumber(
+  metadata: Record<string, string | number | boolean> | undefined,
+  key: string,
+) {
+  const value = metadata?.[key];
+  return typeof value === "number" ? value : undefined;
+}
+
+function financeTypeLabel(type: FinanceStreamItem["type"]) {
+  const labels: Record<FinanceStreamItem["type"], string> = {
+    income: "INGRESO",
+    expense: "GASTO",
+    debt_payment: "PAGO DE DEUDA",
+    debt_created: "DEUDA",
+    debt_updated: "DEUDA ACTUALIZADA",
+    debt_settled: "DEUDA PAGADA",
+    debt_reconciled: "DEUDA CONCILIADA",
+    income_updated: "INGRESO EDITADO",
+    expense_updated: "GASTO EDITADO",
+    income_deleted: "INGRESO ELIMINADO",
+    expense_deleted: "GASTO ELIMINADO",
+  };
+  return labels[type];
+}
+
+function financeTypeDirection(type: FinanceStreamItem["type"]) {
+  if (type === "income") return "in";
+  if (
+    type === "expense" ||
+    type === "debt_payment" ||
+    type === "debt_settled"
+  )
+    return "out";
+  return "neutral";
+}
 
 function TransactionEditor({
   record,
@@ -290,13 +364,6 @@ export function FinanceView() {
   const historicalIncome = incomes
     .filter((i) => i.metadata?.cutoverHistorical === true)
     .reduce((s, i) => s + amountToUSD(n.data, i.amount, i.currency), 0);
-  const currentIncomes = incomes.filter(
-    (i) => i.metadata?.cutoverHistorical !== true,
-  );
-  const currentIncome = currentIncomes.reduce(
-    (s, i) => s + amountToUSD(n.data, i.amount, i.currency),
-    0,
-  );
   const expense = expenses.reduce(
     (s, i) => s + amountToUSD(n.data, i.amount, i.currency),
     0,
@@ -305,11 +372,6 @@ export function FinanceView() {
     (s, p) => s + projectFinance(scoped, p).receivable,
     0,
   );
-  const savings = financialGoals.reduce((s, g) => s + g.saved, 0);
-  const cutoverDate =
-    typeof n.data.user.metadata?.financeCutoverDate === "string"
-      ? n.data.user.metadata.financeCutoverDate
-      : "";
   const cashAccount = accounts.find(
     (item) => item.kind === "cash" && item.currency === "NIO",
   );
@@ -353,34 +415,120 @@ export function FinanceView() {
     setEditingDebtId(pendingDebts[0]?.id ?? debts[0]?.id ?? "");
     setDebtManageOpen(true);
   };
-  const currentMonth = dateKey().slice(0, 7);
-  const [baseMonth] = useState(() => currentMonth);
-  const values = Array.from({ length: 6 }, (_, i) => {
-    const date = new Date(baseMonth + "-01T12:00:00Z");
-    date.setUTCMonth(date.getUTCMonth() - 5 + i);
-    const key = date.toISOString().slice(0, 7);
-    return {
-      label: date
-        .toLocaleDateString("es-NI", { month: "short", timeZone: "UTC" })
-        .toUpperCase(),
-      income: currentIncomes
-        .filter((r) => r.date.startsWith(key))
-        .reduce(
-          (s, r) => s + amountToUSD(n.data, r.amount, r.currency),
-          0,
-        ),
-      expense: expenses
-        .filter((r) => r.date.startsWith(key))
-        .reduce(
-          (s, r) => s + amountToUSD(n.data, r.amount, r.currency),
-          0,
-        ),
-    };
-  });
+  const cut = financeCutSummary(scoped);
+  const values = monthlyFinanceSeries(scoped, 6);
   const records: EditableRecord[] = [
     ...incomes.map((i) => ({ ...i, kind: "income" as const })),
     ...expenses.map((i) => ({ ...i, kind: "expense" as const })),
   ].sort((a, b) => b.date.localeCompare(a.date));
+
+  const recordIds = new Set(records.map((record) => record.id));
+  const activity = n.data.activity.filter(
+    (item) =>
+      item.metadata?.financeEvent === true &&
+      (scope === "all" || item.source === "user"),
+  );
+  const debtCreatedRefs = new Set(
+    activity
+      .filter(
+        (item) => activityString(item.metadata, "financeType") === "debt_created",
+      )
+      .map((item) => activityString(item.metadata, "referenceId"))
+      .filter(Boolean),
+  );
+
+  const recordStream: FinanceStreamItem[] = records.map((record) => ({
+    id: "record-" + record.id,
+    title: record.title,
+    date: record.date,
+    sortTime: new Date(record.date + "T12:00:00").getTime(),
+    type:
+      record.kind === "expense" &&
+      (record.category === "Pago de deuda" ||
+        record.metadata?.financeType === "debt_payment")
+        ? "debt_payment"
+        : record.kind,
+    amount: record.amount,
+    currency: record.currency,
+    accountId: record.accountId,
+    projectId: record.projectId,
+    detail: record.category,
+    record,
+  }));
+
+  const auditStream: FinanceStreamItem[] = activity
+    .filter((item) => {
+      const type = activityString(item.metadata, "financeType");
+      const referenceId = activityString(item.metadata, "referenceId");
+      return !(
+        referenceId &&
+        recordIds.has(referenceId) &&
+        ["income", "expense", "debt_payment", "debt_settled"].includes(type)
+      );
+    })
+    .map((item) => {
+      const type = activityString(
+        item.metadata,
+        "financeType",
+      ) as FinanceStreamItem["type"];
+      const currency = activityString(item.metadata, "currency");
+      return {
+        id: "audit-" + item.id,
+        title: item.title,
+        date:
+          activityString(item.metadata, "date") ||
+          dateKey(item.createdAt, n.data.user.preferences.timezone),
+        sortTime: item.createdAt,
+        type,
+        amount: activityNumber(item.metadata, "amount"),
+        currency:
+          currency === "USD" || currency === "NIO" ? currency : undefined,
+        accountId: activityString(item.metadata, "accountId") || undefined,
+        projectId: item.projectId,
+        detail:
+          type === "debt_reconciled"
+            ? "Conciliación sin salida de cuenta"
+            : type.endsWith("_deleted")
+              ? "Registro eliminado"
+              : type.endsWith("_updated")
+                ? "Registro actualizado"
+                : undefined,
+      };
+    });
+
+  const debtBackfill: FinanceStreamItem[] = debts
+    .filter(
+      (debt) =>
+        (scope === "all" || debt.source === "user") &&
+        !debtCreatedRefs.has(debt.id),
+    )
+    .map((debt) => ({
+      id: "debt-" + debt.id,
+      title: "Deuda registrada · " + debt.creditor,
+      date: dateKey(debt.createdAt, n.data.user.preferences.timezone),
+      sortTime: debt.createdAt,
+      type: "debt_created" as const,
+      amount: debt.originalAmount,
+      currency: debt.currency,
+      projectId: debt.projectId,
+      detail:
+        debt.status === "paid"
+          ? "Saldo actual: pagada"
+          : "Saldo actual: " + formatNative(debt.balance, debt.currency),
+    }));
+
+  const movementStream = [...recordStream, ...auditStream, ...debtBackfill].sort(
+    (a, b) => b.sortTime - a.sortTime,
+  );
+  const movementGroups = Array.from(
+    movementStream.reduce((groups, item) => {
+      const key = item.date.slice(0, 7);
+      const list = groups.get(key) ?? [];
+      list.push(item);
+      groups.set(key, list);
+      return groups;
+    }, new Map<string, FinanceStreamItem[]>()),
+  );
   return (
     <ModuleFrame
       eyebrow="Financial command center / 07"
@@ -400,14 +548,15 @@ export function FinanceView() {
     >
       <div className="finance-headline">
         <div>
-          <Label>CASHFLOW / DESDE EL CORTE</Label>
+          <Label>LIQUIDEZ / DISPONIBLE ACTUAL</Label>
           <div className="finance-net">
-            {money(currentIncome - expense)}
+            {money(cut.currentAvailableUSD)}
             <span>USD</span>
           </div>
           <p>
-            Movimientos posteriores al corte. Los cobros históricos confirmados
-            no se mezclan con el dinero disponible actual.
+            Suma de tus cuentas financieras disponibles. Equivale a{" "}
+            {cordobas(cut.currentAvailableUSD * rate)} al tipo de cambio de
+            referencia configurado en NEXUS.
           </p>
         </div>
         <label className="field">
@@ -420,6 +569,26 @@ export function FinanceView() {
             <option value="user">Solo mis registros</option>
           </select>
         </label>
+      </div>
+      <div className="data-band finance-cut-band">
+        <DataMetric
+          label="Disponible actual"
+          value={money(cut.currentAvailableUSD)}
+          meta="Saldo real agregado de efectivo, banco, tarjeta y wallet"
+        />
+        <DataMetric
+          label="Último corte"
+          value={money(cut.lastCutAvailableUSD)}
+          meta={"Saldo reconstruido al " + cut.cutDate}
+        />
+        <DataMetric
+          label="Después del corte"
+          value={
+            (cut.changeSinceCutUSD >= 0 ? "+" : "−") +
+            money(Math.abs(cut.changeSinceCutUSD))
+          }
+          meta="Variación real de cuentas desde el último corte"
+        />
       </div>
       <div className="finance-view-tabs">
         <Tabs
@@ -439,7 +608,7 @@ export function FinanceView() {
           <section className="finance-chart-command">
             <SectionHeading
               label="MONTHLY PERFORMANCE"
-              title="El movimiento de tu dinero."
+              title="Ingresos, gastos y saldo disponible."
               action={<Badge>ÚLTIMOS 6 MESES</Badge>}
             />
             <CashflowChart values={values} />
@@ -447,11 +616,9 @@ export function FinanceView() {
           {(cashNIO != null || cardUSD != null) && (
             <section className="section">
               <SectionHeading
-                label="LIQUIDEZ REAL"
-                title="Dinero disponible al corte."
-                action={
-                  cutoverDate ? <Badge>CORTE {cutoverDate}</Badge> : undefined
-                }
+                label="COMPOSICIÓN DEL DISPONIBLE"
+                title="Dónde está tu dinero."
+                action={<Badge>CORTE {cut.cutDate}</Badge>}
               />
               <div className="data-band">
                 <DataMetric
@@ -567,9 +734,12 @@ export function FinanceView() {
               meta={`${expenses.length} movimientos`}
             />
             <DataMetric
-              label="Flujo desde corte"
-              value={money(currentIncome - expense - savings)}
-              meta="Movimientos nuevos; la liquidez real se muestra arriba"
+              label="Variación desde corte"
+              value={
+                (cut.changeSinceCutUSD >= 0 ? "+" : "−") +
+                money(Math.abs(cut.changeSinceCutUSD))
+              }
+              meta="Cambio real del saldo disponible desde el corte"
             />
           </div>
         </>
@@ -731,44 +901,99 @@ export function FinanceView() {
         <>
           <section className="section">
             <SectionHeading
-              label="TRANSACTION STREAM"
-              title="Cada movimiento cuenta."
+              label="FINANCIAL LEDGER"
+              title="Historial completo de movimientos."
+              action={<Badge>{movementStream.length} REGISTROS</Badge>}
             />
-            {records.slice(0, 30).map((r) => (
-              <div key={r.id} className="transaction-row">
-                <span className="transaction-icon">
-                  {r.kind === "income" ? (
-                    <ArrowDownLeft size={18} />
-                  ) : (
-                    <Out size={18} />
-                  )}
-                </span>
-                <div>
-                  <h3>{r.title}</h3>
-                  <span className="small muted">
-                    {r.date} ·{" "}
-                    {n.projects.find((p) => p.id === r.projectId)?.name ??
-                      r.category}
-                    {r.source === "demo" ? " · Demo" : ""}
-                  </span>
-                </div>
-                <strong>
-                  {r.kind === "expense" ? "−" : "+"}
-                  {formatNative(r.amount, r.currency)}
-                </strong>
-                <button
-                  className="icon-button"
-                  aria-label={"Editar movimiento " + r.title}
-                  onClick={() => setEditingRecord(r)}
-                >
-                  <Pencil size={14} />
-                </button>
+            <p className="form-note finance-ledger-note">
+              Aquí quedan ingresos, gastos, pagos, deudas, conciliaciones,
+              ediciones y eliminaciones. Las deudas registradas no reducen tu
+              disponible hasta que exista un pago desde una cuenta.
+            </p>
+            {movementGroups.map(([month, items]) => (
+              <div className="finance-movement-month" key={month}>
+                <Label>
+                  {new Date(month + "-01T12:00:00Z")
+                    .toLocaleDateString("es-NI", {
+                      month: "long",
+                      year: "numeric",
+                      timeZone: "UTC",
+                    })
+                    .toUpperCase()}
+                </Label>
+                {items.map((item) => {
+                  const direction = financeTypeDirection(item.type);
+                  const account = accounts.find(
+                    (candidate) => candidate.id === item.accountId,
+                  );
+                  const project = n.projects.find(
+                    (candidate) => candidate.id === item.projectId,
+                  );
+                  return (
+                    <div key={item.id} className="transaction-row">
+                      <span
+                        className={
+                          "transaction-icon transaction-" + direction
+                        }
+                      >
+                        {direction === "in" ? (
+                          <ArrowDownLeft size={18} />
+                        ) : direction === "out" ? (
+                          <Out size={18} />
+                        ) : item.type.startsWith("debt") ? (
+                          <ReceiptText size={17} />
+                        ) : (
+                          <WalletCards size={17} />
+                        )}
+                      </span>
+                      <div>
+                        <div className="row wrap">
+                          <h3>{item.title}</h3>
+                          <Badge>{financeTypeLabel(item.type)}</Badge>
+                        </div>
+                        <span className="small muted">
+                          {item.date}
+                          {account ? " · " + account.name : ""}
+                          {project ? " · " + project.name : ""}
+                          {item.detail ? " · " + item.detail : ""}
+                        </span>
+                      </div>
+                      <strong
+                        className={
+                          direction === "neutral"
+                            ? "transaction-neutral"
+                            : undefined
+                        }
+                      >
+                        {item.amount != null && item.currency
+                          ? (direction === "in"
+                              ? "+"
+                              : direction === "out"
+                                ? "−"
+                                : "") +
+                            formatNative(item.amount, item.currency)
+                          : "—"}
+                      </strong>
+                      {item.record ? (
+                        <button
+                          className="icon-button"
+                          aria-label={"Editar movimiento " + item.title}
+                          onClick={() => setEditingRecord(item.record!)}
+                        >
+                          <Pencil size={14} />
+                        </button>
+                      ) : (
+                        <span className="transaction-audit-mark">AUDIT</span>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             ))}
-            {!records.length && (
+            {!movementStream.length && (
               <Empty
                 title="Tu historia financiera empieza aquí."
-                text="Registra un ingreso o un gasto para comenzar."
+                text="Registra un ingreso, gasto o deuda para comenzar."
                 onAction={() => n.openCapture("income")}
               />
             )}

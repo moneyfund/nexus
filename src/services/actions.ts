@@ -18,12 +18,19 @@ import type {
   AIMessage,
 } from "@/domain/models";
 const id = () => crypto.randomUUID();
-const log = (w: Workspace, title: string, kind: string, projectId?: string) => {
+const log = (
+  w: Workspace,
+  title: string,
+  kind: string,
+  projectId?: string,
+  metadata?: Record<string, string | number | boolean>,
+) => {
   w.activity.unshift({
     ...entity(id(), "user", w.user.id),
     title,
     kind,
     projectId,
+    metadata,
   });
 };
 const clampProgress = (value: number) =>
@@ -278,7 +285,37 @@ export class NexusActions {
         content,
         targetId,
       });
-      log(w, "Capturado: " + content, "capture", input.projectId);
+      if (input.type === "income" || input.type === "expense") {
+        const record = (
+          input.type === "income" ? w.incomes : w.expenses
+        ).find((item) => item.id === targetId);
+        log(
+          w,
+          (input.type === "income" ? "Ingreso registrado: " : "Gasto registrado: ") +
+            content,
+          "finance",
+          input.projectId,
+          record
+            ? {
+                financeEvent: true,
+                financeType: input.type,
+                referenceId: record.id,
+                amount: record.amount,
+                currency: record.currency,
+                date: record.date,
+                cashImpact:
+                  record.accountId
+                    ? input.type === "income"
+                      ? record.amount
+                      : -record.amount
+                    : 0,
+                ...(record.accountId ? { accountId: record.accountId } : {}),
+              }
+            : undefined,
+        );
+      } else {
+        log(w, "Capturado: " + content, "capture", input.projectId);
+      }
     });
     return targetId;
   };
@@ -500,8 +537,10 @@ export class NexusActions {
         if (account) {
           const delta =
             (nextAmount - record.amount) * (kind === "income" ? 1 : -1);
-          account.balance =
-            Math.round((account.balance + delta) * 100) / 100;
+          const nextBalance = Math.round((account.balance + delta) * 100) / 100;
+          if (nextBalance < 0)
+            throw new Error("La cuenta no tiene saldo suficiente.");
+          account.balance = nextBalance;
           account.updatedAt = Date.now();
         }
         record.amount = nextAmount;
@@ -522,6 +561,16 @@ export class NexusActions {
         "Movimiento actualizado: " + record.title,
         "finance",
         record.projectId,
+        {
+          financeEvent: true,
+          financeType: kind + "_updated",
+          referenceId: record.id,
+          amount: record.amount,
+          currency: record.currency,
+          date: record.date,
+          cashImpact: 0,
+          ...(record.accountId ? { accountId: record.accountId } : {}),
+        },
       );
     });
 
@@ -551,6 +600,16 @@ export class NexusActions {
         "Movimiento eliminado: " + record.title,
         "finance",
         record.projectId,
+        {
+          financeEvent: true,
+          financeType: kind + "_deleted",
+          referenceId: record.id,
+          amount: record.amount,
+          currency: record.currency,
+          date: record.date,
+          cashImpact: 0,
+          ...(record.accountId ? { accountId: record.accountId } : {}),
+        },
       );
     });
 
@@ -607,6 +666,19 @@ export class NexusActions {
         "Deuda registrada: " + creditor + " · " + balance + " " + input.currency,
         "debt",
         input.projectId,
+        {
+          financeEvent: true,
+          financeType: "debt_created",
+          referenceId: debtId,
+          debtId,
+          amount: originalAmount,
+          balance,
+          currency: input.currency,
+          date: new Intl.DateTimeFormat("en-CA", {
+            timeZone: w.user.preferences.timezone,
+          }).format(new Date()),
+          cashImpact: 0,
+        },
       );
     });
     return debtId;
@@ -668,6 +740,19 @@ export class NexusActions {
         "Deuda actualizada: " + debt.creditor,
         "debt",
         debt.projectId,
+        {
+          financeEvent: true,
+          financeType: "debt_updated",
+          referenceId: debt.id,
+          debtId: debt.id,
+          amount: debt.originalAmount,
+          balance: debt.balance,
+          currency: debt.currency,
+          date: new Intl.DateTimeFormat("en-CA", {
+            timeZone: w.user.preferences.timezone,
+          }).format(new Date()),
+          cashImpact: 0,
+        },
       );
     });
 
@@ -688,12 +773,14 @@ export class NexusActions {
       if (account && account.balance < remaining)
         throw new Error("La cuenta no tiene saldo suficiente.");
 
+      let paymentRecordId = "";
       if (account && remaining > 0) {
         account.balance =
           Math.round((account.balance - remaining) * 100) / 100;
         account.updatedAt = Date.now();
+        paymentRecordId = id();
         w.expenses.unshift({
-          ...entity(id(), "user", w.user.id),
+          ...entity(paymentRecordId, "user", w.user.id),
           title: "Pago de deuda · " + debt.creditor,
           amount: remaining,
           currency: debt.currency,
@@ -703,6 +790,10 @@ export class NexusActions {
           projectId: debt.projectId,
           category: "Pago de deuda",
           accountId: account.id,
+          metadata: {
+            debtId: debt.id,
+            financeType: "debt_payment",
+          },
         });
       }
 
@@ -716,6 +807,20 @@ export class NexusActions {
           (account ? " · desde " + account.name : " · conciliación manual"),
         "debt",
         debt.projectId,
+        {
+          financeEvent: true,
+          financeType: account ? "debt_settled" : "debt_reconciled",
+          referenceId: paymentRecordId || debt.id,
+          debtId: debt.id,
+          amount: remaining,
+          balance: 0,
+          currency: debt.currency,
+          date: new Intl.DateTimeFormat("en-CA", {
+            timeZone: w.user.preferences.timezone,
+          }).format(new Date()),
+          cashImpact: account ? -remaining : 0,
+          ...(account ? { accountId: account.id } : {}),
+        },
       );
     });
 
@@ -750,22 +855,41 @@ export class NexusActions {
       debt.balance = Math.round((debt.balance - applied) * 100) / 100;
       debt.status = debt.balance <= 0 ? "paid" : "pending";
       debt.updatedAt = Date.now();
+      const paymentRecordId = id();
+      const paymentDate = new Intl.DateTimeFormat("en-CA", {
+        timeZone: w.user.preferences.timezone,
+      }).format(new Date());
       w.expenses.unshift({
-        ...entity(id(), "user", w.user.id),
+        ...entity(paymentRecordId, "user", w.user.id),
         title: "Pago de deuda · " + debt.creditor,
         amount: applied,
         currency: debt.currency,
-        date: new Intl.DateTimeFormat("en-CA", {
-          timeZone: w.user.preferences.timezone,
-        }).format(new Date()),
+        date: paymentDate,
         projectId: debt.projectId,
         category: "Pago de deuda",
         accountId: account?.id,
+        metadata: {
+          debtId: debt.id,
+          financeType: "debt_payment",
+        },
       });
       log(
         w,
         "Pago de deuda: " + debt.creditor + " · " + applied + " " + debt.currency,
         "debt",
+        debt.projectId,
+        {
+          financeEvent: true,
+          financeType: "debt_payment",
+          referenceId: paymentRecordId,
+          debtId: debt.id,
+          amount: applied,
+          balance: debt.balance,
+          currency: debt.currency,
+          date: paymentDate,
+          cashImpact: account ? -applied : 0,
+          ...(account ? { accountId: account.id } : {}),
+        },
       );
     });
 
