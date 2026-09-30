@@ -657,9 +657,40 @@ export function AIView() {
       }
     >
       <div
-        className={`ai-workspace ${n.data.messages.length ? "has-history" : ""} ${busy ? "is-thinking" : ""}`}
+        className={`ai-workspace ${activeMessages.length ? "has-history" : ""} ${busy ? "is-thinking" : ""}`}
       >
+        <AIConversationNav
+          activeConversationId={activeConversationId}
+          onSelect={selectConversation}
+          onNew={newConversation}
+          onProject={openProjectConversation}
+          onDelete={deleteConversation}
+        />
         <section className="ai-conversation">
+          <div className="ai-thread-head">
+            <div>
+              <Label>
+                {activeProject ? "PROJECT CHAT" : "CONVERSATION"}
+              </Label>
+              <strong>
+                {activeConversation?.title ?? "Nueva conversación"}
+              </strong>
+              {activeProject && (
+                <span className="ai-thread-scope">
+                  Contexto principal · {activeProject.name}
+                </span>
+              )}
+            </div>
+            {activeConversation && (
+              <button
+                className="ai-thread-head-delete"
+                aria-label="Eliminar conversación actual"
+                onClick={() => deleteConversation(activeConversation.id)}
+              >
+                <Trash2 size={14} />
+              </button>
+            )}
+          </div>
           <div className="ai-core">
             <IntelligenceCore busy={busy} />
             <Label>INTELLIGENCE CORE</Label>
@@ -678,8 +709,15 @@ export function AIView() {
             role="log"
             aria-label="Conversación con NEXUS"
           >
-            {n.data.messages.map((m) => (
+            {activeMessages.map((m) => (
               <article className={"ai-message " + m.role} key={m.id}>
+                <button
+                  className="ai-message-delete"
+                  aria-label="Eliminar mensaje"
+                  onClick={() => deleteMessage(m.id)}
+                >
+                  <Trash2 size={12} />
+                </button>
                 <Label>
                   {m.role === "assistant"
                     ? m.simulated
@@ -796,7 +834,7 @@ export function AIView() {
             Enter para enviar · Shift + Enter para nueva línea · No se ejecutan
             acciones sin tu confirmación.
           </div>
-          {!n.data.messages.length && (
+          {!activeMessages.length && (
             <div className="ai-prompts">
               {prompts.map((p) => (
                 <button key={p} onClick={() => send(p)}>
