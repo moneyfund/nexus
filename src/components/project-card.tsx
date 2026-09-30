@@ -14,7 +14,11 @@ export function ProjectCard({ project: p }: { project: Project }) {
       <h3>{p.name}</h3>
       <p>{p.nextAction}</p>
       <div className="row between small muted">
-        <span>{p.hours.toFixed(1)} h</span>
+        <span>
+          {p.metadata?.hoursBasis === "flow-only" && p.hours === 0
+            ? "Sin medir"
+            : p.hours.toFixed(1) + " h"}
+        </span>
         <span>{p.deadline}</span>
       </div>
     </Link>
