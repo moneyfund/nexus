@@ -484,6 +484,81 @@ test("explicit receivables stay separate from paid cashflow", () => {
   assert.equal(finance.overdue, 400);
 });
 
+test("multi-currency account balances follow captured movements", () => {
+  const { store, actions } = setup();
+  store.update((w) => {
+    w.financialAccounts = [
+      {
+        ...w.user,
+        id: "cash-nio-test",
+        userId: w.user.id,
+        name: "Efectivo",
+        kind: "cash",
+        currency: "NIO",
+        balance: 2500,
+      },
+    ];
+  });
+  const recordId = actions.capture({
+    type: "expense",
+    content: "Combustible",
+    amount: 250,
+    currency: "NIO",
+    accountId: "cash-nio-test",
+  });
+  assert.equal(
+    store.getSnapshot().financialAccounts?.[0].balance,
+    2250,
+  );
+  actions.updateMoneyRecord("expense", recordId, { amount: 300 });
+  assert.equal(
+    store.getSnapshot().financialAccounts?.[0].balance,
+    2200,
+  );
+  actions.deleteMoneyRecord("expense", recordId);
+  assert.equal(
+    store.getSnapshot().financialAccounts?.[0].balance,
+    2500,
+  );
+});
+
+test("debt payment reduces both debt and selected account and records cashflow", () => {
+  const { store, actions } = setup();
+  store.update((w) => {
+    w.financialAccounts = [
+      {
+        ...w.user,
+        id: "card-usd-test",
+        userId: w.user.id,
+        name: "Tarjeta",
+        kind: "card",
+        currency: "USD",
+        balance: 263,
+      },
+    ];
+    w.debts = [
+      {
+        ...w.user,
+        id: "debt-test",
+        userId: w.user.id,
+        creditor: "Oliver",
+        title: "Préstamo",
+        originalAmount: 200,
+        balance: 200,
+        currency: "USD",
+        status: "pending",
+      },
+    ];
+  });
+  actions.payDebt("debt-test", 200, "card-usd-test");
+  assert.equal(store.getSnapshot().financialAccounts?.[0].balance, 63);
+  assert.equal(store.getSnapshot().debts?.[0].balance, 0);
+  assert.equal(store.getSnapshot().debts?.[0].status, "paid");
+  assert.equal(store.getSnapshot().expenses[0].amount, 200);
+  assert.equal(store.getSnapshot().expenses[0].currency, "USD");
+  assert.equal(store.getSnapshot().expenses[0].category, "Pago de deuda");
+});
+
 test("financial movements can be edited and deleted without touching unrelated data", () => {
   const { store, actions } = setup();
   const recordId = actions.capture({
