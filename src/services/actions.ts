@@ -537,8 +537,10 @@ export class NexusActions {
         if (account) {
           const delta =
             (nextAmount - record.amount) * (kind === "income" ? 1 : -1);
-          account.balance =
-            Math.round((account.balance + delta) * 100) / 100;
+          const nextBalance = Math.round((account.balance + delta) * 100) / 100;
+          if (nextBalance < 0)
+            throw new Error("La cuenta no tiene saldo suficiente.");
+          account.balance = nextBalance;
           account.updatedAt = Date.now();
         }
         record.amount = nextAmount;
