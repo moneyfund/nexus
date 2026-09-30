@@ -139,13 +139,31 @@ export interface Goal extends Entity {
   projectIds: ID[];
   milestones: GoalMilestone[];
 }
+export type Currency = "USD" | "NIO";
+export interface FinancialAccount extends Entity {
+  name: string;
+  kind: "cash" | "bank" | "card" | "wallet";
+  currency: Currency;
+  balance: number;
+}
+export interface Debt extends Entity {
+  creditor: string;
+  title: string;
+  originalAmount: number;
+  balance: number;
+  currency: Currency;
+  dueDate?: string;
+  status: "pending" | "paid";
+  notes?: string;
+}
 export interface MoneyRecord extends Entity {
   title: string;
   amount: number;
-  currency: "USD";
+  currency: Currency;
   date: string;
   projectId?: ID;
   category: string;
+  accountId?: ID;
 }
 export type Income = MoneyRecord;
 export type Expense = MoneyRecord;
@@ -269,6 +287,8 @@ export interface Workspace {
   goals: Goal[];
   incomes: Income[];
   expenses: Expense[];
+  financialAccounts?: FinancialAccount[];
+  debts?: Debt[];
   financialGoals: FinancialGoal[];
   contacts: Contact[];
   knowledge: KnowledgeItem[];
@@ -287,6 +307,8 @@ export interface CaptureInput {
   projectId?: ID;
   category?: string;
   amount?: number;
+  currency?: Currency;
+  accountId?: ID;
   url?: string;
   file?: { name: string; size: number; type: string };
 }
