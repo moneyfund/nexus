@@ -399,34 +399,120 @@ export function FinanceView() {
     setEditingDebtId(pendingDebts[0]?.id ?? debts[0]?.id ?? "");
     setDebtManageOpen(true);
   };
-  const currentMonth = dateKey().slice(0, 7);
-  const [baseMonth] = useState(() => currentMonth);
-  const values = Array.from({ length: 6 }, (_, i) => {
-    const date = new Date(baseMonth + "-01T12:00:00Z");
-    date.setUTCMonth(date.getUTCMonth() - 5 + i);
-    const key = date.toISOString().slice(0, 7);
-    return {
-      label: date
-        .toLocaleDateString("es-NI", { month: "short", timeZone: "UTC" })
-        .toUpperCase(),
-      income: currentIncomes
-        .filter((r) => r.date.startsWith(key))
-        .reduce(
-          (s, r) => s + amountToUSD(n.data, r.amount, r.currency),
-          0,
-        ),
-      expense: expenses
-        .filter((r) => r.date.startsWith(key))
-        .reduce(
-          (s, r) => s + amountToUSD(n.data, r.amount, r.currency),
-          0,
-        ),
-    };
-  });
+  const cut = financeCutSummary(scoped);
+  const values = monthlyFinanceSeries(scoped, 6);
   const records: EditableRecord[] = [
     ...incomes.map((i) => ({ ...i, kind: "income" as const })),
     ...expenses.map((i) => ({ ...i, kind: "expense" as const })),
   ].sort((a, b) => b.date.localeCompare(a.date));
+
+  const recordIds = new Set(records.map((record) => record.id));
+  const activity = n.data.activity.filter(
+    (item) =>
+      item.metadata?.financeEvent === true &&
+      (scope === "all" || item.source === "user"),
+  );
+  const debtCreatedRefs = new Set(
+    activity
+      .filter(
+        (item) => activityString(item.metadata, "financeType") === "debt_created",
+      )
+      .map((item) => activityString(item.metadata, "referenceId"))
+      .filter(Boolean),
+  );
+
+  const recordStream: FinanceStreamItem[] = records.map((record) => ({
+    id: "record-" + record.id,
+    title: record.title,
+    date: record.date,
+    sortTime: new Date(record.date + "T12:00:00").getTime(),
+    type:
+      record.kind === "expense" &&
+      (record.category === "Pago de deuda" ||
+        record.metadata?.financeType === "debt_payment")
+        ? "debt_payment"
+        : record.kind,
+    amount: record.amount,
+    currency: record.currency,
+    accountId: record.accountId,
+    projectId: record.projectId,
+    detail: record.category,
+    record,
+  }));
+
+  const auditStream: FinanceStreamItem[] = activity
+    .filter((item) => {
+      const type = activityString(item.metadata, "financeType");
+      const referenceId = activityString(item.metadata, "referenceId");
+      return !(
+        referenceId &&
+        recordIds.has(referenceId) &&
+        ["income", "expense", "debt_payment", "debt_settled"].includes(type)
+      );
+    })
+    .map((item) => {
+      const type = activityString(
+        item.metadata,
+        "financeType",
+      ) as FinanceStreamItem["type"];
+      const currency = activityString(item.metadata, "currency");
+      return {
+        id: "audit-" + item.id,
+        title: item.title,
+        date:
+          activityString(item.metadata, "date") ||
+          dateKey(item.createdAt, n.data.user.preferences.timezone),
+        sortTime: item.createdAt,
+        type,
+        amount: activityNumber(item.metadata, "amount"),
+        currency:
+          currency === "USD" || currency === "NIO" ? currency : undefined,
+        accountId: activityString(item.metadata, "accountId") || undefined,
+        projectId: item.projectId,
+        detail:
+          type === "debt_reconciled"
+            ? "Conciliación sin salida de cuenta"
+            : type.endsWith("_deleted")
+              ? "Registro eliminado"
+              : type.endsWith("_updated")
+                ? "Registro actualizado"
+                : undefined,
+      };
+    });
+
+  const debtBackfill: FinanceStreamItem[] = debts
+    .filter(
+      (debt) =>
+        (scope === "all" || debt.source === "user") &&
+        !debtCreatedRefs.has(debt.id),
+    )
+    .map((debt) => ({
+      id: "debt-" + debt.id,
+      title: "Deuda registrada · " + debt.creditor,
+      date: dateKey(debt.createdAt, n.data.user.preferences.timezone),
+      sortTime: debt.createdAt,
+      type: "debt_created" as const,
+      amount: debt.originalAmount,
+      currency: debt.currency,
+      projectId: debt.projectId,
+      detail:
+        debt.status === "paid"
+          ? "Saldo actual: pagada"
+          : "Saldo actual: " + formatNative(debt.balance, debt.currency),
+    }));
+
+  const movementStream = [...recordStream, ...auditStream, ...debtBackfill].sort(
+    (a, b) => b.sortTime - a.sortTime,
+  );
+  const movementGroups = Array.from(
+    movementStream.reduce((groups, item) => {
+      const key = item.date.slice(0, 7);
+      const list = groups.get(key) ?? [];
+      list.push(item);
+      groups.set(key, list);
+      return groups;
+    }, new Map<string, FinanceStreamItem[]>()),
+  );
   return (
     <ModuleFrame
       eyebrow="Financial command center / 07"
