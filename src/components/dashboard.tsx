@@ -70,13 +70,13 @@ export function Dashboard() {
       <section className="core-stage immersive-core">
         <div className="core-hud-line">
           <span className="hud-label">
-            NEXUS // {n.data.user.name.split(" ")[0].toUpperCase()} // PERSONAL OS
+            NEXUS · {n.data.user.name.split(" ")[0].toUpperCase()} · PERSONAL OS
           </span>
           <NexusNetworkClock />
         </div>
         <div className="core-copy">
           <div className="core-eyebrow">
-            <span className="core-index">01 //</span>
+            <span className="core-index">01 /</span>
             <Label>INTELLIGENCE CORE</Label>
           </div>
           <h1>
