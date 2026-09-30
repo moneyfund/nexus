@@ -197,18 +197,37 @@ export class NexusActions {
         }
         case "income":
         case "expense": {
+          const currency = input.currency ?? "USD";
+          const account = input.accountId
+            ? (w.financialAccounts ?? []).find(
+                (item) => item.id === input.accountId,
+              )
+            : undefined;
+          if (input.accountId && !account)
+            throw new Error("Cuenta financiera no encontrada.");
+          if (account && account.currency !== currency)
+            throw new Error("La moneda del movimiento no coincide con la cuenta.");
+          const amount = Math.round(input.amount! * 100) / 100;
           const record = {
             ...base,
             title: content,
-            amount: Math.round(input.amount! * 100) / 100,
-            currency: "USD" as const,
+            amount,
+            currency,
             date: new Intl.DateTimeFormat("en-CA", {
               timeZone: w.user.preferences.timezone,
             }).format(new Date()),
             projectId: input.projectId || undefined,
             category: input.category ?? "General",
+            accountId: account?.id,
           };
           w[input.type === "income" ? "incomes" : "expenses"].unshift(record);
+          if (account) {
+            account.balance = Math.round(
+              (account.balance + (input.type === "income" ? amount : -amount)) *
+                100,
+            ) / 100;
+            account.updatedAt = Date.now();
+          }
           break;
         }
         case "contact":
@@ -450,7 +469,10 @@ export class NexusActions {
     kind: "income" | "expense",
     recordId: string,
     patch: Partial<
-      Pick<MoneyRecord, "title" | "amount" | "date" | "projectId" | "category">
+      Pick<
+        MoneyRecord,
+        "title" | "amount" | "date" | "projectId" | "category"
+      >
     >,
   ) =>
     this.store.update((w) => {
@@ -465,7 +487,20 @@ export class NexusActions {
       if (patch.amount != null) {
         if (!Number.isFinite(patch.amount) || patch.amount <= 0)
           throw new Error("El importe debe ser mayor que cero.");
-        record.amount = Math.round(patch.amount * 100) / 100;
+        const nextAmount = Math.round(patch.amount * 100) / 100;
+        const account = record.accountId
+          ? (w.financialAccounts ?? []).find(
+              (item) => item.id === record.accountId,
+            )
+          : undefined;
+        if (account) {
+          const delta =
+            (nextAmount - record.amount) * (kind === "income" ? 1 : -1);
+          account.balance =
+            Math.round((account.balance + delta) * 100) / 100;
+          account.updatedAt = Date.now();
+        }
+        record.amount = nextAmount;
       }
       if (patch.date != null) record.date = patch.date;
       if ("projectId" in patch) {
@@ -491,6 +526,19 @@ export class NexusActions {
       const collection = kind === "income" ? w.incomes : w.expenses;
       const record = collection.find((item) => item.id === recordId);
       if (!record) throw new Error("Movimiento no encontrado.");
+      const account = record.accountId
+        ? (w.financialAccounts ?? []).find(
+            (item) => item.id === record.accountId,
+          )
+        : undefined;
+      if (account) {
+        account.balance =
+          Math.round(
+            (account.balance + (kind === "income" ? -record.amount : record.amount)) *
+              100,
+          ) / 100;
+        account.updatedAt = Date.now();
+      }
       if (kind === "income")
         w.incomes = w.incomes.filter((item) => item.id !== recordId);
       else w.expenses = w.expenses.filter((item) => item.id !== recordId);
@@ -499,6 +547,44 @@ export class NexusActions {
         "Movimiento eliminado: " + record.title,
         "finance",
         record.projectId,
+      );
+    });
+
+  payDebt = (
+    debtId: string,
+    amount: number,
+    accountId?: string,
+  ) =>
+    this.store.update((w) => {
+      const debt = (w.debts ?? []).find((item) => item.id === debtId);
+      if (!debt) throw new Error("Deuda no encontrada.");
+      if (!Number.isFinite(amount) || amount <= 0)
+        throw new Error("El pago debe ser mayor que cero.");
+      const applied = Math.min(
+        Math.round(amount * 100) / 100,
+        debt.balance,
+      );
+      const account = accountId
+        ? (w.financialAccounts ?? []).find((item) => item.id === accountId)
+        : undefined;
+      if (accountId && !account)
+        throw new Error("Cuenta financiera no encontrada.");
+      if (account && account.currency !== debt.currency)
+        throw new Error("La moneda de la cuenta no coincide con la deuda.");
+      if (account) {
+        if (account.balance < applied)
+          throw new Error("La cuenta no tiene saldo suficiente.");
+        account.balance =
+          Math.round((account.balance - applied) * 100) / 100;
+        account.updatedAt = Date.now();
+      }
+      debt.balance = Math.round((debt.balance - applied) * 100) / 100;
+      debt.status = debt.balance <= 0 ? "paid" : "pending";
+      debt.updatedAt = Date.now();
+      log(
+        w,
+        "Pago de deuda: " + debt.creditor + " · " + applied + " " + debt.currency,
+        "debt",
       );
     });
 
