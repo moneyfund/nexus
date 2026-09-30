@@ -58,35 +58,31 @@ export function AIView() {
   const endRef = useRef<HTMLDivElement>(null);
   const requestRef = useRef(false);
   const voiceBootRef = useRef(false);
+  const latestConversation = [...n.data.conversations].sort(
+    (a, b) => b.updatedAt - a.updatedAt,
+  )[0];
+  const currentConversationId =
+    activeConversationId &&
+    n.data.conversations.some(
+      (conversation) => conversation.id === activeConversationId,
+    )
+      ? activeConversationId
+      : latestConversation?.id ?? null;
   const activeConversation = n.data.conversations.find(
-    (conversation) => conversation.id === activeConversationId,
+    (conversation) => conversation.id === currentConversationId,
   );
-  const activeMessages = activeConversationId
+  const activeMessages = currentConversationId
     ? n.data.messages.filter(
-        (message) => message.conversationId === activeConversationId,
+        (message) => message.conversationId === currentConversationId,
       )
     : [];
   const activeProject = activeConversation?.projectId
     ? n.projects.find((project) => project.id === activeConversation.projectId)
     : undefined;
   const context = n.services.context.build(n.data, {
-    conversationId: activeConversationId ?? undefined,
+    conversationId: currentConversationId ?? undefined,
     projectId: activeConversation?.projectId,
   });
-
-  useEffect(() => {
-    if (
-      activeConversationId &&
-      n.data.conversations.some(
-        (conversation) => conversation.id === activeConversationId,
-      )
-    )
-      return;
-    const latest = [...n.data.conversations].sort(
-      (a, b) => b.updatedAt - a.updatedAt,
-    )[0];
-    setActiveConversationId(latest?.id ?? null);
-  }, [activeConversationId, n.data.conversations]);
 
   useEffect(() => {
     if (voiceBootRef.current || typeof window === "undefined") return;
@@ -541,7 +537,7 @@ export function AIView() {
       "Conversación eliminada de NEXUS.",
     );
     if (!removed) return;
-    if (activeConversationId === conversationId) {
+    if (currentConversationId === conversationId) {
       const next = [...n.store.getSnapshot().conversations].sort(
         (a, b) => b.updatedAt - a.updatedAt,
       )[0];
@@ -569,7 +565,7 @@ export function AIView() {
     requestRef.current = true;
     setBusy(true);
     try {
-      let conversationId = activeConversationId;
+      let conversationId = currentConversationId;
       if (
         !conversationId ||
         !n.store
@@ -660,7 +656,7 @@ export function AIView() {
         className={`ai-workspace ${activeMessages.length ? "has-history" : ""} ${busy ? "is-thinking" : ""}`}
       >
         <AIConversationNav
-          activeConversationId={activeConversationId}
+          activeConversationId={currentConversationId}
           onSelect={selectConversation}
           onNew={newConversation}
           onProject={openProjectConversation}
