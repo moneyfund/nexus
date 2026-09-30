@@ -683,6 +683,46 @@ test("debt payment reduces both debt and selected account and records cashflow",
   assert.equal(store.getSnapshot().expenses[0].category, "Pago de deuda");
 });
 
+test("marking a debt paid from an account deducts the full balance and records the expense", () => {
+  const { store, actions } = setup();
+  store.update((w) => {
+    w.financialAccounts = [
+      {
+        ...w.user,
+        id: "cash-nio-debt",
+        userId: w.user.id,
+        name: "Efectivo",
+        kind: "cash",
+        currency: "NIO",
+        balance: 2000,
+      },
+    ];
+    w.debts = [
+      {
+        ...w.user,
+        id: "debt-nio-full",
+        userId: w.user.id,
+        creditor: "DOLCE",
+        title: "Arreglo",
+        projectId: "nexus",
+        originalAmount: 1290,
+        balance: 1290,
+        currency: "NIO",
+        status: "pending",
+      },
+    ];
+  });
+
+  actions.markDebtPaid("debt-nio-full", "cash-nio-debt");
+
+  assert.equal(store.getSnapshot().financialAccounts[0].balance, 710);
+  assert.equal(store.getSnapshot().debts[0].balance, 0);
+  assert.equal(store.getSnapshot().debts[0].status, "paid");
+  assert.equal(store.getSnapshot().expenses[0].amount, 1290);
+  assert.equal(store.getSnapshot().expenses[0].accountId, "cash-nio-debt");
+  assert.equal(store.getSnapshot().expenses[0].projectId, "nexus");
+});
+
 test("debts can be created, edited and manually reconciled without inventing cashflow", () => {
   const { store, actions } = setup();
   store.update((w) => {
