@@ -534,18 +534,25 @@ export function AIView() {
       )
     )
       return;
-    const removed = n.run(
-      () => n.actions.deleteAIConversation(conversationId),
-      "Conversación eliminada de NEXUS.",
-    );
+    const removed =
+      n.run(() => {
+        n.actions.deleteAIConversation(conversationId);
+        return true;
+      }, "Conversación eliminada de NEXUS.") === true;
     if (!removed) return;
     if (currentConversationId === conversationId) {
       const next = [...n.store.getSnapshot().conversations].sort(
         (a, b) => b.updatedAt - a.updatedAt,
       )[0];
-      setActiveConversationId(next?.id ?? null);
+      setActiveConversationId(next?.id ?? "__new__");
     }
     setPendingActions([]);
+    void n.syncNow().catch(() => {
+      n.notify(
+        "La conversación se eliminó localmente, pero Firebase todavía no confirmó la sincronización.",
+        true,
+      );
+    });
   }
 
   function deleteMessage(messageId: string) {
@@ -556,10 +563,19 @@ export function AIView() {
       )
     )
       return;
-    n.run(
-      () => n.actions.deleteAIMessage(messageId),
-      "Mensaje eliminado de NEXUS.",
-    );
+    const removed =
+      n.run(() => {
+        n.actions.deleteAIMessage(messageId);
+        return true;
+      }, "Mensaje eliminado de NEXUS.") === true;
+    if (!removed) return;
+    setPendingActions([]);
+    void n.syncNow().catch(() => {
+      n.notify(
+        "El mensaje se eliminó localmente, pero Firebase todavía no confirmó la sincronización.",
+        true,
+      );
+    });
   }
 
   async function send(text: string) {
