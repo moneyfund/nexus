@@ -2752,3 +2752,21 @@ h3 {
     min-width: 132px;
   }
 }
+
+/* Keep the idle audio launcher clear of NEXUS Voice. */
+.nexus-audio-launcher {
+  right: 96px;
+}
+.nexus-audio-floating {
+  right: 96px;
+}
+@media (max-width: 850px) {
+  .nexus-audio-launcher {
+    right: 82px;
+    bottom: calc(88px + env(safe-area-inset-bottom));
+  }
+  .nexus-audio-floating {
+    right: 82px;
+    bottom: calc(86px + env(safe-area-inset-bottom));
+  }
+}
