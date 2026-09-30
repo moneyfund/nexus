@@ -140,6 +140,10 @@ function prepareWorkspace(original, user) {
     project.source = "user";
     cleanFinancialMetadata(project);
     project.hours = recordedHours(workspace, project.id);
+    project.metadata = {
+      ...(project.metadata || {}),
+      hoursBasis: "flow-only",
+    };
     for (const task of project.tasks || []) {
       task.userId = userId;
       task.source = "user";
@@ -596,6 +600,10 @@ const summary = prepared.projects.map((project) => ({
                 .reduce((sum, item) => sum + item.amount, 0),
           )
         : "",
+  overdueUSD:
+    typeof project.metadata?.overdueUSD === "number"
+      ? project.metadata.overdueUSD
+      : "",
 }));
 
 console.log("\nCuenta seleccionada:");
