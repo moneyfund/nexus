@@ -91,6 +91,10 @@ function useSystem() {
   const [googleGrant, setGoogleGrant] = useState<GoogleWorkspaceGrant | null>(
     null,
   );
+  const [googleLastCalendarSync, setGoogleLastCalendarSync] = useState<number | null>(
+    null,
+  );
+  const [googleSyncError, setGoogleSyncError] = useState("");
   const googleConnected = !!googleGrant;
   const googleAccessToken = googleGrant?.accessToken ?? null;
   const services = useMemo(
@@ -140,6 +144,40 @@ function useSystem() {
 
   const osReduced = useReducedMotion();
   const reduceMotion = !!osReduced || data.user.preferences.motion !== "full";
+
+  const syncGoogleCalendar = useCallback(
+    async (grantOverride?: GoogleWorkspaceGrant) => {
+      const grant = grantOverride ?? googleGrant;
+      if (!grant || !session) return 0;
+
+      const provider = new GoogleCalendarProvider(
+        repositories.calendar,
+        () => grant.accessToken,
+      );
+      const now = Date.now();
+      const from = new Date(now - 90 * 24 * 60 * 60 * 1000).toISOString();
+      const to = new Date(now + 180 * 24 * 60 * 60 * 1000).toISOString();
+
+      try {
+        const synced = await provider.sync(session.uid, from, to);
+        setGoogleLastCalendarSync(Date.now());
+        setGoogleSyncError("");
+        return synced.length;
+      } catch (error) {
+        const message =
+          error instanceof Error
+            ? error.message
+            : "No se pudo sincronizar Google Calendar.";
+        setGoogleSyncError(message);
+        if (/caduc[oó]|401|unauthorized/i.test(message)) {
+          clearGoogleWorkspaceGrant();
+          setGoogleGrant(null);
+        }
+        throw error;
+      }
+    },
+    [googleGrant, repositories.calendar, session],
+  );
 
   const activateSession = useCallback(async (next: FirebaseSession) => {
     setCloudReady(false);
@@ -212,9 +250,38 @@ function useSystem() {
     const timer = window.setTimeout(() => {
       clearGoogleWorkspaceGrant();
       setGoogleGrant(null);
+      setGoogleSyncError(
+        "Google solicitó renovar la autorización de Calendar y Drive.",
+      );
     }, delay);
     return () => window.clearTimeout(timer);
   }, [googleGrant]);
+
+  useEffect(() => {
+    if (!googleGrant || !session || !cloudReady) return;
+
+    let active = true;
+    const sync = () => {
+      void syncGoogleCalendar().catch(() => {
+        // The integration status already exposes the error to the user.
+      });
+    };
+
+    sync();
+    const interval = window.setInterval(sync, 10 * 60 * 1000);
+    const onFocus = () => {
+      if (active && document.visibilityState === "visible") sync();
+    };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onFocus);
+
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onFocus);
+    };
+  }, [googleGrant, session, cloudReady, syncGoogleCalendar]);
 
   useEffect(() => {
     store.load();
@@ -369,14 +436,16 @@ function useSystem() {
     const grant = await firebaseClient.connectGoogleWorkspace();
     saveGoogleWorkspaceGrant(grant);
     setGoogleGrant(grant);
-    notify("Google Calendar y Drive conectados.");
+    setGoogleSyncError("");
+    notify("Google Calendar y Drive conectados. La agenda se sincronizará automáticamente.");
     return grant;
   };
 
   const disconnectGoogleWorkspace = () => {
     clearGoogleWorkspaceGrant();
     setGoogleGrant(null);
-    notify("Google Workspace desconectado de esta sesión.");
+    setGoogleSyncError("");
+    notify("Google Workspace desconectado de este navegador.");
   };
 
   const signOut = async () => {
@@ -439,9 +508,13 @@ function useSystem() {
     googleWorkspace: {
       connected: googleConnected,
       expiresAt: googleGrant?.expiresAt,
+      connectedAt: googleGrant?.connectedAt,
       scopes: googleGrant?.scopes ?? [],
+      lastCalendarSync: googleLastCalendarSync,
+      syncError: googleSyncError,
       connect: connectGoogleWorkspace,
       disconnect: disconnectGoogleWorkspace,
+      syncCalendar: syncGoogleCalendar,
     },
     signInWithGoogle,
     signIn,
