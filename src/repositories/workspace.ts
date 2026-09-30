@@ -49,11 +49,13 @@ export function validateWorkspace(
         ...messages.map((message) => message.updatedAt),
       );
     }
-    for (const conversation of w.conversations) {
-      conversation.messageIds = w.messages
-        .filter((message) => message.conversationId === conversation.id)
-        .map((message) => message.id);
-    }
+  }
+  for (const conversation of w.conversations) {
+    conversation.messageIds = Array.isArray(w.messages)
+      ? w.messages
+          .filter((message) => message.conversationId === conversation.id)
+          .map((message) => message.id)
+      : [];
   }
   const keys = [
     "projects",
