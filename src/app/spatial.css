@@ -59,7 +59,7 @@ h3 {
   background:
     radial-gradient(ellipse at 10% 85%, #52379720, transparent 48%),
     radial-gradient(ellipse at 94% 90%, #a2356820, transparent 35%);
-  animation: atmosphere-drift 32s ease-in-out infinite alternate;
+  animation: atmosphere-drift 54s ease-in-out infinite alternate;
   animation-play-state: paused;
 }
 .spatial-stars {
@@ -167,7 +167,7 @@ h3 {
 }
 .app-rail {
   background: linear-gradient(160deg, #151021d9, #08070ddd 55%);
-  backdrop-filter: blur(26px);
+  backdrop-filter: blur(14px);
   box-shadow: 16px 0 60px #0002;
   padding: 26px 16px 20px;
   overflow-y: auto;
@@ -263,7 +263,7 @@ h3 {
   height: 68px;
   padding: 0 32px;
   background: #080611a8;
-  backdrop-filter: blur(24px);
+  backdrop-filter: blur(12px);
 }
 .topbar-path {
   letter-spacing: 0.11em;
@@ -328,7 +328,7 @@ h3 {
 }
 .surface {
   background: linear-gradient(125deg, #23172b80, #0d0c1866);
-  backdrop-filter: blur(15px);
+  backdrop-filter: blur(8px);
   box-shadow:
     inset 0 1px #e9d6ff09,
     0 16px 45px #0002;
@@ -632,31 +632,17 @@ h3 {
   width: 100%;
   height: 100%;
 }
-.node-satellite svg {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  transform: rotate(-90deg);
-  fill: #0d0a19aa;
-  stroke: currentColor;
-  stroke-width: 0.7;
-}
-.node-satellite svg circle:first-child {
-  opacity: 0.32;
-}
-.node-satellite svg .node-progress {
-  stroke-width: 1.65;
-  stroke: #f6ddff;
-  fill: none;
-}
 .universe-galaxy .node-dot {
-  width: 6px;
-  height: 6px;
+  width: 7px;
+  height: 7px;
   background: currentColor;
-  box-shadow: 0 0 13px currentColor;
+  box-shadow: 0 0 7px color-mix(in srgb, currentColor 55%, transparent);
   border-radius: 50%;
   display: block;
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease,
+    filter 0.18s ease;
 }
 .universe-galaxy .node-dot:before,
 .universe-galaxy .node-dot:after {
@@ -674,11 +660,6 @@ h3 {
 }
 .universe-galaxy .status-completed {
   color: #91bab2;
-}
-.universe-galaxy .idea .node-satellite svg {
-  width: 22px;
-  height: 22px;
-  inset: 7px;
 }
 .universe-galaxy .idea .node-dot {
   width: 3px;
@@ -698,7 +679,7 @@ h3 {
   white-space: normal;
   color: #decfe8;
   background: linear-gradient(90deg, #0b0815cc, #0b081530);
-  opacity: var(--label-opacity, 1);
+  opacity: 0;
   pointer-events: none;
   font-weight: 400;
   transform: none;
@@ -717,11 +698,19 @@ h3 {
   background: linear-gradient(270deg, #0b0815cc, #0b081530);
 }
 .universe-galaxy .is-inspected {
-  background: #ebadff0f;
-  outline: 1px solid #e4b8ef44;
+  background: transparent;
+  outline: 0;
+}
+.universe-galaxy .galaxy-node:hover .node-dot,
+.universe-galaxy .galaxy-node:focus-visible .node-dot,
+.universe-galaxy .galaxy-node.is-inspected .node-dot {
+  transform: scale(1.35);
+  box-shadow: 0 0 11px color-mix(in srgb, currentColor 72%, transparent);
+  filter: brightness(1.18);
 }
 .universe-galaxy .galaxy-node:hover .node-label,
-.universe-galaxy .galaxy-node:focus-visible .node-label {
+.universe-galaxy .galaxy-node:focus-visible .node-label,
+.universe-galaxy .galaxy-node.is-inspected .node-label {
   opacity: 1;
   color: white;
   background: #170f23ed;
@@ -834,7 +823,7 @@ h3 {
   border: 1px solid var(--line-strong);
   border-radius: 12px;
   background: #0c0916f5;
-  backdrop-filter: blur(20px);
+  backdrop-filter: blur(12px);
   overflow-y: auto;
   box-shadow: 0 20px 80px #0008;
 }
@@ -1410,7 +1399,7 @@ h3 {
   background: linear-gradient(135deg, #261630aa, #0c0a16ca);
   border: 1px solid #d1b1ed26;
   border-radius: 20px;
-  backdrop-filter: blur(20px);
+  backdrop-filter: blur(12px);
   box-shadow:
     0 30px 100px #0005,
     inset 0 1px #f4d4ff12;
