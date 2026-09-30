@@ -458,6 +458,32 @@ test("milestone baseline protects existing progress while tasks advance the rema
   assert.ok(milestone().progress >= 55);
 });
 
+test("explicit receivables stay separate from paid cashflow", () => {
+  const { store, actions } = setup();
+  actions.capture({
+    type: "income",
+    content: "Cobro confirmado",
+    amount: 200,
+    projectId: "drg-web",
+  });
+  store.update((w) => {
+    const project = w.projects.find((item) => item.id === "drg-web")!;
+    project.value = 2000;
+    project.metadata = {
+      ...(project.metadata ?? {}),
+      receivableUSD: 1800,
+      overdueUSD: 400,
+    };
+  });
+  const project = store
+    .getSnapshot()
+    .projects.find((item) => item.id === "drg-web")!;
+  const finance = projectFinance(store.getSnapshot(), project);
+  assert.equal(finance.paid, 200);
+  assert.equal(finance.receivable, 1800);
+  assert.equal(finance.overdue, 400);
+});
+
 test("financial movements can be edited and deleted without touching unrelated data", () => {
   const { store, actions } = setup();
   const recordId = actions.capture({
