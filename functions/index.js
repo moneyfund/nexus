@@ -27,6 +27,7 @@ const ACTION_TYPES = [
   "delete_task",
   "record_income",
   "record_expense",
+  "pay_debt",
   "update_transaction",
   "delete_transaction",
   "update_project_status",
@@ -63,6 +64,12 @@ const responseSchema = {
             type: ["string", "null"],
             enum: ["income", "expense", null],
           },
+          currency: {
+            type: ["string", "null"],
+            enum: ["USD", "NIO", null],
+          },
+          accountId: { type: ["string", "null"] },
+          debtId: { type: ["string", "null"] },
           title: { type: ["string", "null"] },
           milestone: { type: ["string", "null"] },
           amount: { type: ["number", "null"] },
@@ -107,6 +114,9 @@ const responseSchema = {
           "projectId",
           "taskId",
           "transactionKind",
+          "currency",
+          "accountId",
+          "debtId",
           "title",
           "milestone",
           "amount",
@@ -366,7 +376,9 @@ export const nexusAI = onCall(
           "Usa create_project cuando el usuario pida crear un proyecto nuevo; title es obligatorio y puedes usar description, area, client, priority, dueDate, value y status si fueron dados o se pueden inferir sin ambigüedad. " +
           "Usa complete_task para terminar una tarea existente; update_task para editar título, prioridad, duración o hito; delete_task solo si el usuario pide eliminarla claramente. " +
           "Usa record_income o record_expense para movimientos nuevos. Para corregir un movimiento existente usa update_transaction con targetId y transactionKind; para eliminarlo usa delete_transaction. " +
-          "En movimientos financieros usa amount para importe, date en formato YYYY-MM-DD, itemCategory para categoría y projectId para asociación. Interpreta hoy/ayer usando now y timezone. " +
+          "En movimientos financieros usa amount para importe, currency para USD o NIO, accountId cuando el usuario indique de qué cuenta sale o entra el dinero, date en formato YYYY-MM-DD, itemCategory para categoría y projectId para asociación. Nunca conviertas el importe si el usuario ya dio una moneda explícita. " +
+          "Usa pay_debt cuando el usuario diga que pagó una deuda existente: usa debtId exacto del contexto, amount en la moneda de la deuda y accountId si especifica o puede identificarse una única cuenta compatible. Nunca marques una deuda como pagada sin una confirmación explícita del usuario. " +
+          "Interpreta hoy/ayer usando now y timezone. " +
           "Cuando el usuario diga cosas como 'el gasto de ayer', compara fecha, título, importe, proyecto y categoría de transactions; si hay más de un candidato razonable, pregunta cuál. " +
           "Usa update_project para nombre, descripción, notas, prioridad, fecha, área o cliente; update_project_status y update_project_value para esos campos específicos. " +
           "Si el usuario cuenta un avance realizado en un proyecto pero no corresponde claramente a una tarea existente, usa log_project_activity para conservarlo en el historial y notas del proyecto. " +
