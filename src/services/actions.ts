@@ -14,6 +14,7 @@ import type {
   UserPreferences,
   Milestone,
   MoneyRecord,
+  AIMessage,
 } from "@/domain/models";
 const id = () => crypto.randomUUID();
 const log = (w: Workspace, title: string, kind: string, projectId?: string) => {
@@ -802,6 +803,96 @@ export class NexusActions {
       if (!memory) throw new Error("Memoria no encontrada.");
       w.memories = w.memories.filter((item) => item.id !== memoryId);
       log(w, "Memoria eliminada", "memory", memory.projectIds[0]);
+    });
+
+  createAIConversation = (projectId?: string, title?: string) => {
+    const snapshot = this.store.getSnapshot();
+    if (projectId) {
+      const existing = snapshot.conversations.find(
+        (conversation) =>
+          conversation.kind === "project" &&
+          conversation.projectId === projectId,
+      );
+      if (existing) return existing.id;
+    }
+    const conversationId = id();
+    this.store.update((w) => {
+      const project = projectId
+        ? w.projects.find((item) => item.id === projectId)
+        : undefined;
+      if (projectId && !project) throw new Error("Proyecto no encontrado.");
+      w.conversations.unshift({
+        ...entity(conversationId, "user", w.user.id),
+        title:
+          title?.trim() ||
+          project?.name ||
+          "Nueva conversación",
+        kind: project ? "project" : "general",
+        projectId: project?.id,
+        messageIds: [],
+      });
+    });
+    return conversationId;
+  };
+
+  appendAIMessage = (conversationId: string, message: AIMessage) =>
+    this.store.update((w) => {
+      const conversation = w.conversations.find(
+        (item) => item.id === conversationId,
+      );
+      if (!conversation) throw new Error("Conversación no encontrada.");
+      const clean = message.content.trim();
+      if (!clean) throw new Error("El mensaje no puede quedar vacío.");
+      const owned: AIMessage = {
+        ...message,
+        userId: w.user.id,
+        source: "user",
+        conversationId,
+        content: clean,
+        updatedAt: Date.now(),
+      };
+      w.messages.push(owned);
+      if (!conversation.messageIds.includes(owned.id))
+        conversation.messageIds.push(owned.id);
+      if (
+        conversation.kind === "general" &&
+        conversation.title === "Nueva conversación" &&
+        owned.role === "user"
+      ) {
+        conversation.title =
+          clean.length > 54 ? clean.slice(0, 51).trimEnd() + "…" : clean;
+      }
+      conversation.updatedAt = Date.now();
+    });
+
+  deleteAIMessage = (messageId: string) =>
+    this.store.update((w) => {
+      const message = w.messages.find((item) => item.id === messageId);
+      if (!message) throw new Error("Mensaje no encontrado.");
+      w.messages = w.messages.filter((item) => item.id !== messageId);
+      const conversation = w.conversations.find(
+        (item) => item.id === message.conversationId,
+      );
+      if (conversation) {
+        conversation.messageIds = conversation.messageIds.filter(
+          (id) => id !== messageId,
+        );
+        conversation.updatedAt = Date.now();
+      }
+    });
+
+  deleteAIConversation = (conversationId: string) =>
+    this.store.update((w) => {
+      const conversation = w.conversations.find(
+        (item) => item.id === conversationId,
+      );
+      if (!conversation) throw new Error("Conversación no encontrada.");
+      w.messages = w.messages.filter(
+        (message) => message.conversationId !== conversationId,
+      );
+      w.conversations = w.conversations.filter(
+        (item) => item.id !== conversationId,
+      );
     });
 
   logProjectActivity = (projectId: string, content: string) =>
