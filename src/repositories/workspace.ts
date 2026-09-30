@@ -14,6 +14,8 @@ export function validateWorkspace(
   if (!value || typeof value !== "object")
     throw new Error("La copia no contiene un espacio válido.");
   const w = value as Workspace;
+  if (!Array.isArray(w.financialAccounts)) w.financialAccounts = [];
+  if (!Array.isArray(w.debts)) w.debts = [];
   const keys = [
     "projects",
     "inbox",
@@ -23,6 +25,8 @@ export function validateWorkspace(
     "goals",
     "incomes",
     "expenses",
+    "financialAccounts",
+    "debts",
     "financialGoals",
     "contacts",
     "knowledge",
@@ -76,11 +80,31 @@ export function validateWorkspace(
     if (
       !Number.isFinite(r.amount) ||
       r.amount <= 0 ||
-      r.currency !== "USD" ||
+      !["USD", "NIO"].includes(r.currency) ||
       typeof r.date !== "string" ||
       typeof r.title !== "string"
     )
       throw new Error("Movimiento financiero inválido.");
+  for (const account of w.financialAccounts ?? [])
+    if (
+      !account.name ||
+      !["cash", "bank", "card", "wallet"].includes(account.kind) ||
+      !["USD", "NIO"].includes(account.currency) ||
+      !Number.isFinite(account.balance)
+    )
+      throw new Error("Cuenta financiera inválida.");
+  for (const debt of w.debts ?? [])
+    if (
+      !debt.creditor ||
+      !debt.title ||
+      !["USD", "NIO"].includes(debt.currency) ||
+      !Number.isFinite(debt.originalAmount) ||
+      debt.originalAmount <= 0 ||
+      !Number.isFinite(debt.balance) ||
+      debt.balance < 0 ||
+      !["pending", "paid"].includes(debt.status)
+    )
+      throw new Error("Deuda inválida.");
   for (const i of w.ideas)
     if (
       typeof i.title !== "string" ||
@@ -223,6 +247,8 @@ export function reassignWorkspaceUser(
 ): Workspace {
   const next = structuredClone(data);
   const now = Date.now();
+  next.financialAccounts ??= [];
+  next.debts ??= [];
 
   const entities = [
     ...next.projects,
@@ -233,6 +259,8 @@ export function reassignWorkspaceUser(
     ...next.goals,
     ...next.incomes,
     ...next.expenses,
+    ...(next.financialAccounts ?? []),
+    ...(next.debts ?? []),
     ...next.financialGoals,
     ...next.contacts,
     ...next.knowledge,
