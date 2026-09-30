@@ -233,7 +233,6 @@ export function KnowledgeView({
         grant.accessToken,
         file,
       );
-      const syncedAt = Date.now();
       const reference =
         "Referencia importada desde Google Drive" +
         (file.modifiedTime
@@ -245,6 +244,7 @@ export function KnowledgeView({
         : reference + (extracted.reason ? "\n" + extracted.reason : "");
 
       const saved = n.update((w) => {
+        const syncedAt = Date.now();
         const existing = w.knowledge.find(
           (item) => item.metadata?.googleDriveId === file.id,
         );
