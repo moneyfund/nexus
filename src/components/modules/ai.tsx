@@ -61,11 +61,13 @@ export function AIView() {
   const latestConversation = [...n.data.conversations].sort(
     (a, b) => b.updatedAt - a.updatedAt,
   )[0];
-  const currentConversationId =
-    activeConversationId &&
-    n.data.conversations.some(
-      (conversation) => conversation.id === activeConversationId,
-    )
+  const startingNewConversation = activeConversationId === "__new__";
+  const currentConversationId = startingNewConversation
+    ? null
+    : activeConversationId &&
+        n.data.conversations.some(
+          (conversation) => conversation.id === activeConversationId,
+        )
       ? activeConversationId
       : latestConversation?.id ?? null;
   const activeConversation = n.data.conversations.find(
@@ -504,8 +506,8 @@ export function AIView() {
   }
 
   function newConversation() {
-    const conversationId = n.actions.createAIConversation();
-    selectConversation(conversationId);
+    setActiveConversationId("__new__");
+    setPendingActions([]);
     setPrompt("");
   }
 
