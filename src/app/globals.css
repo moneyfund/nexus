@@ -4642,3 +4642,86 @@ html[data-motion="reduced"] *:after {
     margin-bottom: 30px;
   }
 }
+
+
+/* SYSTEM DEPTH LAYER */
+.app-rail {
+  background:
+    linear-gradient(180deg, rgba(9, 6, 12, 0.96), rgba(3, 3, 5, 0.98)),
+    #050406;
+  box-shadow: 18px 0 70px rgba(0,0,0,.22);
+}
+.brand-name,
+.brand-subtitle,
+.rail-group-label,
+.topbar-path,
+.system-footer {
+  font-family: var(--font-tech), var(--font-display), sans-serif;
+}
+.brand-name {
+  letter-spacing: .24em;
+}
+.topbar {
+  background:
+    linear-gradient(180deg, rgba(10,7,13,.91), rgba(2,2,3,.78));
+  border-bottom-color: rgba(235,205,248,.08);
+  box-shadow: 0 18px 55px rgba(0,0,0,.16);
+}
+.main-content {
+  position: relative;
+}
+.main-content::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 540px;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 72% 2%, rgba(217,70,239,.06), transparent 36%),
+    radial-gradient(circle at 44% 8%, rgba(117,71,255,.035), transparent 28%);
+}
+.surface,
+.project-card {
+  position: relative;
+  overflow: hidden;
+  background:
+    linear-gradient(145deg, rgba(23,14,30,.66), rgba(7,5,10,.83));
+  border-color: rgba(230,204,244,.105);
+  box-shadow:
+    0 24px 70px rgba(0,0,0,.19),
+    inset 0 1px rgba(255,255,255,.025);
+  backdrop-filter: blur(18px);
+}
+.surface::before,
+.project-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(120deg, rgba(255,255,255,.025), transparent 26%, transparent 74%, rgba(217,70,239,.018));
+}
+.project-card {
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+.project-card:hover {
+  transform: perspective(900px) translateY(-7px) rotateX(1.1deg) rotateY(-.7deg);
+  border-color: rgba(224,125,242,.25);
+  box-shadow:
+    0 32px 90px rgba(0,0,0,.26),
+    0 0 45px rgba(217,70,239,.045);
+}
+.data-band {
+  border-block-color: rgba(232,207,245,.08);
+  background: linear-gradient(90deg, rgba(255,255,255,.012), transparent 32%, rgba(217,70,239,.012));
+}
+.data-metric strong {
+  text-shadow: 0 0 26px rgba(219,118,236,.07);
+}
+.section-heading .hud-label,
+.section-number {
+  font-family: var(--font-tech), var(--font-display), sans-serif;
+  letter-spacing: .12em;
+}
