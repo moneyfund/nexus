@@ -425,8 +425,16 @@ export function ProjectDetail({ id }: { id: string }) {
       <div className="data-band">
         <DataMetric
           label="Tiempo acumulado"
-          value={p.hours.toFixed(1) + " h"}
-          meta={`${sessions.length} sesiones registradas`}
+          value={
+            p.metadata?.hoursBasis === "flow-only" && p.hours === 0
+              ? "Sin medir"
+              : p.hours.toFixed(1) + " h"
+          }
+          meta={
+            p.metadata?.hoursBasis === "flow-only"
+              ? `${sessions.length} sesiones Flow reales`
+              : `${sessions.length} sesiones registradas`
+          }
         />
         <DataMetric
           label="Valor acordado"
@@ -440,8 +448,8 @@ export function ProjectDetail({ id }: { id: string }) {
         />
         <DataMetric
           label="Valor por hora"
-          value={money(finance.contractedHour)}
-          meta="Valor acordado ÷ horas"
+          value={p.hours ? money(finance.contractedHour) : "—"}
+          meta={p.hours ? "Valor acordado ÷ horas" : "Sin horas medidas todavía"}
         />
       </div>
       <Tabs
