@@ -23,13 +23,16 @@ import {
 } from "../ui/primitives";
 import { CashflowChart } from "../ui/charts";
 import {
+  amountToNIO,
+  amountToUSD,
   dateKey,
+  exchangeRate,
   financialScope,
   money,
   projectFinance,
 } from "@/domain/selectors";
 import { entity } from "@/domain/seed";
-import type { MoneyRecord } from "@/domain/models";
+import type { Currency, MoneyRecord } from "@/domain/models";
 
 type EditableRecord = MoneyRecord & { kind: "income" | "expense" };
 
@@ -137,15 +140,27 @@ export function FinanceView() {
   const [editingRecord, setEditingRecord] = useState<EditableRecord | null>(null);
   const scoped = financialScope(n.data, scope);
   const { incomes, expenses, projects, financialGoals } = scoped;
-  const income = incomes.reduce((s, i) => s + i.amount, 0);
+  const rate = exchangeRate(n.data);
+  const accounts = n.data.financialAccounts ?? [];
+  const debts = n.data.debts ?? [];
+  const income = incomes.reduce(
+    (s, i) => s + amountToUSD(n.data, i.amount, i.currency),
+    0,
+  );
   const historicalIncome = incomes
     .filter((i) => i.metadata?.cutoverHistorical === true)
-    .reduce((s, i) => s + i.amount, 0);
+    .reduce((s, i) => s + amountToUSD(n.data, i.amount, i.currency), 0);
   const currentIncomes = incomes.filter(
     (i) => i.metadata?.cutoverHistorical !== true,
   );
-  const currentIncome = currentIncomes.reduce((s, i) => s + i.amount, 0);
-  const expense = expenses.reduce((s, i) => s + i.amount, 0);
+  const currentIncome = currentIncomes.reduce(
+    (s, i) => s + amountToUSD(n.data, i.amount, i.currency),
+    0,
+  );
+  const expense = expenses.reduce(
+    (s, i) => s + amountToUSD(n.data, i.amount, i.currency),
+    0,
+  );
   const receivable = projects.reduce(
     (s, p) => s + projectFinance(scoped, p).receivable,
     0,
@@ -155,14 +170,24 @@ export function FinanceView() {
     typeof n.data.user.metadata?.financeCutoverDate === "string"
       ? n.data.user.metadata.financeCutoverDate
       : "";
+  const cashAccount = accounts.find(
+    (item) => item.kind === "cash" && item.currency === "NIO",
+  );
+  const cardAccount = accounts.find(
+    (item) =>
+      (item.kind === "card" || item.kind === "bank") &&
+      item.currency === "USD",
+  );
   const cashNIO =
-    typeof n.data.user.metadata?.cashNIO === "number"
+    cashAccount?.balance ??
+    (typeof n.data.user.metadata?.cashNIO === "number"
       ? n.data.user.metadata.cashNIO
-      : null;
+      : null);
   const cardUSD =
-    typeof n.data.user.metadata?.cardUSD === "number"
+    cardAccount?.balance ??
+    (typeof n.data.user.metadata?.cardUSD === "number"
       ? n.data.user.metadata.cardUSD
-      : null;
+      : null);
   const historyReconciled =
     n.data.user.metadata?.financeHistoryReconciled === true;
   const cordobas = (amount: number) =>
@@ -171,6 +196,15 @@ export function FinanceView() {
       currency: "NIO",
       maximumFractionDigits: 2,
     }).format(amount);
+  const formatNative = (amount: number, currency: Currency) =>
+    currency === "USD" ? money(amount) : cordobas(amount);
+  const pendingDebts = debts.filter(
+    (debt) => debt.status === "pending" && debt.balance > 0,
+  );
+  const debtUSD = pendingDebts.reduce(
+    (sum, debt) => sum + amountToUSD(n.data, debt.balance, debt.currency),
+    0,
+  );
   const currentMonth = dateKey().slice(0, 7);
   const [baseMonth] = useState(() => currentMonth);
   const values = Array.from({ length: 6 }, (_, i) => {
@@ -183,10 +217,16 @@ export function FinanceView() {
         .toUpperCase(),
       income: currentIncomes
         .filter((r) => r.date.startsWith(key))
-        .reduce((s, r) => s + r.amount, 0),
+        .reduce(
+          (s, r) => s + amountToUSD(n.data, r.amount, r.currency),
+          0,
+        ),
       expense: expenses
         .filter((r) => r.date.startsWith(key))
-        .reduce((s, r) => s + r.amount, 0),
+        .reduce(
+          (s, r) => s + amountToUSD(n.data, r.amount, r.currency),
+          0,
+        ),
     };
   });
   const records: EditableRecord[] = [
@@ -242,14 +282,22 @@ export function FinanceView() {
           />
           <div className="data-band">
             <DataMetric
-              label="Efectivo"
+              label={cashAccount?.name ?? "Efectivo"}
               value={cashNIO == null ? "—" : cordobas(cashNIO)}
-              meta="Saldo declarado · NIO"
+              meta={
+                cashNIO == null
+                  ? "Saldo no definido"
+                  : "≈ " + money(cashNIO / rate) + " · tipo oficial BCN"
+              }
             />
             <DataMetric
-              label="Tarjeta / banco"
+              label={cardAccount?.name ?? "Tarjeta / banco"}
               value={cardUSD == null ? "—" : money(cardUSD)}
-              meta="Saldo declarado · USD"
+              meta={
+                cardUSD == null
+                  ? "Saldo no definido"
+                  : "≈ " + cordobas(cardUSD * rate) + " · tipo oficial BCN"
+              }
             />
             <DataMetric
               label="Histórico"
@@ -263,6 +311,47 @@ export function FinanceView() {
           </div>
         </section>
       )}
+      <section className="section">
+        <SectionHeading
+          label="DEUDAS"
+          title="Obligaciones pendientes."
+          action={<Badge>{pendingDebts.length} ABIERTA{pendingDebts.length === 1 ? "" : "S"}</Badge>}
+        />
+        {pendingDebts.length ? (
+          <>
+            <div className="data-band">
+              <DataMetric
+                label="Deuda total"
+                value={money(debtUSD)}
+                meta={"≈ " + cordobas(debtUSD * rate) + " al tipo oficial"}
+              />
+              {pendingDebts.slice(0, 3).map((debt) => (
+                <DataMetric
+                  key={debt.id}
+                  label={debt.creditor}
+                  value={formatNative(debt.balance, debt.currency)}
+                  meta={
+                    (debt.currency === "USD"
+                      ? "≈ " + cordobas(amountToNIO(n.data, debt.balance, debt.currency))
+                      : "≈ " + money(amountToUSD(n.data, debt.balance, debt.currency))) +
+                    (debt.dueDate ? " · vence " + debt.dueDate : "")
+                  }
+                />
+              ))}
+            </div>
+            {pendingDebts.length > 3 && (
+              <p className="form-note">
+                +{pendingDebts.length - 3} deuda{pendingDebts.length - 3 === 1 ? "" : "s"} adicional{pendingDebts.length - 3 === 1 ? "" : "es"}.
+              </p>
+            )}
+          </>
+        ) : (
+          <Empty
+            title="Sin deudas pendientes."
+            text="Cuando registres una obligación aparecerá aquí."
+          />
+        )}
+      </section>
       <div className="data-band">
         <DataMetric
           label="Cobrado confirmado"
@@ -461,7 +550,7 @@ export function FinanceView() {
             </div>
             <strong>
               {r.kind === "expense" ? "−" : "+"}
-              {money(r.amount)}
+              {formatNative(r.amount, r.currency)}
             </strong>
             <button
               className="icon-button"
