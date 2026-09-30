@@ -174,6 +174,15 @@ export function NexusAudioPlayer() {
   const showPanel = isMusicPage && panelOpen;
 
   useEffect(() => {
+    if (showPanel) return;
+    const panel = panelRef.current;
+    const active = document.activeElement;
+    if (panel && active instanceof HTMLElement && panel.contains(active)) {
+      active.blur();
+    }
+  }, [showPanel]);
+
+  useEffect(() => {
     if (!showPanel) return;
 
     const panel = panelRef.current;
@@ -460,7 +469,7 @@ export function NexusAudioPlayer() {
             (playing ? "is-playing" : "is-paused")
           }
           aria-label="NEXUS Audio"
-          aria-hidden={!showPanel}
+          inert={!showPanel}
         >
           <div
             className="nexus-audio-head nexus-audio-drag-handle"
