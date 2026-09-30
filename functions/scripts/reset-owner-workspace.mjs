@@ -1,5 +1,6 @@
 import { writeFileSync } from "node:fs";
 import { randomUUID } from "node:crypto";
+import { createInterface } from "node:readline/promises";
 import { initializeApp, applicationDefault } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
@@ -482,28 +483,57 @@ function prepareWorkspace(original, user) {
   return workspace;
 }
 
-async function listUsers() {
+async function getUsers() {
   let pageToken;
-  const rows = [];
+  const users = [];
   do {
     const result = await auth.listUsers(1000, pageToken);
-    for (const user of result.users)
-      rows.push({
-        email: user.email || "",
-        displayName: user.displayName || "",
-        uid: user.uid,
-      });
+    users.push(...result.users);
     pageToken = result.pageToken;
   } while (pageToken);
-  console.table(rows);
+  return users;
+}
+
+async function listUsers() {
+  const users = await getUsers();
+  console.table(
+    users.map((user, index) => ({
+      option: index + 1,
+      email: user.email || "",
+      displayName: user.displayName || "",
+      uid: user.uid,
+    })),
+  );
+  return users;
 }
 
 async function resolveUser() {
   if (typeof args.uid === "string") return auth.getUser(args.uid);
   if (typeof args.email === "string") return auth.getUserByEmail(args.email);
-  throw new Error(
-    "Indica --email=TU_CORREO o --uid=TU_UID. Usa --list-users para ver las cuentas.",
+
+  const users = await listUsers();
+  if (!users.length) throw new Error("No hay usuarios en Firebase Auth.");
+
+  const rl = createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
+  const answer = await rl.question(
+    "\nEscribe el número de TU cuenta principal de NEXUS y presiona Enter: ",
   );
+  rl.close();
+
+  const index = Number(answer) - 1;
+  if (!Number.isInteger(index) || index < 0 || index >= users.length)
+    throw new Error("Selección inválida. No se modificó ninguna cuenta.");
+
+  const selected = users[index];
+  console.log(
+    "\nSeleccionaste:",
+    selected.email || "(sin correo)",
+    selected.uid,
+  );
+  return selected;
 }
 
 if (args["list-users"]) {
