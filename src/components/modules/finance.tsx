@@ -336,13 +336,6 @@ export function FinanceView() {
   const historicalIncome = incomes
     .filter((i) => i.metadata?.cutoverHistorical === true)
     .reduce((s, i) => s + amountToUSD(n.data, i.amount, i.currency), 0);
-  const currentIncomes = incomes.filter(
-    (i) => i.metadata?.cutoverHistorical !== true,
-  );
-  const currentIncome = currentIncomes.reduce(
-    (s, i) => s + amountToUSD(n.data, i.amount, i.currency),
-    0,
-  );
   const expense = expenses.reduce(
     (s, i) => s + amountToUSD(n.data, i.amount, i.currency),
     0,
@@ -351,7 +344,6 @@ export function FinanceView() {
     (s, p) => s + projectFinance(scoped, p).receivable,
     0,
   );
-  const savings = financialGoals.reduce((s, g) => s + g.saved, 0);
   const cutoverDate =
     typeof n.data.user.metadata?.financeCutoverDate === "string"
       ? n.data.user.metadata.financeCutoverDate
@@ -592,7 +584,7 @@ export function FinanceView() {
           <section className="finance-chart-command">
             <SectionHeading
               label="MONTHLY PERFORMANCE"
-              title="El movimiento de tu dinero."
+              title="Ingresos, gastos y saldo disponible."
               action={<Badge>ÚLTIMOS 6 MESES</Badge>}
             />
             <CashflowChart values={values} />
@@ -600,11 +592,9 @@ export function FinanceView() {
           {(cashNIO != null || cardUSD != null) && (
             <section className="section">
               <SectionHeading
-                label="LIQUIDEZ REAL"
-                title="Dinero disponible al corte."
-                action={
-                  cutoverDate ? <Badge>CORTE {cutoverDate}</Badge> : undefined
-                }
+                label="COMPOSICIÓN DEL DISPONIBLE"
+                title="Dónde está tu dinero."
+                action={<Badge>CORTE {cut.cutDate}</Badge>}
               />
               <div className="data-band">
                 <DataMetric
@@ -720,9 +710,12 @@ export function FinanceView() {
               meta={`${expenses.length} movimientos`}
             />
             <DataMetric
-              label="Flujo desde corte"
-              value={money(currentIncome - expense - savings)}
-              meta="Movimientos nuevos; la liquidez real se muestra arriba"
+              label="Variación desde corte"
+              value={
+                (cut.changeSinceCutUSD >= 0 ? "+" : "−") +
+                money(Math.abs(cut.changeSinceCutUSD))
+              }
+              meta="Cambio real del saldo disponible desde el corte"
             />
           </div>
         </>
