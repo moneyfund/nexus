@@ -12,7 +12,6 @@ import {
 } from "lucide-react";
 import { useNexus } from "./nexus-provider";
 import { IconButton } from "./ui/primitives";
-import { CATEGORIES } from "@/config/system";
 type Point = {
   x: number;
   y: number;
@@ -383,11 +382,15 @@ export function NexusGalaxy({ compact = false }: { compact?: boolean }) {
         >
           <option value="all">Todas las órbitas</option>
           <option value="Projects">Todos los proyectos</option>
-          {CATEGORIES.filter((c) => nodes.some((p) => p.category === c)).map(
-            (c) => (
-              <option key={c}>{c}</option>
+          {Array.from(
+            new Set(
+              nodes
+                .filter((node) => node.kind === "idea")
+                .map((node) => node.category),
             ),
-          )}
+          ).map((category) => (
+            <option key={category}>{category}</option>
+          ))}
         </select>
       </div>
       <div
