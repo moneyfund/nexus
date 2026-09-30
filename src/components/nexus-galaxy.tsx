@@ -451,7 +451,6 @@ export function NexusGalaxy({
   const inspect = (node: SpaceNode) => {
     setInspectedId(node.id);
     pointerInside.current = true;
-    interactionUntil.current = performance.now() + 900;
     renderRef.current();
   };
   return (
