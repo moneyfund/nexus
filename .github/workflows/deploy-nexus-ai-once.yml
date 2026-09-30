@@ -19,6 +19,9 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     environment: production
+    env:
+      FIREBASE_TOKEN_PRIMARY: ${{ secrets.FIREBASE_TOKEN }}
+      FIREBASE_TOKEN_ALT: ${{ secrets.FIREBASE_CLI_TOKEN }}
     steps:
       - name: Checkout deployment branch
         uses: actions/checkout@v4
@@ -27,11 +30,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-
-      - name: Authenticate to Google Cloud
-        uses: google-github-actions/auth@v3
-        with:
-          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_NEXUS_96795 }}
 
       - name: Install Firebase CLI and Functions dependencies
         run: |
@@ -42,8 +40,13 @@ jobs:
         run: node --check functions/index.js
 
       - name: Deploy NEXUS AI functions
-        run: >
-          firebase deploy
-          --only functions
-          --project nexus-96795
-          --non-interactive
+        shell: bash
+        run: |
+          set -euo pipefail
+          TOKEN="${FIREBASE_TOKEN_PRIMARY:-}"
+          if [ -z "$TOKEN" ]; then TOKEN="${FIREBASE_TOKEN_ALT:-}"; fi
+          if [ -z "$TOKEN" ]; then
+            echo "No Firebase deployment credential is configured in GitHub Actions."
+            exit 2
+          fi
+          firebase deploy --only functions --project nexus-96795 --non-interactive --token "$TOKEN"
