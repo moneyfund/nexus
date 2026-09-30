@@ -12,6 +12,7 @@ import {
   Plus,
   Check,
   Zap,
+  Trash2,
 } from "lucide-react";
 import { IntelligenceCore } from "../spatial-environment";
 import { useNexus } from "../nexus-provider";
@@ -19,6 +20,7 @@ import { ModuleFrame, Badge, Label, Button } from "../ui/primitives";
 import { entity } from "@/domain/seed";
 import { NexusToolRegistry } from "@/services/providers";
 import type { NexusAIAction } from "@/services/openai";
+import { AIConversationNav } from "../ai-conversation-nav";
 const prompts = [
   "¿Qué debería priorizar mañana?",
   "¿Qué proyectos están activos?",
@@ -50,10 +52,41 @@ export function AIView() {
   const [pendingActions, setPendingActions] = useState<
     Array<{ id: string; action: NexusAIAction }>
   >([]);
+  const [activeConversationId, setActiveConversationId] = useState<string | null>(
+    null,
+  );
   const endRef = useRef<HTMLDivElement>(null);
   const requestRef = useRef(false);
   const voiceBootRef = useRef(false);
-  const context = n.services.context.build(n.data);
+  const activeConversation = n.data.conversations.find(
+    (conversation) => conversation.id === activeConversationId,
+  );
+  const activeMessages = activeConversationId
+    ? n.data.messages.filter(
+        (message) => message.conversationId === activeConversationId,
+      )
+    : [];
+  const activeProject = activeConversation?.projectId
+    ? n.projects.find((project) => project.id === activeConversation.projectId)
+    : undefined;
+  const context = n.services.context.build(n.data, {
+    conversationId: activeConversationId ?? undefined,
+    projectId: activeConversation?.projectId,
+  });
+
+  useEffect(() => {
+    if (
+      activeConversationId &&
+      n.data.conversations.some(
+        (conversation) => conversation.id === activeConversationId,
+      )
+    )
+      return;
+    const latest = [...n.data.conversations].sort(
+      (a, b) => b.updatedAt - a.updatedAt,
+    )[0];
+    setActiveConversationId(latest?.id ?? null);
+  }, [activeConversationId, n.data.conversations]);
 
   useEffect(() => {
     if (voiceBootRef.current || typeof window === "undefined") return;
