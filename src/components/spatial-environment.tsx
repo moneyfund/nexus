@@ -9,6 +9,7 @@ export type SpatialZone =
   | "finance"
   | "calendar"
   | "flow"
+  | "music"
   | "ai"
   | "ideas"
   | "knowledge"
@@ -24,6 +25,7 @@ export function spatialZone(path: string): SpatialZone {
         "finance",
         "calendar",
         "flow",
+        "music",
         "ai",
         "ideas",
         "knowledge",

@@ -6,6 +6,7 @@ import {
   useState,
   type PointerEvent as ReactPointerEvent,
 } from "react";
+import { usePathname } from "next/navigation";
 import {
   ExternalLink,
   GripHorizontal,
@@ -143,6 +144,8 @@ function initialVolume() {
 }
 
 export function NexusAudioPlayer() {
+  const pathname = usePathname();
+  const isMusicPage = pathname.startsWith("/music");
   const panelRef = useRef<HTMLElement>(null);
   const playerMount = useRef<HTMLDivElement>(null);
   const playerRef = useRef<YouTubePlayer | null>(null);
@@ -153,6 +156,7 @@ export function NexusAudioPlayer() {
     offsetY: 0,
   });
 
+  const [engineActive, setEngineActive] = useState(false);
   const [panelOpen, setPanelOpen] = useState(false);
   const [trackIndex, setTrackIndex] = useState(initialTrackIndex);
   const indexRef = useRef(trackIndex);
@@ -167,9 +171,10 @@ export function NexusAudioPlayer() {
   const [author, setAuthor] = useState("YouTube");
   const [error, setError] = useState("");
   const currentTrack = NEXUS_AUDIO_TRACKS[trackIndex];
+  const showPanel = isMusicPage && panelOpen;
 
   useEffect(() => {
-    if (!panelOpen) return;
+    if (!showPanel) return;
 
     const panel = panelRef.current;
     if (!panel) return;
@@ -184,28 +189,24 @@ export function NexusAudioPlayer() {
         const rect = panel.getBoundingClientRect();
         const maxX = Math.max(8, window.innerWidth - rect.width - 8);
         const maxY = Math.max(8, window.innerHeight - rect.height - 8);
-        const x = Math.max(8, Math.min(saved.x as number, maxX));
-        const y = Math.max(8, Math.min(saved.y as number, maxY));
+        const x = Math.max(8, Math.min(saved.x, maxX));
+        const y = Math.max(8, Math.min(saved.y, maxY));
 
         panel.style.left = x + "px";
         panel.style.top = y + "px";
         panel.style.right = "auto";
         panel.style.bottom = "auto";
       } catch {
-        // Keep the default dock position when storage is unavailable.
+        // Keep the default position when local storage is unavailable.
       }
     };
 
     const frame = window.requestAnimationFrame(applySavedPosition);
     return () => window.cancelAnimationFrame(frame);
-  }, [panelOpen]);
+  }, [showPanel]);
 
   useEffect(() => {
-    if (!panelOpen) {
-      playerRef.current?.destroy();
-      playerRef.current = null;
-      return;
-    }
+    if (!engineActive) return;
 
     const nextIndex = indexRef.current;
     const nextVolume = startupRef.current.volume;
@@ -214,6 +215,7 @@ export function NexusAudioPlayer() {
     void loadYouTubeApi()
       .then((YT) => {
         if (disposed || !playerMount.current) return;
+
         const player = new YT.Player(playerMount.current, {
           width: 224,
           height: 224,
@@ -242,8 +244,10 @@ export function NexusAudioPlayer() {
             },
             onStateChange: (event) => {
               if (disposed) return;
+
               if (event.data === YT.PlayerState.PLAYING) {
                 setPlaying(true);
+                setPanelOpen(true);
                 const data = event.target.getVideoData();
                 setTitle(
                   data.title ||
@@ -253,7 +257,6 @@ export function NexusAudioPlayer() {
                 setAuthor(data.author || "YouTube");
               } else if (event.data === YT.PlayerState.PAUSED) {
                 setPlaying(false);
-                setReady(false);
                 setPanelOpen(false);
               } else if (event.data === YT.PlayerState.ENDED) {
                 const next = clampIndex(indexRef.current + 1);
@@ -269,6 +272,7 @@ export function NexusAudioPlayer() {
             },
           },
         });
+
         playerRef.current = player;
       })
       .catch((cause) => {
@@ -285,10 +289,10 @@ export function NexusAudioPlayer() {
       playerRef.current?.destroy();
       playerRef.current = null;
     };
-  }, [panelOpen]);
+  }, [engineActive]);
 
   useEffect(() => {
-    if (!ready || !panelOpen) return;
+    if (!ready || !engineActive) return;
     const timer = window.setInterval(() => {
       const player = playerRef.current;
       if (!player) return;
@@ -296,11 +300,17 @@ export function NexusAudioPlayer() {
         setCurrentTime(player.getCurrentTime() || 0);
         setDuration(player.getDuration() || 0);
       } catch {
-        // The iframe can be between tracks for a fraction of a second.
+        // YouTube can briefly be between tracks.
       }
     }, 500);
     return () => window.clearInterval(timer);
-  }, [ready, panelOpen]);
+  }, [ready, engineActive]);
+
+  function openPlayer() {
+    setError("");
+    setPanelOpen(true);
+    if (!engineActive) setEngineActive(true);
+  }
 
   function switchTrack(delta: number) {
     const player = playerRef.current;
@@ -353,7 +363,6 @@ export function NexusAudioPlayer() {
   function closePlayer() {
     playerRef.current?.pauseVideo();
     setPlaying(false);
-    setReady(false);
     setPanelOpen(false);
   }
 
@@ -411,7 +420,10 @@ export function NexusAudioPlayer() {
       const rect = panel.getBoundingClientRect();
       window.localStorage.setItem(
         AUDIO_POSITION_KEY,
-        JSON.stringify({ x: Math.round(rect.left), y: Math.round(rect.top) }),
+        JSON.stringify({
+          x: Math.round(rect.left),
+          y: Math.round(rect.top),
+        }),
       );
     } catch {
       // Position persistence is optional.
@@ -420,183 +432,193 @@ export function NexusAudioPlayer() {
 
   if (!NEXUS_AUDIO_TRACKS.length) return null;
 
-  if (!panelOpen) {
-    return (
-      <button
-        type="button"
-        className="nexus-audio-launcher"
-        onClick={() => {
-          setError("");
-          setReady(false);
-          setPanelOpen(true);
-        }}
-        aria-label="Abrir NEXUS Audio"
-        title="Abrir NEXUS Audio"
-      >
-        <span className="nexus-audio-launcher-orbit" aria-hidden="true" />
-        <RadioTower size={17} />
-        <span>
-          NEXUS AUDIO
-          <small>OPEN SIGNAL</small>
-        </span>
-      </button>
-    );
-  }
-
   return (
-    <aside
-      ref={panelRef}
-      className={
-        "nexus-audio-player nexus-audio-floating " +
-        (playing ? "is-playing" : "is-paused")
-      }
-      aria-label="NEXUS Audio"
-    >
-      <div
-        className="nexus-audio-head nexus-audio-drag-handle"
-        onPointerDown={startDrag}
-        onPointerMove={moveDrag}
-        onPointerUp={finishDrag}
-        onPointerCancel={finishDrag}
-      >
-        <span>
-          <GripHorizontal size={13} />
-          <i />
-          NEXUS AUDIO
-        </span>
-        <span>
-          SIGNAL {String(trackIndex + 1).padStart(2, "0")} /{" "}
-          {String(NEXUS_AUDIO_TRACKS.length).padStart(2, "0")}
-        </span>
+    <>
+      {isMusicPage && !showPanel && (
         <button
           type="button"
-          className="nexus-audio-close"
-          onClick={closePlayer}
-          aria-label="Cerrar NEXUS Audio"
-          title="Cerrar reproductor"
+          className="nexus-audio-launcher nexus-audio-music-launcher"
+          onClick={openPlayer}
+          aria-label="Abrir NEXUS Audio"
+          title="Abrir NEXUS Audio"
         >
-          <X size={13} />
+          <span className="nexus-audio-launcher-orbit" aria-hidden="true" />
+          <RadioTower size={17} />
+          <span>
+            NEXUS AUDIO
+            <small>{playing ? "NOW PLAYING" : "OPEN SIGNAL"}</small>
+          </span>
         </button>
-      </div>
+      )}
 
-      <div className="nexus-audio-grid">
-        <div className="nexus-audio-visual">
-          <div className="nexus-audio-corner nexus-audio-corner-a" />
-          <div className="nexus-audio-corner nexus-audio-corner-b" />
-          <div className="nexus-audio-youtube" ref={playerMount} />
-          <span className="nexus-audio-feed-label">VISUAL FEED / YOUTUBE</span>
-        </div>
-
-        <div className="nexus-audio-console">
-          <div className="nexus-audio-track-copy">
-            <span>NOW TRANSMITTING</span>
-            <strong title={title}>{title}</strong>
-            <small>{author}</small>
-          </div>
-
+      {engineActive && (
+        <aside
+          ref={panelRef}
+          className={
+            "nexus-audio-player nexus-audio-floating " +
+            (showPanel ? "nexus-audio-visible " : "nexus-audio-engine-only ") +
+            (playing ? "is-playing" : "is-paused")
+          }
+          aria-label="NEXUS Audio"
+          aria-hidden={!showPanel}
+        >
           <div
-            className="nexus-audio-spectrum"
-            aria-hidden="true"
-            data-playing={playing ? "true" : "false"}
+            className="nexus-audio-head nexus-audio-drag-handle"
+            onPointerDown={startDrag}
+            onPointerMove={moveDrag}
+            onPointerUp={finishDrag}
+            onPointerCancel={finishDrag}
           >
-            {Array.from({ length: 14 }, (_, index) => (
-              <i
-                key={index}
-                style={{
-                  height: 5 + ((index * 7) % 13),
-                  animationDelay: index * -0.055 + "s",
-                }}
-              />
-            ))}
+            <span>
+              <GripHorizontal size={13} />
+              <i />
+              NEXUS AUDIO
+            </span>
+            <span>
+              SIGNAL {String(trackIndex + 1).padStart(2, "0")} /{" "}
+              {String(NEXUS_AUDIO_TRACKS.length).padStart(2, "0")}
+            </span>
+            <button
+              type="button"
+              className="nexus-audio-close"
+              onClick={closePlayer}
+              aria-label="Cerrar NEXUS Audio"
+              title="Cerrar reproductor"
+              tabIndex={showPanel ? 0 : -1}
+            >
+              <X size={13} />
+            </button>
           </div>
 
-          <div className="nexus-audio-progress">
-            <input
-              aria-label="Posición de reproducción"
-              type="range"
-              min={0}
-              max={Math.max(duration, 1)}
-              step={1}
-              value={Math.min(currentTime, Math.max(duration, 1))}
-              onChange={(event) => {
-                const seconds = Number(event.target.value);
-                setCurrentTime(seconds);
-                playerRef.current?.seekTo(seconds, true);
-              }}
-            />
-            <div>
-              <span>{formatTime(currentTime)}</span>
-              <span>{formatTime(duration)}</span>
+          <div className="nexus-audio-grid">
+            <div className="nexus-audio-visual">
+              <div className="nexus-audio-corner nexus-audio-corner-a" />
+              <div className="nexus-audio-corner nexus-audio-corner-b" />
+              <div className="nexus-audio-youtube" ref={playerMount} />
+              <span className="nexus-audio-feed-label">
+                VISUAL FEED / YOUTUBE
+              </span>
+            </div>
+
+            <div className="nexus-audio-console">
+              <div className="nexus-audio-track-copy">
+                <span>NOW TRANSMITTING</span>
+                <strong title={title}>{title}</strong>
+                <small>{author}</small>
+              </div>
+
+              <div
+                className="nexus-audio-spectrum"
+                aria-hidden="true"
+                data-playing={playing ? "true" : "false"}
+              >
+                {Array.from({ length: 14 }, (_, index) => (
+                  <i
+                    key={index}
+                    style={{
+                      height: 5 + ((index * 7) % 13),
+                      animationDelay: index * -0.055 + "s",
+                    }}
+                  />
+                ))}
+              </div>
+
+              <div className="nexus-audio-progress">
+                <input
+                  aria-label="Posición de reproducción"
+                  type="range"
+                  min={0}
+                  max={Math.max(duration, 1)}
+                  step={1}
+                  value={Math.min(currentTime, Math.max(duration, 1))}
+                  tabIndex={showPanel ? 0 : -1}
+                  onChange={(event) => {
+                    const seconds = Number(event.target.value);
+                    setCurrentTime(seconds);
+                    playerRef.current?.seekTo(seconds, true);
+                  }}
+                />
+                <div>
+                  <span>{formatTime(currentTime)}</span>
+                  <span>{formatTime(duration)}</span>
+                </div>
+              </div>
+
+              <div className="nexus-audio-controls">
+                <button
+                  type="button"
+                  onClick={() => switchTrack(-1)}
+                  aria-label="Canción anterior"
+                  tabIndex={showPanel ? 0 : -1}
+                >
+                  <SkipBack size={16} />
+                </button>
+                <button
+                  type="button"
+                  className="nexus-audio-play"
+                  onClick={togglePlayback}
+                  aria-label={playing ? "Pausar" : "Reproducir"}
+                  disabled={!ready}
+                  tabIndex={showPanel ? 0 : -1}
+                >
+                  {playing ? (
+                    <Pause size={17} fill="currentColor" />
+                  ) : (
+                    <Play size={17} fill="currentColor" />
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => switchTrack(1)}
+                  aria-label="Canción siguiente"
+                  tabIndex={showPanel ? 0 : -1}
+                >
+                  <SkipForward size={16} />
+                </button>
+                <button
+                  type="button"
+                  onClick={toggleMute}
+                  aria-label={muted ? "Activar sonido" : "Silenciar"}
+                  tabIndex={showPanel ? 0 : -1}
+                >
+                  {muted ? <VolumeX size={15} /> : <Volume2 size={15} />}
+                </button>
+                <input
+                  className="nexus-audio-volume"
+                  aria-label="Volumen"
+                  type="range"
+                  min={0}
+                  max={100}
+                  value={volume}
+                  tabIndex={showPanel ? 0 : -1}
+                  onChange={(event) => updateVolume(Number(event.target.value))}
+                />
+                <a
+                  href={currentTrack.sourceUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-label="Abrir canción en YouTube"
+                  tabIndex={showPanel ? 0 : -1}
+                >
+                  <ExternalLink size={14} />
+                </a>
+              </div>
+
+              {error ? (
+                <p className="nexus-audio-error">{error}</p>
+              ) : (
+                <p className="nexus-audio-status">
+                  {playing
+                    ? "AUDIO LINK STABLE · seguirá sonando al navegar por NEXUS"
+                    : ready
+                      ? "STANDBY · reproduce una señal"
+                      : "LINKING YOUTUBE SIGNAL…"}
+                </p>
+              )}
             </div>
           </div>
-
-          <div className="nexus-audio-controls">
-            <button
-              type="button"
-              onClick={() => switchTrack(-1)}
-              aria-label="Canción anterior"
-            >
-              <SkipBack size={16} />
-            </button>
-            <button
-              type="button"
-              className="nexus-audio-play"
-              onClick={togglePlayback}
-              aria-label={playing ? "Pausar" : "Reproducir"}
-              disabled={!ready}
-            >
-              {playing ? (
-                <Pause size={17} fill="currentColor" />
-              ) : (
-                <Play size={17} fill="currentColor" />
-              )}
-            </button>
-            <button
-              type="button"
-              onClick={() => switchTrack(1)}
-              aria-label="Canción siguiente"
-            >
-              <SkipForward size={16} />
-            </button>
-            <button
-              type="button"
-              onClick={toggleMute}
-              aria-label={muted ? "Activar sonido" : "Silenciar"}
-            >
-              {muted ? <VolumeX size={15} /> : <Volume2 size={15} />}
-            </button>
-            <input
-              className="nexus-audio-volume"
-              aria-label="Volumen"
-              type="range"
-              min={0}
-              max={100}
-              value={volume}
-              onChange={(event) => updateVolume(Number(event.target.value))}
-            />
-            <a
-              href={currentTrack.sourceUrl}
-              target="_blank"
-              rel="noreferrer"
-              aria-label="Abrir canción en YouTube"
-            >
-              <ExternalLink size={14} />
-            </a>
-          </div>
-
-          {error ? (
-            <p className="nexus-audio-error">{error}</p>
-          ) : (
-            <p className="nexus-audio-status">
-              {playing
-                ? "AUDIO LINK STABLE · arrastra la barra superior para moverlo"
-                : ready
-                  ? "STANDBY · reproduce una señal o cierra el panel"
-                  : "LINKING YOUTUBE SIGNAL…"}
-            </p>
-          )}
-        </div>
-      </div>
-    </aside>
+        </aside>
+      )}
+    </>
   );
 }
