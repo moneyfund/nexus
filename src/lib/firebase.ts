@@ -170,6 +170,7 @@ export const firebaseClient = {
 
       return {
         accessToken,
+        connectedAt: Date.now(),
         expiresAt: Date.now() + 50 * 60 * 1000,
         scopes: [
           "https://www.googleapis.com/auth/calendar.events",
