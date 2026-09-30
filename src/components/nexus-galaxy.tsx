@@ -83,6 +83,7 @@ export function NexusGalaxy({
   const drag = useRef({ active: false, x: 0, y: 0 });
   const flightTime = useRef(0);
   const pointerInside = useRef(false);
+  const interactionUntil = useRef(0);
   const renderRef = useRef<() => void>(() => {});
   const [paused, setPaused] = useState(false);
   const [orbit, setOrbit] = useState("all");
@@ -186,7 +187,9 @@ export function NexusGalaxy({
       raf = 0;
       if (!visible || document.hidden) return;
       const continuous = !reduce && !paused && !pointerInside.current;
-      if (continuous && now - lastPaint < 1000 / budget.fps - 1) {
+      const interacting = drag.current.active || now < interactionUntil.current;
+      const targetFps = interacting ? budget.interactionFps : budget.fps;
+      if (continuous && now - lastPaint < 1000 / targetFps - 1) {
         raf = requestAnimationFrame(draw);
         return;
       }
@@ -246,8 +249,8 @@ export function NexusGalaxy({
           [1, 0.18],
         ]) {
           ctx!.beginPath();
-          for (let i = 0; i <= 80; i++) {
-            const r = 0.8 + (i / 80) * 5.8,
+          for (let i = 0; i <= budget.armSamples; i++) {
+            const r = 0.8 + (i / budget.armSamples) * 5.8,
               a = (arm * Math.PI * 2) / 3 + r * 0.73;
             const p = project(Math.cos(a) * r, 0, Math.sin(a) * r);
             if (!i) ctx!.moveTo(p.x, p.y);
@@ -267,7 +270,7 @@ export function NexusGalaxy({
       }
       ctx!.globalAlpha = 1;
       // Accretion rings in world space, with a bright rim and a shaded spherical core.
-      for (let ring = 0; ring < 24; ring++) {
+      for (let ring = 0; ring < budget.ringCount; ring++) {
         const r = 0.95 + ring * 0.032;
         ctx!.beginPath();
         for (let i = 0; i <= 90; i++) {
@@ -281,7 +284,9 @@ export function NexusGalaxy({
           else ctx!.lineTo(p.x, p.y);
         }
         ctx!.strokeStyle =
-          ring < 5 ? "#ffe4fb82" : `rgba(217,116,230,${0.24 - ring * 0.007})`;
+          ring < 4
+            ? "#ffe4fb82"
+            : `rgba(217,116,230,${Math.max(0.055, 0.22 - ring * 0.009)})`;
         ctx!.lineWidth = ring < 5 ? 1.3 : 0.8;
         ctx!.stroke();
       }
@@ -367,19 +372,18 @@ export function NexusGalaxy({
             bounds.top < q.bottom + 6 &&
             bounds.bottom > q.top - 6,
         );
-        const showLabel =
-          width >= 500 &&
-          !overlaps &&
-          (filtered.length <= 8 || node.status === "active");
-        button.style.setProperty("--label-opacity", showLabel ? "1" : "0");
+        // Labels are intentionally hidden at rest. Hover, keyboard focus or
+        // an explicit touch/click reveals project identity and progress.
+        button.style.setProperty("--label-opacity", "0");
         button.dataset.side = leftSide ? "left" : "right";
-        if (showLabel) positions.push(bounds);
+        if (!overlaps && inspectedId === node.id) positions.push(bounds);
       }
       frames++;
       cost += performance.now() - started;
-      if (quality === "auto" && frames === 90 && cost / frames > 12) {
-        count = Math.max(420, Math.floor(count * 0.6));
-        budget.fps = 30;
+      if (quality === "auto" && frames === 75 && cost / frames > 10) {
+        count = Math.max(520, Math.floor(count * 0.68));
+        budget.fps = Math.min(budget.fps, 24);
+        budget.interactionFps = Math.min(budget.interactionFps, 36);
       }
       const settling =
         Math.abs(v.yaw - v.targetYaw) +
@@ -447,6 +451,7 @@ export function NexusGalaxy({
   const inspect = (node: SpaceNode) => {
     setInspectedId(node.id);
     pointerInside.current = true;
+    interactionUntil.current = performance.now() + 900;
     renderRef.current();
   };
   return (
@@ -482,6 +487,7 @@ export function NexusGalaxy({
           if (e.target !== e.currentTarget || !e.key.startsWith("Arrow"))
             return;
           e.preventDefault();
+          interactionUntil.current = performance.now() + 900;
           if (e.key === "ArrowLeft") view.current.targetYaw -= 0.15;
           if (e.key === "ArrowRight") view.current.targetYaw += 0.15;
           if (e.key === "ArrowUp")
@@ -497,11 +503,13 @@ export function NexusGalaxy({
           renderRef.current();
         }}
         onPointerDown={(e) => {
+          interactionUntil.current = performance.now() + 1200;
           if ((e.target as HTMLElement).closest("button")) return;
           drag.current = { active: true, x: e.clientX, y: e.clientY };
           e.currentTarget.setPointerCapture(e.pointerId);
         }}
         onPointerMove={(e) => {
+          interactionUntil.current = performance.now() + 700;
           const r = e.currentTarget.getBoundingClientRect();
           if (!reduce && e.pointerType === "mouse") {
             view.current.tx = (e.clientX - r.left) / r.width - 0.5;
@@ -566,17 +574,6 @@ export function NexusGalaxy({
             aria-pressed={inspected?.id === node.id}
           >
             <span className="node-satellite">
-              <svg viewBox="0 0 36 36" aria-hidden="true">
-                <circle cx="18" cy="18" r="15" />
-                <circle
-                  className="node-progress"
-                  cx="18"
-                  cy="18"
-                  r="15"
-                  pathLength="100"
-                  strokeDasharray={`${node.progress ?? 0} 100`}
-                />
-              </svg>
               <span className="node-dot" />
             </span>
             <span className="node-label">
@@ -649,7 +646,8 @@ export function NexusGalaxy({
               onClick={() => {
                 setInspectedId(null);
                 pointerInside.current = false;
-                renderRef.current();
+                interactionUntil.current = performance.now() + 900;
+              renderRef.current();
               }}
             >
               <X size={14} />
@@ -688,6 +686,7 @@ export function NexusGalaxy({
                 0.65,
                 view.current.targetZoom - 0.15,
               );
+              interactionUntil.current = performance.now() + 900;
               renderRef.current();
             }}
           >
@@ -700,6 +699,7 @@ export function NexusGalaxy({
                 1.35,
                 view.current.targetZoom + 0.15,
               );
+              interactionUntil.current = performance.now() + 900;
               renderRef.current();
             }}
           >
@@ -718,6 +718,7 @@ export function NexusGalaxy({
               view.current.targetZoom = 1;
               view.current.targetPitch = 0.66;
               view.current.targetYaw = -0.18;
+              interactionUntil.current = performance.now() + 900;
               renderRef.current();
             }}
           >
