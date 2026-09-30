@@ -16,6 +16,40 @@ export function validateWorkspace(
   const w = value as Workspace;
   if (!Array.isArray(w.financialAccounts)) w.financialAccounts = [];
   if (!Array.isArray(w.debts)) w.debts = [];
+  if (!Array.isArray(w.conversations)) w.conversations = [];
+  if (Array.isArray(w.messages) && w.messages.length) {
+    const groups = new Map<string, typeof w.messages>();
+    for (const message of w.messages) {
+      const conversationId = message.conversationId || "legacy-ai-conversation";
+      message.conversationId = conversationId;
+      const group = groups.get(conversationId) ?? [];
+      group.push(message);
+      groups.set(conversationId, group);
+    }
+    for (const [conversationId, messages] of groups) {
+      let conversation = w.conversations.find((item) => item.id === conversationId);
+      if (!conversation) {
+        const createdAt = Math.min(...messages.map((message) => message.createdAt));
+        const updatedAt = Math.max(...messages.map((message) => message.updatedAt));
+        conversation = {
+          ...entity(conversationId, "user", userId, createdAt),
+          updatedAt,
+          title:
+            messages.find((message) => message.role === "user")?.content
+              .slice(0, 54)
+              .trim() || "Conversación anterior",
+          kind: "general",
+          messageIds: [],
+        };
+        w.conversations.push(conversation);
+      }
+      conversation.messageIds = messages.map((message) => message.id);
+      conversation.updatedAt = Math.max(
+        conversation.updatedAt,
+        ...messages.map((message) => message.updatedAt),
+      );
+    }
+  }
   const keys = [
     "projects",
     "inbox",
@@ -33,6 +67,7 @@ export function validateWorkspace(
     "attachments",
     "notifications",
     "activity",
+    "conversations",
     "messages",
     "memories",
     "aiUsage",
@@ -109,6 +144,23 @@ export function validateWorkspace(
       !["pending", "paid"].includes(debt.status)
     )
       throw new Error("Deuda inválida.");
+  for (const conversation of w.conversations)
+    if (
+      typeof conversation.title !== "string" ||
+      !Array.isArray(conversation.messageIds) ||
+      !["general", "project"].includes(conversation.kind) ||
+      (conversation.kind === "project" && !conversation.projectId)
+    )
+      throw new Error("Conversación de IA inválida.");
+  for (const message of w.messages)
+    if (
+      !message.conversationId ||
+      !w.conversations.some((conversation) => conversation.id === message.conversationId) ||
+      !["user", "assistant"].includes(message.role) ||
+      typeof message.content !== "string" ||
+      !Array.isArray(message.contextIds)
+    )
+      throw new Error("Mensaje de IA inválido.");
   for (const i of w.ideas)
     if (
       typeof i.title !== "string" ||
@@ -253,6 +305,25 @@ export function reassignWorkspaceUser(
   const now = Date.now();
   next.financialAccounts ??= [];
   next.debts ??= [];
+  next.conversations ??= [];
+  if (next.messages.length && !next.conversations.length) {
+    const conversationId =
+      next.messages[0]?.conversationId || "legacy-ai-conversation";
+    for (const message of next.messages) message.conversationId = conversationId;
+    const firstUser = next.messages.find((message) => message.role === "user");
+    next.conversations.push({
+      ...entity(
+        conversationId,
+        "user",
+        userId,
+        Math.min(...next.messages.map((message) => message.createdAt)),
+      ),
+      updatedAt: Math.max(...next.messages.map((message) => message.updatedAt)),
+      title: firstUser?.content.slice(0, 54).trim() || "Conversación anterior",
+      kind: "general",
+      messageIds: next.messages.map((message) => message.id),
+    });
+  }
 
   const entities = [
     ...next.projects,
@@ -271,6 +342,7 @@ export function reassignWorkspaceUser(
     ...next.attachments,
     ...next.notifications,
     ...next.activity,
+    ...next.conversations,
     ...next.messages,
     ...next.memories,
     ...next.aiUsage,
