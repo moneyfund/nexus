@@ -232,6 +232,8 @@ export interface ActivityEvent extends Entity {
 export interface AIConversation extends Entity {
   title: string;
   messageIds: ID[];
+  kind: "general" | "project";
+  projectId?: ID;
 }
 export interface AIMessage extends Entity {
   conversationId: ID;
@@ -295,6 +297,7 @@ export interface Workspace {
   attachments: Attachment[];
   notifications: Notification[];
   activity: ActivityEvent[];
+  conversations: AIConversation[];
   messages: AIMessage[];
   memories: AIMemory[];
   aiUsage: AIUsage[];
