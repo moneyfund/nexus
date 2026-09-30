@@ -9,6 +9,8 @@ import {
   ArrowUpRight as Out,
   Pencil,
   Trash2,
+  ReceiptText,
+  WalletCards,
 } from "lucide-react";
 import { useNexus } from "../nexus-provider";
 import {
@@ -28,14 +30,58 @@ import {
   amountToUSD,
   dateKey,
   exchangeRate,
+  financeCutSummary,
   financialScope,
   money,
+  monthlyFinanceSeries,
   projectFinance,
 } from "@/domain/selectors";
 import { entity } from "@/domain/seed";
 import type { Currency, Debt, MoneyRecord } from "@/domain/models";
 
 type EditableRecord = MoneyRecord & { kind: "income" | "expense" };
+
+
+type FinanceStreamItem = {
+  id: string;
+  title: string;
+  date: string;
+  sortTime: number;
+  type:
+    | "income"
+    | "expense"
+    | "debt_payment"
+    | "debt_created"
+    | "debt_updated"
+    | "debt_settled"
+    | "debt_reconciled"
+    | "income_updated"
+    | "expense_updated"
+    | "income_deleted"
+    | "expense_deleted";
+  amount?: number;
+  currency?: Currency;
+  accountId?: string;
+  projectId?: string;
+  detail?: string;
+  record?: EditableRecord;
+};
+
+function activityString(
+  metadata: Record<string, string | number | boolean> | undefined,
+  key: string,
+) {
+  const value = metadata?.[key];
+  return typeof value === "string" ? value : "";
+}
+
+function activityNumber(
+  metadata: Record<string, string | number | boolean> | undefined,
+  key: string,
+) {
+  const value = metadata?.[key];
+  return typeof value === "number" ? value : undefined;
+}
 
 function TransactionEditor({
   record,
