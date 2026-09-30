@@ -2637,3 +2637,136 @@ h3 {
     padding-inline: 9px;
   }
 }
+
+
+/* Draggable / idle behavior for NEXUS Audio. */
+.nexus-audio-floating {
+  right: 28px;
+  bottom: 28px;
+  top: auto;
+  left: auto;
+  user-select: none;
+}
+.nexus-audio-drag-handle {
+  cursor: grab;
+  touch-action: none;
+}
+.nexus-audio-player.is-dragging {
+  transition: none !important;
+  box-shadow:
+    0 24px 80px #000000d4,
+    0 0 0 1px #ffffff08 inset,
+    0 0 66px #d946ef24;
+}
+.nexus-audio-player.is-dragging .nexus-audio-drag-handle {
+  cursor: grabbing;
+}
+.nexus-audio-drag-handle > span:first-child {
+  gap: 5px;
+}
+.nexus-audio-drag-handle > span:first-child > svg {
+  color: #776781;
+  flex-shrink: 0;
+}
+.nexus-audio-close {
+  justify-self: end;
+}
+.nexus-audio-launcher {
+  position: fixed;
+  right: 28px;
+  bottom: 28px;
+  z-index: calc(var(--z-nav) + 4);
+  min-width: 142px;
+  height: 43px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 12px 8px 10px;
+  border: 1px solid #e184ef2e;
+  border-radius: 22px;
+  color: #ddc9e5;
+  background:
+    linear-gradient(145deg, #140b1bdc, #08050ddd),
+    radial-gradient(circle at 18% 50%, #d946ef1a, transparent 42%);
+  backdrop-filter: blur(20px) saturate(1.1);
+  box-shadow:
+    0 14px 40px #0009,
+    0 0 0 1px #ffffff04 inset,
+    0 0 30px #d946ef0c;
+  font:
+    500 0.52rem var(--font-tech),
+    sans-serif;
+  letter-spacing: 0.11em;
+  transition:
+    transform 0.22s ease,
+    border-color 0.22s ease,
+    box-shadow 0.22s ease;
+}
+.nexus-audio-launcher:hover {
+  transform: translateY(-2px);
+  border-color: #ef9aff55;
+  box-shadow:
+    0 18px 48px #000a,
+    0 0 34px #d946ef18;
+}
+.nexus-audio-launcher > span:not(.nexus-audio-launcher-orbit) {
+  display: grid;
+  gap: 2px;
+  text-align: left;
+}
+.nexus-audio-launcher small {
+  font-size: 0.4rem;
+  color: #7f708a;
+  letter-spacing: 0.14em;
+}
+.nexus-audio-launcher-orbit {
+  width: 17px;
+  height: 17px;
+  border: 1px solid #e391f2a8;
+  border-radius: 50%;
+  position: relative;
+  box-shadow:
+    0 0 0 4px #d946ef0a,
+    0 0 14px #d946ef38;
+}
+.nexus-audio-launcher-orbit:after {
+  content: "";
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #f0b5fa;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 8px #f0b5fa;
+}
+@media (max-width: 850px) {
+  .nexus-audio-floating {
+    right: 12px;
+    bottom: 86px;
+  }
+  .nexus-audio-launcher {
+    right: 12px;
+    bottom: 88px;
+    min-width: 132px;
+  }
+}
+
+/* Keep the idle audio launcher clear of NEXUS Voice. */
+.nexus-audio-launcher {
+  right: 96px;
+}
+.nexus-audio-floating {
+  right: 96px;
+}
+@media (max-width: 850px) {
+  .nexus-audio-launcher {
+    right: 82px;
+    bottom: calc(88px + env(safe-area-inset-bottom));
+  }
+  .nexus-audio-floating {
+    right: 82px;
+    bottom: calc(86px + env(safe-area-inset-bottom));
+  }
+}
