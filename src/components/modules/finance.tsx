@@ -138,6 +138,13 @@ export function FinanceView() {
   const scoped = financialScope(n.data, scope);
   const { incomes, expenses, projects, financialGoals } = scoped;
   const income = incomes.reduce((s, i) => s + i.amount, 0);
+  const historicalIncome = incomes
+    .filter((i) => i.metadata?.cutoverHistorical === true)
+    .reduce((s, i) => s + i.amount, 0);
+  const currentIncomes = incomes.filter(
+    (i) => i.metadata?.cutoverHistorical !== true,
+  );
+  const currentIncome = currentIncomes.reduce((s, i) => s + i.amount, 0);
   const expense = expenses.reduce((s, i) => s + i.amount, 0);
   const receivable = projects.reduce(
     (s, p) => s + projectFinance(scoped, p).receivable,
@@ -174,7 +181,7 @@ export function FinanceView() {
       label: date
         .toLocaleDateString("es-NI", { month: "short", timeZone: "UTC" })
         .toUpperCase(),
-      income: incomes
+      income: currentIncomes
         .filter((r) => r.date.startsWith(key))
         .reduce((s, r) => s + r.amount, 0),
       expense: expenses
@@ -205,12 +212,15 @@ export function FinanceView() {
     >
       <div className="finance-headline">
         <div>
-          <Label>CASHFLOW / ACUMULADO</Label>
+          <Label>CASHFLOW / DESDE EL CORTE</Label>
           <div className="finance-net">
-            {money(income - expense)}
+            {money(currentIncome - expense)}
             <span>USD</span>
           </div>
-          <p>Ingresos registrados menos gastos registrados.</p>
+          <p>
+            Movimientos posteriores al corte. Los cobros históricos confirmados
+            no se mezclan con el dinero disponible actual.
+          </p>
         </div>
         <label className="field">
           Origen de datos
@@ -255,9 +265,13 @@ export function FinanceView() {
       )}
       <div className="data-band">
         <DataMetric
-          label="Ingresos"
+          label="Cobrado confirmado"
           value={money(income)}
-          meta={`${incomes.length} cobros registrados`}
+          meta={
+            historicalIncome
+              ? money(historicalIncome) + " del histórico confirmado"
+              : `${incomes.length} cobros registrados`
+          }
         />
         <DataMetric
           label="Por cobrar"
@@ -270,9 +284,9 @@ export function FinanceView() {
           meta={`${expenses.length} movimientos`}
         />
         <DataMetric
-          label="Flujo registrado"
-          value={money(income - expense - savings)}
-          meta="No equivale a liquidez cuando existe un corte financiero"
+          label="Flujo desde corte"
+          value={money(currentIncome - expense - savings)}
+          meta="Movimientos nuevos; la liquidez real se muestra arriba"
         />
       </div>
       <section className="section">
@@ -312,14 +326,18 @@ export function FinanceView() {
                   return (
                     <tr key={p.id}>
                       <td>
-                        <Link href={"/projects/" + p.id}>
+                        <Link href={"/project?id=" + encodeURIComponent(p.id)}>
                           {p.name}
                           <ArrowUpRight size={12} />
                         </Link>
                         {p.source === "demo" && <small>DEMO</small>}
                       </td>
                       <td>{p.value == null ? "—" : money(p.value)}</td>
-                      <td>{p.hours.toFixed(1)}</td>
+                      <td>
+                        {p.metadata?.hoursBasis === "flow-only" && p.hours === 0
+                          ? "Sin medir"
+                          : p.hours.toFixed(1)}
+                      </td>
                       <td>
                         {p.value == null || !p.hours
                           ? "—"
