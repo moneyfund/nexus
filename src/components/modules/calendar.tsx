@@ -299,15 +299,9 @@ export function CalendarView() {
                 try {
                   if (!n.googleWorkspace.connected)
                     await n.googleWorkspace.connect();
-                  const from = addDays(anchor, -90) + "T00:00:00-06:00";
-                  const to = addDays(anchor, 90) + "T23:59:59-06:00";
-                  const synced = await n.services.calendar.sync(
-                    n.data.user.id,
-                    from,
-                    to,
-                  );
+                  const synced = await n.googleWorkspace.syncCalendar();
                   n.notify(
-                    synced.length +
+                    synced +
                       " eventos sincronizados desde Google Calendar.",
                   );
                 } catch (error) {
