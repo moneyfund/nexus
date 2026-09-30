@@ -1,15 +1,22 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { usePathname } from "next/navigation";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
 import {
   ExternalLink,
+  GripHorizontal,
   Pause,
   Play,
+  RadioTower,
   SkipBack,
   SkipForward,
   Volume2,
   VolumeX,
+  X,
 } from "lucide-react";
 import { NEXUS_AUDIO_TRACKS } from "@/config/audio";
 
@@ -69,6 +76,8 @@ declare global {
 }
 
 let youtubeApiPromise: Promise<YouTubeNamespace> | null = null;
+
+const AUDIO_POSITION_KEY = "nexus-audio-position-v1";
 
 function loadYouTubeApi() {
   if (typeof window === "undefined") {
@@ -134,9 +143,17 @@ function initialVolume() {
 }
 
 export function NexusAudioPlayer() {
-  const pathname = usePathname();
+  const panelRef = useRef<HTMLElement>(null);
   const playerMount = useRef<HTMLDivElement>(null);
   const playerRef = useRef<YouTubePlayer | null>(null);
+  const dragRef = useRef({
+    active: false,
+    pointerId: -1,
+    offsetX: 0,
+    offsetY: 0,
+  });
+
+  const [panelOpen, setPanelOpen] = useState(false);
   const [trackIndex, setTrackIndex] = useState(initialTrackIndex);
   const indexRef = useRef(trackIndex);
   const [ready, setReady] = useState(false);
@@ -151,16 +168,47 @@ export function NexusAudioPlayer() {
   const [error, setError] = useState("");
   const currentTrack = NEXUS_AUDIO_TRACKS[trackIndex];
 
-  const positionClass = useMemo(
-    () => (pathname === "/" ? "nexus-audio-home" : "nexus-audio-docked"),
-    [pathname],
-  );
+  useEffect(() => {
+    if (!panelOpen) return;
+
+    const panel = panelRef.current;
+    if (!panel) return;
+
+    const applySavedPosition = () => {
+      try {
+        const raw = window.localStorage.getItem(AUDIO_POSITION_KEY);
+        if (!raw) return;
+        const saved = JSON.parse(raw) as { x?: number; y?: number };
+        if (!Number.isFinite(saved.x) || !Number.isFinite(saved.y)) return;
+
+        const rect = panel.getBoundingClientRect();
+        const maxX = Math.max(8, window.innerWidth - rect.width - 8);
+        const maxY = Math.max(8, window.innerHeight - rect.height - 8);
+        const x = Math.max(8, Math.min(saved.x as number, maxX));
+        const y = Math.max(8, Math.min(saved.y as number, maxY));
+
+        panel.style.left = x + "px";
+        panel.style.top = y + "px";
+        panel.style.right = "auto";
+        panel.style.bottom = "auto";
+      } catch {
+        // Keep the default dock position when storage is unavailable.
+      }
+    };
+
+    const frame = window.requestAnimationFrame(applySavedPosition);
+    return () => window.cancelAnimationFrame(frame);
+  }, [panelOpen]);
 
   useEffect(() => {
-    const nextIndex = startupRef.current.trackIndex;
-    const nextVolume = startupRef.current.volume;
-    indexRef.current = nextIndex;
+    if (!panelOpen) {
+      playerRef.current?.destroy();
+      playerRef.current = null;
+      return;
+    }
 
+    const nextIndex = indexRef.current;
+    const nextVolume = startupRef.current.volume;
     let disposed = false;
 
     void loadYouTubeApi()
@@ -186,7 +234,10 @@ export function NexusAudioPlayer() {
               setReady(true);
               setError("");
               const data = event.target.getVideoData();
-              setTitle(data.title || "NEXUS SIGNAL 01");
+              setTitle(
+                data.title ||
+                  "NEXUS SIGNAL " + String(nextIndex + 1).padStart(2, "0"),
+              );
               setAuthor(data.author || "YouTube");
             },
             onStateChange: (event) => {
@@ -202,6 +253,7 @@ export function NexusAudioPlayer() {
                 setAuthor(data.author || "YouTube");
               } else if (event.data === YT.PlayerState.PAUSED) {
                 setPlaying(false);
+                setPanelOpen(false);
               } else if (event.data === YT.PlayerState.ENDED) {
                 const next = clampIndex(indexRef.current + 1);
                 indexRef.current = next;
@@ -231,11 +283,12 @@ export function NexusAudioPlayer() {
       disposed = true;
       playerRef.current?.destroy();
       playerRef.current = null;
+      setReady(false);
     };
-  }, []);
+  }, [panelOpen]);
 
   useEffect(() => {
-    if (!ready) return;
+    if (!ready || !panelOpen) return;
     const timer = window.setInterval(() => {
       const player = playerRef.current;
       if (!player) return;
@@ -247,7 +300,7 @@ export function NexusAudioPlayer() {
       }
     }, 500);
     return () => window.clearInterval(timer);
-  }, [ready]);
+  }, [ready, panelOpen]);
 
   function switchTrack(delta: number) {
     const player = playerRef.current;
@@ -270,14 +323,13 @@ export function NexusAudioPlayer() {
     const player = playerRef.current;
     if (!player || !ready) return;
     if (playing) player.pauseVideo();
-    else {
-      player.playVideo();
-    }
+    else player.playVideo();
   }
 
   function updateVolume(next: number) {
     const value = Math.max(0, Math.min(100, next));
     setVolume(value);
+    startupRef.current.volume = value;
     playerRef.current?.setVolume(value);
     if (value > 0 && playerRef.current?.isMuted()) {
       playerRef.current.unMute();
@@ -298,19 +350,115 @@ export function NexusAudioPlayer() {
     }
   }
 
+  function closePlayer() {
+    playerRef.current?.pauseVideo();
+    setPlaying(false);
+    setPanelOpen(false);
+  }
+
+  function startDrag(event: ReactPointerEvent<HTMLDivElement>) {
+    if (event.button !== 0) return;
+    if ((event.target as HTMLElement).closest("button, a, input")) return;
+
+    const panel = panelRef.current;
+    if (!panel) return;
+
+    const rect = panel.getBoundingClientRect();
+    dragRef.current = {
+      active: true,
+      pointerId: event.pointerId,
+      offsetX: event.clientX - rect.left,
+      offsetY: event.clientY - rect.top,
+    };
+
+    panel.style.left = rect.left + "px";
+    panel.style.top = rect.top + "px";
+    panel.style.right = "auto";
+    panel.style.bottom = "auto";
+    panel.classList.add("is-dragging");
+    event.currentTarget.setPointerCapture(event.pointerId);
+    event.preventDefault();
+  }
+
+  function moveDrag(event: ReactPointerEvent<HTMLDivElement>) {
+    const drag = dragRef.current;
+    const panel = panelRef.current;
+    if (!drag.active || drag.pointerId !== event.pointerId || !panel) return;
+
+    const rect = panel.getBoundingClientRect();
+    const maxX = Math.max(8, window.innerWidth - rect.width - 8);
+    const maxY = Math.max(8, window.innerHeight - rect.height - 8);
+    const x = Math.max(8, Math.min(event.clientX - drag.offsetX, maxX));
+    const y = Math.max(8, Math.min(event.clientY - drag.offsetY, maxY));
+
+    panel.style.left = x + "px";
+    panel.style.top = y + "px";
+  }
+
+  function finishDrag(event: ReactPointerEvent<HTMLDivElement>) {
+    const drag = dragRef.current;
+    const panel = panelRef.current;
+    if (!drag.active || drag.pointerId !== event.pointerId || !panel) return;
+
+    dragRef.current.active = false;
+    panel.classList.remove("is-dragging");
+
+    try {
+      if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+        event.currentTarget.releasePointerCapture(event.pointerId);
+      }
+      const rect = panel.getBoundingClientRect();
+      window.localStorage.setItem(
+        AUDIO_POSITION_KEY,
+        JSON.stringify({ x: Math.round(rect.left), y: Math.round(rect.top) }),
+      );
+    } catch {
+      // Position persistence is optional.
+    }
+  }
+
   if (!NEXUS_AUDIO_TRACKS.length) return null;
+
+  if (!panelOpen) {
+    return (
+      <button
+        type="button"
+        className="nexus-audio-launcher"
+        onClick={() => {
+          setError("");
+          setPanelOpen(true);
+        }}
+        aria-label="Abrir NEXUS Audio"
+        title="Abrir NEXUS Audio"
+      >
+        <span className="nexus-audio-launcher-orbit" aria-hidden="true" />
+        <RadioTower size={17} />
+        <span>
+          NEXUS AUDIO
+          <small>OPEN SIGNAL</small>
+        </span>
+      </button>
+    );
+  }
 
   return (
     <aside
+      ref={panelRef}
       className={
-        "nexus-audio-player " +
-        positionClass +
-        (playing ? " is-playing" : " is-paused")
+        "nexus-audio-player nexus-audio-floating " +
+        (playing ? "is-playing" : "is-paused")
       }
       aria-label="NEXUS Audio"
     >
-      <div className="nexus-audio-head">
+      <div
+        className="nexus-audio-head nexus-audio-drag-handle"
+        onPointerDown={startDrag}
+        onPointerMove={moveDrag}
+        onPointerUp={finishDrag}
+        onPointerCancel={finishDrag}
+      >
         <span>
+          <GripHorizontal size={13} />
           <i />
           NEXUS AUDIO
         </span>
@@ -318,7 +466,15 @@ export function NexusAudioPlayer() {
           SIGNAL {String(trackIndex + 1).padStart(2, "0")} /{" "}
           {String(NEXUS_AUDIO_TRACKS.length).padStart(2, "0")}
         </span>
-        <span className="nexus-audio-state">{playing ? "LIVE" : "STANDBY"}</span>
+        <button
+          type="button"
+          className="nexus-audio-close"
+          onClick={closePlayer}
+          aria-label="Cerrar NEXUS Audio"
+          title="Cerrar reproductor"
+        >
+          <X size={13} />
+        </button>
       </div>
 
       <div className="nexus-audio-grid">
@@ -374,12 +530,14 @@ export function NexusAudioPlayer() {
 
           <div className="nexus-audio-controls">
             <button
+              type="button"
               onClick={() => switchTrack(-1)}
               aria-label="Canción anterior"
             >
               <SkipBack size={16} />
             </button>
             <button
+              type="button"
               className="nexus-audio-play"
               onClick={togglePlayback}
               aria-label={playing ? "Pausar" : "Reproducir"}
@@ -392,12 +550,17 @@ export function NexusAudioPlayer() {
               )}
             </button>
             <button
+              type="button"
               onClick={() => switchTrack(1)}
               aria-label="Canción siguiente"
             >
               <SkipForward size={16} />
             </button>
-            <button onClick={toggleMute} aria-label={muted ? "Activar sonido" : "Silenciar"}>
+            <button
+              type="button"
+              onClick={toggleMute}
+              aria-label={muted ? "Activar sonido" : "Silenciar"}
+            >
               {muted ? <VolumeX size={15} /> : <Volume2 size={15} />}
             </button>
             <input
@@ -424,9 +587,9 @@ export function NexusAudioPlayer() {
           ) : (
             <p className="nexus-audio-status">
               {playing
-                ? "AUDIO LINK STABLE · reproducción activa"
+                ? "AUDIO LINK STABLE · arrastra la barra superior para moverlo"
                 : ready
-                  ? "PAUSED · inicia la señal cuando quieras"
+                  ? "STANDBY · reproduce una señal o cierra el panel"
                   : "LINKING YOUTUBE SIGNAL…"}
             </p>
           )}
