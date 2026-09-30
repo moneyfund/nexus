@@ -23,6 +23,8 @@ const orbitron = Orbitron({
 });
 const assetBase = process.env.GITHUB_PAGES === "true" ? "/nexus" : "";
 
+const assetBase = process.env.GITHUB_PAGES === "true" ? "/nexus" : "";
+
 export const metadata: Metadata = {
   title: {
     default: "NEXUS OS · Tu universo conectado",
