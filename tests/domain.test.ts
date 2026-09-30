@@ -683,6 +683,51 @@ test("debt payment reduces both debt and selected account and records cashflow",
   assert.equal(store.getSnapshot().expenses[0].category, "Pago de deuda");
 });
 
+test("debts can be created, edited and manually reconciled without inventing cashflow", () => {
+  const { store, actions } = setup();
+  store.update((w) => {
+    w.user.preferences.aiContext.finance = true;
+  });
+  const expensesBefore = store.getSnapshot().expenses.length;
+  const debtId = actions.createDebt({
+    creditor: "Arreglo DOLCE",
+    title: "Pago de arreglo",
+    amount: 1290,
+    currency: "NIO",
+    dueDate: "2026-10-15",
+    projectId: "nexus",
+    notes: "Compromiso asociado al proyecto.",
+  });
+
+  let debt = store.getSnapshot().debts.find((item) => item.id === debtId)!;
+  assert.equal(debt.originalAmount, 1290);
+  assert.equal(debt.balance, 1290);
+  assert.equal(debt.projectId, "nexus");
+  assert.equal(debt.status, "pending");
+
+  actions.updateDebt(debtId, {
+    originalAmount: 1300,
+    balance: 1000,
+    dueDate: "2026-10-16",
+  });
+  debt = store.getSnapshot().debts.find((item) => item.id === debtId)!;
+  assert.equal(debt.originalAmount, 1300);
+  assert.equal(debt.balance, 1000);
+  assert.equal(debt.dueDate, "2026-10-16");
+
+  const context = new NexusContextBuilder().build(store.getSnapshot());
+  assert.equal(
+    context.debts.find((item) => item.id === debtId)?.projectId,
+    "nexus",
+  );
+
+  actions.markDebtPaid(debtId);
+  debt = store.getSnapshot().debts.find((item) => item.id === debtId)!;
+  assert.equal(debt.balance, 0);
+  assert.equal(debt.status, "paid");
+  assert.equal(store.getSnapshot().expenses.length, expensesBefore);
+});
+
 test("financial movements can be edited and deleted without touching unrelated data", () => {
   const { store, actions } = setup();
   const recordId = actions.capture({
