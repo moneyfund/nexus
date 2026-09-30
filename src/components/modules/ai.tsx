@@ -120,6 +120,9 @@ export function AIView() {
     const memory = action.targetId
       ? n.data.memories.find((item) => item.id === action.targetId)
       : undefined;
+    const debt = action.debtId
+      ? (n.data.debts ?? []).find((item) => item.id === action.debtId)
+      : undefined;
     const task =
       action.projectId && action.taskId
         ? n.projects
@@ -139,9 +142,11 @@ export function AIView() {
       case "delete_task":
         return "Eliminar tarea · " + (task?.title ?? action.title ?? "tarea") + " · " + projectName;
       case "record_income":
-        return "Registrar ingreso · $" + (action.amount ?? 0) + " · " + projectName;
+        return "Registrar ingreso · " + (action.currency ?? "USD") + " " + (action.amount ?? 0) + " · " + projectName;
       case "record_expense":
-        return "Registrar gasto · $" + (action.amount ?? 0) + " · " + projectName;
+        return "Registrar gasto · " + (action.currency ?? "USD") + " " + (action.amount ?? 0) + " · " + projectName;
+      case "pay_debt":
+        return "Pagar deuda · " + (debt?.creditor ?? "Deuda") + " · " + (action.currency ?? debt?.currency ?? "USD") + " " + (action.amount ?? 0);
       case "update_transaction":
         return "Editar " + (action.transactionKind === "income" ? "ingreso" : "gasto") + " · " + (transaction?.title ?? action.title ?? "movimiento");
       case "delete_transaction":
@@ -258,6 +263,8 @@ export function AIView() {
               action.title?.trim() ||
               (kind === "income" ? "Ingreso" : "Gasto"),
             amount: action.amount,
+            currency: action.currency ?? "USD",
+            accountId: action.accountId || undefined,
             projectId: action.projectId || undefined,
             category: action.itemCategory || undefined,
           });
@@ -269,6 +276,16 @@ export function AIView() {
                 : {}),
             });
           }
+          break;
+        }
+        case "pay_debt": {
+          if (!action.debtId || !action.amount || action.amount <= 0)
+            throw new Error("Falta una deuda o un importe válido.");
+          n.actions.payDebt(
+            action.debtId,
+            action.amount,
+            action.accountId || undefined,
+          );
           break;
         }
         case "update_transaction": {
