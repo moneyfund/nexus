@@ -225,6 +225,8 @@ export interface NexusContext {
   timezone: string;
   now: string;
   currency: "USD";
+  conversationId?: string;
+  focusProjectId?: string;
   projects: Array<{
     id: string;
     name: string;
@@ -324,16 +326,25 @@ export interface NexusContext {
   }>;
 }
 export class NexusContextBuilder {
-  build(w: Workspace): NexusContext {
+  build(
+    w: Workspace,
+    scope?: { conversationId?: string; projectId?: string },
+  ): NexusContext {
     const c = w.user.preferences.aiContext;
+    const focusProjectId = scope?.projectId;
+    const projectScope = focusProjectId
+      ? w.projects.filter((project) => project.id === focusProjectId)
+      : w.projects;
     return {
       userId: w.user.id,
       userName: w.user.name,
       timezone: w.user.preferences.timezone,
       now: new Date().toISOString(),
       currency: "USD",
+      conversationId: scope?.conversationId,
+      focusProjectId,
       projects: c.projects
-        ? w.projects.map((project) => ({
+        ? projectScope.map((project) => ({
             id: project.id,
             name: project.name,
             area: project.area,
@@ -360,7 +371,11 @@ export class NexusContextBuilder {
             })),
           }))
         : [],
-      events: c.calendar ? w.events : [],
+      events: c.calendar
+        ? focusProjectId
+          ? w.events.filter((event) => event.projectId === focusProjectId)
+          : w.events
+        : [],
       transactions: c.finance
         ? [
             ...w.incomes.map((record) => ({
@@ -388,6 +403,10 @@ export class NexusContextBuilder {
               updatedAt: record.updatedAt,
             })),
           ]
+            .filter(
+              (record) =>
+                !focusProjectId || record.projectId === focusProjectId,
+            )
             .sort((a, b) => b.updatedAt - a.updatedAt)
             .slice(0, 100)
         : [],
@@ -431,6 +450,10 @@ export class NexusContextBuilder {
           : 36.6243,
       ideas: c.knowledge
         ? w.ideas
+            .filter(
+              (idea) =>
+                !focusProjectId || idea.projectIds.includes(focusProjectId),
+            )
             .slice()
             .sort((a, b) => b.updatedAt - a.updatedAt)
             .slice(0, 60)
@@ -462,6 +485,10 @@ export class NexusContextBuilder {
         : [],
       recentActivity: c.projects
         ? w.activity
+            .filter(
+              (activity) =>
+                !focusProjectId || activity.projectId === focusProjectId,
+            )
             .slice(0, 60)
             .map(({ id, title, kind, projectId, createdAt }) => ({
               id,
@@ -472,7 +499,7 @@ export class NexusContextBuilder {
             }))
         : [],
       finance: c.finance
-        ? w.projects.map((project) => {
+        ? projectScope.map((project) => {
             const finance = projectFinance(w, project);
             return {
               projectId: project.id,
@@ -484,7 +511,14 @@ export class NexusContextBuilder {
           })
         : [],
       knowledge: c.knowledge
-        ? w.knowledge.map(
+        ? w.knowledge
+            .filter(
+              (item) =>
+                !focusProjectId ||
+                !item.projectId ||
+                item.projectId === focusProjectId,
+            )
+            .map(
             ({ id, title, category, tags, content, url, projectId }) => ({
               id,
               title,
@@ -497,13 +531,25 @@ export class NexusContextBuilder {
           )
         : [],
       memories: c.knowledge
-        ? w.memories.map(({ id, content, projectIds }) => ({
+        ? w.memories
+            .filter(
+              (memory) =>
+                !focusProjectId ||
+                memory.projectIds.length === 0 ||
+                memory.projectIds.includes(focusProjectId),
+            )
+            .map(({ id, content, projectIds }) => ({
             id,
             content: content.slice(0, 2500),
             projectIds,
           }))
         : [],
       recentMessages: w.messages
+        .filter(
+          (message) =>
+            !scope?.conversationId ||
+            message.conversationId === scope.conversationId,
+        )
         .slice(-12)
         .map(({ role, content }) => ({
           role,
