@@ -10,8 +10,10 @@ import {
 import { NexusActions } from "../src/services/actions";
 import { entity, seedWorkspace } from "../src/domain/seed";
 import {
+  financeCutSummary,
   financialScope,
   flowElapsed,
+  monthlyFinanceSeries,
   projectFinance,
 } from "../src/domain/selectors";
 import { createRepositories } from "../src/repositories/contracts";
@@ -644,6 +646,110 @@ test("multi-currency account balances follow captured movements", () => {
     store.getSnapshot().financialAccounts?.[0].balance,
     2500,
   );
+});
+
+test("finance cut reconstructs opening balance and monthly availability from account movements", () => {
+  const { store, actions } = setup();
+  store.update((w) => {
+    w.user.preferences.timezone = "America/Managua";
+    w.user.metadata = {
+      ...(w.user.metadata ?? {}),
+      financeCutoverDate: "2026-09-01",
+      exchangeRateNIOPerUSD: 40,
+    };
+    w.financialAccounts = [
+      {
+        ...w.user,
+        id: "cash-cut",
+        userId: w.user.id,
+        name: "Efectivo",
+        kind: "cash",
+        currency: "NIO",
+        balance: 4000,
+      },
+      {
+        ...w.user,
+        id: "bank-cut",
+        userId: w.user.id,
+        name: "Digital",
+        kind: "bank",
+        currency: "USD",
+        balance: 100,
+      },
+    ];
+  });
+
+  actions.capture({
+    type: "income",
+    content: "Ingreso septiembre",
+    amount: 40,
+    currency: "USD",
+    accountId: "bank-cut",
+  });
+  actions.capture({
+    type: "expense",
+    content: "Gasto septiembre",
+    amount: 400,
+    currency: "NIO",
+    accountId: "cash-cut",
+  });
+
+  const summary = financeCutSummary(
+    store.getSnapshot(),
+    new Date("2026-09-30T18:00:00Z"),
+  );
+  assert.equal(summary.currentAvailableUSD, 230);
+  assert.equal(summary.changeSinceCutUSD, 30);
+  assert.equal(summary.lastCutAvailableUSD, 200);
+  assert.equal(summary.cutDate, "2026-09-01");
+
+  const series = monthlyFinanceSeries(
+    store.getSnapshot(),
+    1,
+    new Date("2026-09-30T18:00:00Z"),
+  );
+  assert.equal(series[0].income, 40);
+  assert.equal(series[0].expense, 10);
+  assert.equal(series[0].available, 230);
+});
+
+test("financial actions append auditable activity metadata", () => {
+  const { store, actions } = setup();
+  store.update((w) => {
+    w.financialAccounts = [
+      {
+        ...w.user,
+        id: "cash-audit",
+        userId: w.user.id,
+        name: "Efectivo",
+        kind: "cash",
+        currency: "NIO",
+        balance: 2000,
+      },
+    ];
+  });
+
+  const recordId = actions.capture({
+    type: "expense",
+    content: "Transporte",
+    amount: 100,
+    currency: "NIO",
+    accountId: "cash-audit",
+  });
+  actions.updateMoneyRecord("expense", recordId, { amount: 120 });
+  actions.deleteMoneyRecord("expense", recordId);
+
+  const events = store
+    .getSnapshot()
+    .activity.filter((item) => item.metadata?.financeEvent === true);
+  assert.ok(events.some((item) => item.metadata?.financeType === "expense"));
+  assert.ok(
+    events.some((item) => item.metadata?.financeType === "expense_updated"),
+  );
+  assert.ok(
+    events.some((item) => item.metadata?.financeType === "expense_deleted"),
+  );
+  assert.ok(events.every((item) => typeof item.metadata?.referenceId === "string"));
 });
 
 test("debt payment reduces both debt and selected account and records cashflow", () => {
