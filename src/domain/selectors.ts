@@ -45,6 +45,144 @@ export function amountToNIO(
 ) {
   return currency === "NIO" ? amount : amount * exchangeRate(w);
 }
+
+export function availableBalanceUSD(w: Workspace) {
+  const accounts = w.financialAccounts ?? [];
+  if (accounts.length) {
+    return accounts.reduce(
+      (sum, account) => sum + amountToUSD(w, account.balance, account.currency),
+      0,
+    );
+  }
+
+  const cashNIO =
+    typeof w.user.metadata?.cashNIO === "number"
+      ? w.user.metadata.cashNIO
+      : 0;
+  const cardUSD =
+    typeof w.user.metadata?.cardUSD === "number"
+      ? w.user.metadata.cardUSD
+      : 0;
+  return cardUSD + cashNIO / exchangeRate(w);
+}
+
+export function financeCutDate(
+  w: Workspace,
+  now: Date | number = new Date(),
+) {
+  const monthStart =
+    dateKey(now, w.user.preferences.timezone).slice(0, 7) + "-01";
+  const migrationCut =
+    typeof w.user.metadata?.financeCutoverDate === "string"
+      ? w.user.metadata.financeCutoverDate
+      : "";
+  return migrationCut && migrationCut > monthStart ? migrationCut : monthStart;
+}
+
+export function accountNetMovementUSD(
+  w: Workspace,
+  fromDate: string,
+  toDate?: string,
+) {
+  const inRange = (date: string) =>
+    date >= fromDate && (!toDate || date <= toDate);
+
+  const income = w.incomes
+    .filter((record) => !!record.accountId && inRange(record.date))
+    .reduce(
+      (sum, record) => sum + amountToUSD(w, record.amount, record.currency),
+      0,
+    );
+  const expense = w.expenses
+    .filter((record) => !!record.accountId && inRange(record.date))
+    .reduce(
+      (sum, record) => sum + amountToUSD(w, record.amount, record.currency),
+      0,
+    );
+  return income - expense;
+}
+
+export function financeCutSummary(
+  w: Workspace,
+  now: Date | number = new Date(),
+) {
+  const currentAvailableUSD = availableBalanceUSD(w);
+  const cutDate = financeCutDate(w, now);
+  const changeSinceCutUSD = accountNetMovementUSD(w, cutDate);
+  return {
+    cutDate,
+    currentAvailableUSD,
+    lastCutAvailableUSD: currentAvailableUSD - changeSinceCutUSD,
+    changeSinceCutUSD,
+  };
+}
+
+export function monthlyFinanceSeries(
+  w: Workspace,
+  months = 6,
+  now: Date | number = new Date(),
+) {
+  const currentAvailableUSD = availableBalanceUSD(w);
+  const today = dateKey(now, w.user.preferences.timezone);
+  const currentMonth = today.slice(0, 7);
+  const migrationCut =
+    typeof w.user.metadata?.financeCutoverDate === "string"
+      ? w.user.metadata.financeCutoverDate
+      : "";
+
+  return Array.from({ length: months }, (_, index) => {
+    const cursor = new Date(currentMonth + "-01T12:00:00Z");
+    cursor.setUTCMonth(cursor.getUTCMonth() - (months - 1 - index));
+    const key = cursor.toISOString().slice(0, 7);
+    const monthEndDate = new Date(cursor);
+    monthEndDate.setUTCMonth(monthEndDate.getUTCMonth() + 1);
+    monthEndDate.setUTCDate(0);
+    const monthEnd = monthEndDate.toISOString().slice(0, 10);
+    const effectiveEnd = monthEnd > today ? today : monthEnd;
+
+    const income = w.incomes
+      .filter((record) => record.date.startsWith(key))
+      .reduce(
+        (sum, record) => sum + amountToUSD(w, record.amount, record.currency),
+        0,
+      );
+    const expense = w.expenses
+      .filter((record) => record.date.startsWith(key))
+      .reduce(
+        (sum, record) => sum + amountToUSD(w, record.amount, record.currency),
+        0,
+      );
+
+    const available =
+      migrationCut && effectiveEnd < migrationCut
+        ? undefined
+        : currentAvailableUSD -
+          accountNetMovementUSD(
+            w,
+            new Date(effectiveEnd + "T12:00:00Z").getTime() >=
+              new Date(today + "T12:00:00Z").getTime()
+              ? "9999-12-31"
+              : (() => {
+                  const next = new Date(effectiveEnd + "T12:00:00Z");
+                  next.setUTCDate(next.getUTCDate() + 1);
+                  return next.toISOString().slice(0, 10);
+                })(),
+            today,
+          );
+
+    return {
+      key,
+      label: cursor
+        .toLocaleDateString("es-NI", { month: "short", timeZone: "UTC" })
+        .toUpperCase(),
+      income,
+      expense,
+      available,
+      net: income - expense,
+    };
+  });
+}
+
 export function projectPaid(w: Workspace, projectId: string) {
   return w.incomes
     .filter((i) => i.projectId === projectId)
