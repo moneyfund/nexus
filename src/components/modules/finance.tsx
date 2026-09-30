@@ -33,7 +33,7 @@ import {
   projectFinance,
 } from "@/domain/selectors";
 import { entity } from "@/domain/seed";
-import type { Currency, MoneyRecord } from "@/domain/models";
+import type { Currency, Debt, MoneyRecord } from "@/domain/models";
 
 type EditableRecord = MoneyRecord & { kind: "income" | "expense" };
 
@@ -131,6 +131,142 @@ function TransactionEditor({
     </form>
   );
 }
+
+function DebtEditor({
+  debt,
+  close,
+}: {
+  debt: Debt;
+  close: () => void;
+}) {
+  const n = useNexus();
+  const [creditor, setCreditor] = useState(debt.creditor);
+  const [title, setTitle] = useState(debt.title);
+  const [originalAmount, setOriginalAmount] = useState(
+    String(debt.originalAmount),
+  );
+  const [balance, setBalance] = useState(String(debt.balance));
+  const [dueDate, setDueDate] = useState(debt.dueDate ?? "");
+  const [projectId, setProjectId] = useState(debt.projectId ?? "");
+  const [notes, setNotes] = useState(debt.notes ?? "");
+  const [confirmPaid, setConfirmPaid] = useState(false);
+  const paid = debt.status === "paid" || debt.balance <= 0;
+
+  return (
+    <form
+      className="stack"
+      onSubmit={(e) => {
+        e.preventDefault();
+        n.run(() => {
+          n.actions.updateDebt(debt.id, {
+            creditor,
+            title,
+            originalAmount: Number(originalAmount),
+            balance: Number(balance),
+            dueDate: dueDate || undefined,
+            projectId: projectId || undefined,
+            notes: notes || undefined,
+          });
+          close();
+        }, "Deuda actualizada.");
+      }}
+    >
+      <div className="form-grid">
+        <label className="field">
+          Acreedor
+          <input
+            value={creditor}
+            onChange={(e) => setCreditor(e.target.value)}
+            required
+          />
+        </label>
+        <label className="field">
+          Concepto
+          <input value={title} onChange={(e) => setTitle(e.target.value)} required />
+        </label>
+      </div>
+      <div className="form-grid">
+        <label className="field">
+          Importe original {debt.currency}
+          <input
+            type="number"
+            min=".01"
+            step=".01"
+            value={originalAmount}
+            onChange={(e) => setOriginalAmount(e.target.value)}
+            required
+          />
+        </label>
+        <label className="field">
+          Saldo pendiente {debt.currency}
+          <input
+            type="number"
+            min="0"
+            step=".01"
+            value={balance}
+            onChange={(e) => setBalance(e.target.value)}
+            required
+          />
+        </label>
+      </div>
+      <div className="form-grid">
+        <label className="field">
+          Vencimiento
+          <input
+            type="date"
+            value={dueDate}
+            onChange={(e) => setDueDate(e.target.value)}
+          />
+        </label>
+        <label className="field">
+          Proyecto relacionado
+          <select value={projectId} onChange={(e) => setProjectId(e.target.value)}>
+            <option value="">Sin proyecto</option>
+            {n.projects.map((project) => (
+              <option key={project.id} value={project.id}>
+                {project.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+      <label className="field">
+        Notas
+        <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} />
+      </label>
+      <div className="row between">
+        <Button type="submit">Guardar deuda</Button>
+        {!paid && (
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => {
+              if (!confirmPaid) {
+                setConfirmPaid(true);
+                return;
+              }
+              const marked =
+                n.run(
+                  () => {
+                    n.actions.markDebtPaid(debt.id);
+                    return true;
+                  },
+                  "Deuda marcada como pagada.",
+                ) === true;
+              if (marked) close();
+            }}
+          >
+            {confirmPaid ? "Confirmar pagada" : "Marcar pagada"}
+          </Button>
+        )}
+      </div>
+      <p className="form-note">
+        Marcarla como pagada deja el saldo en cero sin crear un gasto automático.
+        Para registrar una salida real de dinero usa un pago de deuda.
+      </p>
+    </form>
+  );
+}
 export function FinanceView() {
   const n = useNexus();
   const [view, setView] = useState("overview");
@@ -140,6 +276,8 @@ export function FinanceView() {
   const [goalTarget, setGoalTarget] = useState("");
   const [goalKind, setGoalKind] = useState<"savings" | "investment">("savings");
   const [editingRecord, setEditingRecord] = useState<EditableRecord | null>(null);
+  const [debtManageOpen, setDebtManageOpen] = useState(false);
+  const [editingDebtId, setEditingDebtId] = useState("");
   const scoped = financialScope(n.data, scope);
   const { incomes, expenses, projects, financialGoals } = scoped;
   const rate = exchangeRate(n.data);
@@ -207,6 +345,14 @@ export function FinanceView() {
     (sum, debt) => sum + amountToUSD(n.data, debt.balance, debt.currency),
     0,
   );
+  const editingDebt =
+    debts.find((debt) => debt.id === editingDebtId) ??
+    pendingDebts[0] ??
+    debts[0];
+  const openDebtManager = () => {
+    setEditingDebtId(pendingDebts[0]?.id ?? debts[0]?.id ?? "");
+    setDebtManageOpen(true);
+  };
   const currentMonth = dateKey().slice(0, 7);
   const [baseMonth] = useState(() => currentMonth);
   const values = Array.from({ length: 6 }, (_, i) => {
@@ -343,10 +489,18 @@ export function FinanceView() {
               label="DEUDAS"
               title="Obligaciones pendientes."
               action={
-                <Badge>
-                  {pendingDebts.length} ABIERTA
-                  {pendingDebts.length === 1 ? "" : "S"}
-                </Badge>
+                <div className="row">
+                  <Badge>
+                    {pendingDebts.length} ABIERTA
+                    {pendingDebts.length === 1 ? "" : "S"}
+                  </Badge>
+                  {debts.length > 0 && (
+                    <Button variant="ghost" onClick={openDebtManager}>
+                      <Pencil size={14} />
+                      Gestionar
+                    </Button>
+                  )}
+                </div>
               }
             />
             {pendingDebts.length ? (
@@ -631,6 +785,41 @@ export function FinanceView() {
             key={editingRecord.id + editingRecord.kind}
             record={editingRecord}
             close={() => setEditingRecord(null)}
+          />
+        )}
+      </Modal>
+
+      <Modal
+        open={debtManageOpen}
+        onClose={() => setDebtManageOpen(false)}
+        title="Gestionar deudas"
+      >
+        {debts.length && editingDebt ? (
+          <div className="stack">
+            <label className="field">
+              Deuda
+              <select
+                value={editingDebt.id}
+                onChange={(e) => setEditingDebtId(e.target.value)}
+              >
+                {debts.map((debt) => (
+                  <option key={debt.id} value={debt.id}>
+                    {debt.creditor} · {formatNative(debt.balance, debt.currency)}
+                    {debt.status === "paid" ? " · pagada" : ""}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <DebtEditor
+              key={editingDebt.id}
+              debt={editingDebt}
+              close={() => setDebtManageOpen(false)}
+            />
+          </div>
+        ) : (
+          <Empty
+            title="No hay deudas registradas."
+            text="NEXUS AI puede crear una cuando se lo indiques."
           />
         )}
       </Modal>
