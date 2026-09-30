@@ -26,8 +26,10 @@ type Node = {
   label: string;
   category: string;
   kind: "idea" | "project";
+  status?: "active" | "waiting" | "backlog" | "completed";
   angle: number;
   radius: number;
+  speed: number;
   fresh: boolean;
 };
 function stars(count: number) {
@@ -79,24 +81,51 @@ export function NexusGalaxy({ compact = false }: { compact?: boolean }) {
     const ideas = n.data.ideas.filter(
       (i) => i.status !== "archived" && i.status !== "converted",
     );
-    const projects = n.projects.filter((p) => p.status === "active");
+    const statusRadius = {
+      active: 2.05,
+      waiting: 3.35,
+      backlog: 4.55,
+      completed: 5.65,
+    } as const;
+    const projects = n.projects;
     return [
-      ...ideas.slice(0, 28).map((i, index) => ({
+      ...projects.map((p, index) => {
+        const sameStatus = projects.filter((item) => item.status === p.status);
+        const statusIndex = sameStatus.findIndex((item) => item.id === p.id);
+        const radius =
+          statusRadius[p.status] +
+          (statusIndex % 3) * 0.16 +
+          Math.floor(statusIndex / 3) * 0.09;
+        return {
+          id: p.id,
+          label: p.name,
+          category: "Projects",
+          kind: "project" as const,
+          status: p.status,
+          angle:
+            (statusIndex / Math.max(sameStatus.length, 1)) * Math.PI * 2 +
+            index * 0.17 +
+            0.8,
+          radius,
+          speed:
+            p.status === "active"
+              ? 0.000032
+              : p.status === "waiting"
+                ? 0.000021
+                : p.status === "backlog"
+                  ? 0.000014
+                  : 0.000009,
+          fresh: false,
+        };
+      }),
+      ...ideas.slice(0, 18).map((i, index) => ({
         id: i.id,
         label: i.title,
         category: i.category,
         kind: "idea" as const,
         angle: index * 2.399 + 0.2,
-        radius: 3.8 + Math.max(0, CATEGORIES.indexOf(i.category)) * 0.16,
-        fresh: false,
-      })),
-      ...projects.slice(0, 10).map((p, index) => ({
-        id: p.id,
-        label: p.name,
-        category: "Projects",
-        kind: "project" as const,
-        angle: (index / Math.max(projects.length, 1)) * Math.PI * 2 + 1.3,
-        radius: 2.4,
+        radius: 6.25 + (index % 4) * 0.17,
+        speed: 0.000007,
         fresh: false,
       })),
     ];
@@ -178,8 +207,44 @@ export function NexusGalaxy({ compact = false }: { compact?: boolean }) {
       nebula.addColorStop(1, "#00000000");
       ctx!.fillStyle = nebula;
       ctx!.fillRect(0, 0, width, height);
-      // Orbit tracks share the same perspective as nodes and particles.
-      for (const r of [2.4, 4.1, 5.6]) {
+
+      // Cinematic nucleus: layered accretion light gives the hero real depth
+      // without adding a heavy WebGL dependency to the static GitHub Pages build.
+      ctx!.save();
+      ctx!.translate(cx, cy);
+      ctx!.rotate(v.yaw * 0.18);
+      for (let ring = 0; ring < 5; ring++) {
+        ctx!.beginPath();
+        ctx!.ellipse(
+          0,
+          0,
+          radius * (0.2 + ring * 0.075),
+          radius * (0.045 + ring * 0.012),
+          0,
+          0,
+          Math.PI * 2,
+        );
+        ctx!.strokeStyle =
+          ring === 0
+            ? "rgba(255,232,255,.42)"
+            : `rgba(221,82,237,${0.2 - ring * 0.026})`;
+        ctx!.lineWidth = ring === 0 ? 1.4 : 0.8;
+        ctx!.stroke();
+      }
+      const horizon = ctx!.createRadialGradient(0, 0, 0, 0, 0, radius * 0.23);
+      horizon.addColorStop(0, "rgba(255,255,255,.95)");
+      horizon.addColorStop(0.12, "rgba(252,218,255,.8)");
+      horizon.addColorStop(0.28, "rgba(226,92,241,.46)");
+      horizon.addColorStop(0.56, "rgba(133,39,170,.18)");
+      horizon.addColorStop(1, "rgba(70,18,92,0)");
+      ctx!.fillStyle = horizon;
+      ctx!.beginPath();
+      ctx!.arc(0, 0, radius * 0.23, 0, Math.PI * 2);
+      ctx!.fill();
+      ctx!.restore();
+
+      // Orbit tracks encode project state: active projects live closest to the core.
+      for (const r of [2.05, 3.35, 4.55, 5.65, 6.25]) {
         ctx!.beginPath();
         for (let i = 0; i <= 120; i++) {
           const a = (i / 120) * Math.PI * 2;
@@ -187,7 +252,12 @@ export function NexusGalaxy({ compact = false }: { compact?: boolean }) {
           if (!i) ctx!.moveTo(p.x, p.y);
           else ctx!.lineTo(p.x, p.y);
         }
-        ctx!.strokeStyle = r === 2.4 ? "#e580ec23" : "#c677f019";
+        ctx!.strokeStyle =
+          r === 2.05
+            ? "#f4a8ff3d"
+            : r === 3.35
+              ? "#c783ff25"
+              : "#c677f016";
         ctx!.lineWidth = 0.8;
         ctx!.stroke();
       }
@@ -200,7 +270,7 @@ export function NexusGalaxy({ compact = false }: { compact?: boolean }) {
         ctx!.drawImage(sprite, p.x - size / 2, p.y - size / 2, size, size);
       }
       ctx!.globalAlpha = 1;
-      const coreSize = Math.min(width, height) * 0.09 * v.zoom;
+      const coreSize = Math.min(width, height) * 0.135 * v.zoom;
       const core = ctx!.createRadialGradient(cx, cy, 0, cx, cy, coreSize * 2.1);
       core.addColorStop(0, "#fff6ff");
       core.addColorStop(0.08, "#f8cbfc");
@@ -214,10 +284,18 @@ export function NexusGalaxy({ compact = false }: { compact?: boolean }) {
       ctx!.globalCompositeOperation = "source-over";
       const labelPositions: { x: number; y: number }[] = [];
       for (const node of filtered) {
+        const orbitAngle =
+          node.angle +
+          (!reduce && !paused ? now * node.speed : 0);
         const p = project({
-          x: Math.cos(node.angle) * node.radius,
-          y: node.kind === "idea" ? 0.3 : 0,
-          z: Math.sin(node.angle) * node.radius,
+          x: Math.cos(orbitAngle) * node.radius,
+          y:
+            node.kind === "idea"
+              ? 0.34
+              : node.status === "active"
+                ? Math.sin(orbitAngle * 1.7) * 0.08
+                : 0,
+          z: Math.sin(orbitAngle) * node.radius,
         });
         const button = nodeRefs.current.get(node.id);
         if (button) {
@@ -291,20 +369,20 @@ export function NexusGalaxy({ compact = false }: { compact?: boolean }) {
     view.current.targetZoom = 1.12;
     renderRef.current();
     if (node.kind === "idea") n.setSelectedIdeaId(node.id);
-    else router.push("/projects/" + node.id);
+    else router.push("/project?id=" + encodeURIComponent(node.id));
   }
   return (
     <div className={"galaxy-wrapper " + (compact ? "galaxy-compact" : "")}>
       <div className="galaxy-category">
         <span className="status-tick" />
-        <span>KNOWLEDGE GALAXY</span>
+        <span>NEXUS PROJECT GALAXY</span>
         <select
           value={orbit}
           aria-label="Filtrar órbita"
           onChange={(e) => setOrbit(e.target.value)}
         >
           <option value="all">Todas las órbitas</option>
-          <option value="Projects">Proyectos</option>
+          <option value="Projects">Todos los proyectos</option>
           {CATEGORIES.filter((c) => nodes.some((p) => p.category === c)).map(
             (c) => (
               <option key={c}>{c}</option>
@@ -382,7 +460,11 @@ export function NexusGalaxy({ compact = false }: { compact?: boolean }) {
               else nodeRefs.current.delete(node.id);
             }}
             onClick={() => select(node)}
-            className={"galaxy-node " + node.kind}
+            className={
+              "galaxy-node " +
+              node.kind +
+              (node.status ? " status-" + node.status : "")
+            }
             aria-label={`${node.kind === "idea" ? "Abrir idea" : "Abrir proyecto"}: ${node.label}`}
             title={node.label}
           >
@@ -390,7 +472,11 @@ export function NexusGalaxy({ compact = false }: { compact?: boolean }) {
             <span className="node-label">
               {node.label}
               <small>
-                {node.kind === "idea" ? node.category : "ACTIVE PROJECT"}
+                {node.kind === "idea"
+                  ? node.category
+                  : node.status === "active"
+                    ? "ACTIVE · INNER ORBIT"
+                    : (node.status ?? "PROJECT").toUpperCase()}
               </small>
             </span>
           </button>
@@ -411,9 +497,9 @@ export function NexusGalaxy({ compact = false }: { compact?: boolean }) {
           <br />N / {String(nodes.length).padStart(2, "0")}
         </span>
         <span className="galaxy-coordinate galaxy-coordinate-right">
-          MEMORY
+          PROJECT FIELD
           <br />
-          {orbit === "all" ? "ALL ORBITS" : orbit.toUpperCase()}
+          {n.projects.filter((p) => p.status === "active").length} INNER / {n.projects.length} TOTAL
         </span>
       </div>
       <div className="galaxy-controls">
