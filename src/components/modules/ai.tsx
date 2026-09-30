@@ -155,6 +155,11 @@ export function AIView() {
     const debt = action.debtId
       ? (n.data.debts ?? []).find((item) => item.id === action.debtId)
       : undefined;
+    const account = action.accountId
+      ? (n.data.financialAccounts ?? []).find(
+          (item) => item.id === action.accountId,
+        )
+      : undefined;
     const task =
       action.projectId && action.taskId
         ? n.projects
@@ -174,17 +179,17 @@ export function AIView() {
       case "delete_task":
         return "Eliminar tarea · " + (task?.title ?? action.title ?? "tarea") + " · " + projectName;
       case "record_income":
-        return "Registrar ingreso · " + (action.currency ?? "USD") + " " + (action.amount ?? 0) + " · " + projectName;
+        return "Registrar ingreso · " + (action.currency ?? "USD") + " " + (action.amount ?? 0) + (account ? " · a " + account.name : "") + " · " + projectName;
       case "record_expense":
-        return "Registrar gasto · " + (action.currency ?? "USD") + " " + (action.amount ?? 0) + " · " + projectName;
+        return "Registrar gasto · " + (action.currency ?? "USD") + " " + (action.amount ?? 0) + (account ? " · desde " + account.name : "") + " · " + projectName;
       case "create_debt":
         return "Crear deuda · " + (action.creditor ?? action.title ?? "Deuda") + " · " + (action.currency ?? "USD") + " " + (action.amount ?? 0);
       case "update_debt":
         return "Editar deuda · " + (debt?.creditor ?? action.creditor ?? "Deuda");
       case "pay_debt":
-        return "Registrar pago · " + (debt?.creditor ?? "Deuda") + " · " + (action.currency ?? debt?.currency ?? "USD") + " " + (action.amount ?? 0);
+        return "Registrar pago · " + (debt?.creditor ?? "Deuda") + " · " + (action.currency ?? debt?.currency ?? "USD") + " " + (action.amount ?? 0) + (account ? " · desde " + account.name : "");
       case "mark_debt_paid":
-        return "Marcar pagada · " + (debt?.creditor ?? "Deuda");
+        return "Marcar pagada · " + (debt?.creditor ?? "Deuda") + (account ? " · cargar saldo a " + account.name : " · conciliación");
       case "update_transaction":
         return "Editar " + (action.transactionKind === "income" ? "ingreso" : "gasto") + " · " + (transaction?.title ?? action.title ?? "movimiento");
       case "delete_transaction":
@@ -218,7 +223,86 @@ export function AIView() {
     }
   }
 
-  function applyAction(id: string, action: NexusAIAction) {
+  async function applyAction(id: string, action: NexusAIAction) {
+    if (
+      action.type === "create_event" ||
+      action.type === "update_event" ||
+      action.type === "delete_event"
+    ) {
+      try {
+        if (action.type === "create_event") {
+          if (!action.title?.trim() || !action.start || !action.end)
+            throw new Error("Faltan título, inicio o fin para el evento.");
+          const start = new Date(action.start);
+          const end = new Date(action.end);
+          if (
+            !Number.isFinite(+start) ||
+            !Number.isFinite(+end) ||
+            +end <= +start
+          )
+            throw new Error("El horario propuesto para el evento no es válido.");
+
+          await n.services.calendar.createEvent(n.data.user.id, {
+            ...entity(crypto.randomUUID(), "user", n.data.user.id),
+            title: action.title.trim(),
+            start: start.toISOString(),
+            end: end.toISOString(),
+            category: action.category ?? "personal",
+            projectId: action.projectId || undefined,
+            description: action.description || undefined,
+          });
+        } else if (action.type === "update_event") {
+          if (!action.targetId)
+            throw new Error("La IA no identificó el evento que debe editarse.");
+          const current = n.data.events.find(
+            (item) => item.id === action.targetId,
+          );
+          if (!current) throw new Error("El evento propuesto ya no existe.");
+          const nextStart = action.start
+            ? new Date(action.start).toISOString()
+            : current.start;
+          const nextEnd = action.end
+            ? new Date(action.end).toISOString()
+            : current.end;
+
+          await n.services.calendar.updateEvent(n.data.user.id, {
+            ...current,
+            title: action.title?.trim() || current.title,
+            start: nextStart,
+            end: nextEnd,
+            category: action.category ?? current.category,
+            projectId: action.projectId || current.projectId,
+            description:
+              action.description != null
+                ? action.description
+                : current.description,
+          });
+        } else {
+          if (!action.targetId)
+            throw new Error("La IA no identificó el evento que debe eliminarse.");
+          await n.services.calendar.deleteEvent(
+            n.data.user.id,
+            action.targetId,
+          );
+        }
+
+        n.notify(
+          n.googleWorkspace.connected
+            ? "Acción aplicada en NEXUS y Google Calendar."
+            : "Acción aplicada en NEXUS.",
+        );
+        setPendingActions((items) => items.filter((item) => item.id !== id));
+      } catch (error) {
+        n.notify(
+          error instanceof Error
+            ? error.message
+            : "No se pudo aplicar la acción de calendario.",
+          true,
+        );
+      }
+      return;
+    }
+
     const applied = n.run(() => {
       switch (action.type) {
         case "complete_task": {
@@ -295,13 +379,20 @@ export function AIView() {
             throw new Error("La propuesta no contiene un importe válido.");
           const kind =
             action.type === "record_income" ? "income" : "expense";
+          const selectedAccount = action.accountId
+            ? (n.data.financialAccounts ?? []).find(
+                (item) => item.id === action.accountId,
+              )
+            : undefined;
+          if (action.accountId && !selectedAccount)
+            throw new Error("La IA indicó una cuenta financiera que ya no existe.");
           const recordId = n.actions.capture({
             type: kind,
             content:
               action.title?.trim() ||
               (kind === "income" ? "Ingreso" : "Gasto"),
             amount: action.amount,
-            currency: action.currency ?? "USD",
+            currency: action.currency ?? selectedAccount?.currency ?? "USD",
             accountId: action.accountId || undefined,
             projectId: action.projectId || undefined,
             category: action.itemCategory || undefined,
@@ -367,7 +458,10 @@ export function AIView() {
         case "mark_debt_paid": {
           if (!action.debtId)
             throw new Error("La IA no identificó la deuda.");
-          n.actions.markDebtPaid(action.debtId);
+          n.actions.markDebtPaid(
+            action.debtId,
+            action.accountId || undefined,
+          );
           break;
         }
         case "update_transaction": {
@@ -850,7 +944,7 @@ export function AIView() {
                     </Button>
                     <Button
                       variant={isDestructive(action) ? "danger" : "primary"}
-                      onClick={() => applyAction(id, action)}
+                      onClick={() => void applyAction(id, action)}
                     >
                       <Check size={14} />
                       {isDestructive(action) ? "Eliminar" : "Aplicar"}

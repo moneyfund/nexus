@@ -340,7 +340,17 @@ export function SettingsView() {
                   Google Calendar
                 </span>
                 <Badge active={n.googleWorkspace.connected}>
-                  {n.googleWorkspace.connected ? "CONNECTED" : "NOT CONNECTED"}
+                  {n.googleWorkspace.connected
+                    ? n.googleWorkspace.lastCalendarSync
+                      ? "SYNC · " +
+                        new Date(
+                          n.googleWorkspace.lastCalendarSync,
+                        ).toLocaleTimeString("es-NI", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })
+                      : "CONNECTED"
+                    : "NOT CONNECTED"}
                 </Badge>
               </div>
               <div className="integration-row">
@@ -349,17 +359,62 @@ export function SettingsView() {
                   Google Drive
                 </span>
                 <Badge active={n.googleWorkspace.connected}>
-                  {n.googleWorkspace.connected ? "CONNECTED" : "NOT CONNECTED"}
+                  {n.googleWorkspace.connected ? "READ ONLY · CONNECTED" : "NOT CONNECTED"}
                 </Badge>
               </div>
+              {n.googleWorkspace.syncError && (
+                <p className="accent" role="alert">
+                  {n.googleWorkspace.syncError}
+                </p>
+              )}
               <div className="row wrap">
                 {n.googleWorkspace.connected ? (
-                  <Button
-                    variant="secondary"
-                    onClick={() => n.googleWorkspace.disconnect()}
-                  >
-                    Desconectar Google Workspace
-                  </Button>
+                  <>
+                    <Button
+                      variant="secondary"
+                      onClick={() =>
+                        void n.googleWorkspace
+                          .syncCalendar()
+                          .then((count) =>
+                            n.notify(
+                              count +
+                                " eventos verificados con Google Calendar.",
+                            ),
+                          )
+                          .catch((error) =>
+                            n.notify(
+                              error instanceof Error
+                                ? error.message
+                                : "No se pudo sincronizar Google Calendar.",
+                              true,
+                            ),
+                          )
+                      }
+                    >
+                      Sincronizar ahora
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      onClick={() =>
+                        void n.googleWorkspace.connect().catch((error) =>
+                          n.notify(
+                            error instanceof Error
+                              ? error.message
+                              : "No se pudo renovar Google Workspace.",
+                            true,
+                          ),
+                        )
+                      }
+                    >
+                      Renovar acceso
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      onClick={() => n.googleWorkspace.disconnect()}
+                    >
+                      Desconectar
+                    </Button>
+                  </>
                 ) : (
                   <Button
                     onClick={() =>
@@ -378,8 +433,11 @@ export function SettingsView() {
                 )}
               </div>
               <p className="form-note">
-                La autorización de Google vive solo en esta sesión del navegador;
-                el token OAuth no se guarda en Firestore.
+                Calendar puede leer y modificar tu calendario principal. Drive es
+                solo lectura. El acceso OAuth se conserva únicamente en este
+                navegador hasta que Google lo expire; nunca se guarda en Firestore.
+                Mientras está autorizado, Calendar se sincroniza al abrir NEXUS,
+                al volver a la pestaña y cada 10 minutos.
               </p>
               <div className="integration-row">
                 <span>
@@ -684,14 +742,14 @@ export function SettingsView() {
                 NEXUS usa Firebase Authentication para el acceso y Firebase Storage
                 para archivos. El cambio de Firestore a SQL Connect/PostgreSQL
                 se realiza por etapas; el modo activo es <strong>{dataMode.mode}</strong>. Google
-                Calendar y Drive se autorizan mediante OAuth por sesión, y NEXUS
+                Calendar y Drive se autorizan mediante OAuth en el navegador, y NEXUS
                 AI usa un endpoint de servidor protegido por el token de Firebase.
               </p>
               <div className="surface">
                 <Label>SEGURIDAD DE INTEGRACIONES</Label>
                 <p>
                   Firestore y Storage usan rutas privadas ligadas al UID. El token
-                  de Google Workspace no se persiste en la nube y la clave de
+                  de Google Workspace se conserva solo en el navegador y no se persiste en la nube; la clave de
                   OpenAI permanece únicamente como variable de entorno del servidor.
                 </p>
               </div>

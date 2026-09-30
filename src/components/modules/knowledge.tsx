@@ -215,45 +215,93 @@ export function KnowledgeView({
     }
   }
 
-  function importDriveFile(file: GoogleDriveFile) {
+  async function importDriveFile(file: GoogleDriveFile) {
     if (!file.webViewLink) {
       n.notify("Google no devolvió un enlace para este archivo.", true);
       return;
     }
-    const exists = n.data.knowledge.some(
-      (item) => item.metadata?.googleDriveId === file.id,
-    );
-    if (exists) {
-      n.notify("Ese archivo de Drive ya está conectado a Knowledge.");
-      return;
-    }
-    n.update((w) => {
-      w.knowledge.unshift({
-        ...entity(crypto.randomUUID(), "user", w.user.id),
-        title: file.name,
-        type:
-          file.mimeType === "application/pdf"
-            ? "pdf"
-            : file.mimeType.startsWith("application/vnd.google-apps.")
-              ? "document"
-              : "link",
-        content:
-          "Referencia importada desde Google Drive" +
-          (file.modifiedTime
-            ? " · actualizado " +
-              new Date(file.modifiedTime).toLocaleString("es-NI")
-            : ""),
-        url: file.webViewLink,
-        projectId: driveProject || undefined,
-        category: "Personal",
-        tags: ["drive", "google"],
-        metadata: {
+
+    setDriveBusy(true);
+    try {
+      if (!n.googleWorkspace.connected) await n.googleWorkspace.connect();
+      const grant = await import("@/lib/google-workspace").then((module) =>
+        module.readGoogleWorkspaceGrant(),
+      );
+      if (!grant) throw new Error("Vuelve a conectar Google Workspace.");
+
+      const extracted = await n.services.google.readDriveFile(
+        grant.accessToken,
+        file,
+      );
+      const reference =
+        "Referencia importada desde Google Drive" +
+        (file.modifiedTime
+          ? " · actualizado " +
+            new Date(file.modifiedTime).toLocaleString("es-NI")
+          : "");
+      const content = extracted.readable && extracted.text
+        ? extracted.text
+        : reference + (extracted.reason ? "\n" + extracted.reason : "");
+
+      const saved = n.update((w) => {
+        const syncedAt = Date.now();
+        const existing = w.knowledge.find(
+          (item) => item.metadata?.googleDriveId === file.id,
+        );
+        const metadata = {
+          ...(existing?.metadata ?? {}),
           googleDriveId: file.id,
           googleMimeType: file.mimeType,
-        },
+          googleDriveReadable: extracted.readable,
+          googleDriveTruncated: extracted.truncated,
+          googleDriveSyncedAt: syncedAt,
+        };
+
+        if (existing) {
+          existing.title = file.name;
+          existing.url = file.webViewLink;
+          existing.content = content;
+          existing.projectId = driveProject || existing.projectId;
+          existing.tags = [...new Set([...existing.tags, "drive", "google"])];
+          existing.metadata = metadata;
+          existing.updatedAt = syncedAt;
+          return;
+        }
+
+        w.knowledge.unshift({
+          ...entity(crypto.randomUUID(), "user", w.user.id),
+          title: file.name,
+          type:
+            file.mimeType === "application/pdf"
+              ? "pdf"
+              : file.mimeType.startsWith("application/vnd.google-apps.")
+                ? "document"
+                : "link",
+          content,
+          url: file.webViewLink,
+          projectId: driveProject || undefined,
+          category: "Personal",
+          tags: ["drive", "google"],
+          metadata,
+        });
       });
-    });
-    n.notify("Archivo de Drive conectado a Knowledge.");
+      if (!saved) return;
+
+      n.notify(
+        extracted.readable
+          ? "Archivo de Drive indexado en Knowledge para NEXUS AI."
+          : "Archivo de Drive conectado como referencia. Ese formato todavía no se indexa.",
+      );
+    } catch (error) {
+      n.notify(
+        error instanceof Error
+          ? error.message
+          : "No se pudo importar el contenido desde Google Drive.",
+        true,
+      );
+    } finally {
+      setDriveBusy(false);
+    }
   }
   const items = n.data.knowledge.filter(
     (k) =>
@@ -440,7 +488,7 @@ export function KnowledgeView({
               <button
                 key={file.id}
                 className="knowledge-item"
-                onClick={() => importDriveFile(file)}
+                onClick={() => void importDriveFile(file)}
               >
                 <div className="knowledge-type-icon">
                   <Cloud size={20} />
@@ -467,8 +515,10 @@ export function KnowledgeView({
             />
           )}
           <p className="form-note">
-            NEXUS importa una referencia y enlace al archivo; no copia el contenido
-            completo a Firestore.
+            NEXUS indexa el texto legible de Google Docs, Sheets, Slides y archivos
+            de texto dentro de Knowledge para que la IA pueda usarlo. Ese extracto
+            pasa a tu workspace privado y se sincroniza con Firestore. PDF y otros
+            formatos no extraíbles se conservan solo como referencia y enlace.
           </p>
         </div>
       </Modal>
