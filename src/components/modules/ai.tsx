@@ -860,7 +860,7 @@ export function AIView() {
           )}
         </section>
         <aside className="ai-context">
-          <details open>
+          <details>
             <summary>Contexto y consumo</summary>
             <Section label="CONTEXT WINDOW" title="Tú decides qué compartes." />
             {contextOptions.map((option) => (
