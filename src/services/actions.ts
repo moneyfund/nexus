@@ -671,16 +671,49 @@ export class NexusActions {
       );
     });
 
-  markDebtPaid = (debtId: string) =>
+  markDebtPaid = (debtId: string, accountId?: string) =>
     this.store.update((w) => {
       const debt = (w.debts ?? []).find((item) => item.id === debtId);
       if (!debt) throw new Error("Deuda no encontrada.");
+
+      const remaining = Math.max(0, Math.round(debt.balance * 100) / 100);
+      const account = accountId
+        ? (w.financialAccounts ?? []).find((item) => item.id === accountId)
+        : undefined;
+
+      if (accountId && !account)
+        throw new Error("Cuenta financiera no encontrada.");
+      if (account && account.currency !== debt.currency)
+        throw new Error("La moneda de la cuenta no coincide con la deuda.");
+      if (account && account.balance < remaining)
+        throw new Error("La cuenta no tiene saldo suficiente.");
+
+      if (account && remaining > 0) {
+        account.balance =
+          Math.round((account.balance - remaining) * 100) / 100;
+        account.updatedAt = Date.now();
+        w.expenses.unshift({
+          ...entity(id(), "user", w.user.id),
+          title: "Pago de deuda · " + debt.creditor,
+          amount: remaining,
+          currency: debt.currency,
+          date: new Intl.DateTimeFormat("en-CA", {
+            timeZone: w.user.preferences.timezone,
+          }).format(new Date()),
+          projectId: debt.projectId,
+          category: "Pago de deuda",
+          accountId: account.id,
+        });
+      }
+
       debt.balance = 0;
       debt.status = "paid";
       debt.updatedAt = Date.now();
       log(
         w,
-        "Deuda marcada como pagada: " + debt.creditor,
+        "Deuda marcada como pagada: " +
+          debt.creditor +
+          (account ? " · desde " + account.name : " · conciliación manual"),
         "debt",
         debt.projectId,
       );
@@ -725,6 +758,7 @@ export class NexusActions {
         date: new Intl.DateTimeFormat("en-CA", {
           timeZone: w.user.preferences.timezone,
         }).format(new Date()),
+        projectId: debt.projectId,
         category: "Pago de deuda",
         accountId: account?.id,
       });
