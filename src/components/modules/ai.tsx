@@ -13,6 +13,7 @@ import {
   Check,
   Zap,
 } from "lucide-react";
+import { IntelligenceCore } from "../spatial-environment";
 import { useNexus } from "../nexus-provider";
 import { ModuleFrame, Badge, Label, Button } from "../ui/primitives";
 import { entity } from "@/domain/seed";
@@ -524,8 +525,8 @@ export function AIView() {
   return (
     <ModuleFrame
       eyebrow="Nexus intelligence / 10"
-      title="Piensa en voz alta"
-      description="Tus proyectos, tu tiempo y tu conocimiento en una conversación."
+      title="NEXUS AI"
+      description="Piensa con todo tu contexto."
       action={
         <Badge active={!!aiStatus?.configured}>
           {aiStatus?.configured
@@ -536,34 +537,23 @@ export function AIView() {
         </Badge>
       }
     >
-      <div className="ai-workspace">
+      <div
+        className={`ai-workspace ${n.data.messages.length ? "has-history" : ""} ${busy ? "is-thinking" : ""}`}
+      >
         <section className="ai-conversation">
           <div className="ai-core">
-            <div className="ai-orb">
-              <Orbit size={41} strokeWidth={1} />
-            </div>
-            <Label>NEXUS / CONTEXT AWARE INTERFACE</Label>
+            <IntelligenceCore busy={busy} />
+            <Label>INTELLIGENCE CORE</Label>
             <h2>
               Todo conectado.
               <br />
               <span className="accent">Una perspectiva más clara.</span>
             </h2>
             <p>
-              NEXUS puede razonar sobre tus proyectos, calendario, finanzas y
-              conocimiento. Los cambios sensibles se presentan como propuestas
-              y solo se ejecutan cuando tú los confirmas.
+              Encuentra claridad. Decide el siguiente paso. Tú confirmas cada
+              acción.
             </p>
           </div>
-          {!n.data.messages.length && (
-            <div className="ai-prompts">
-              {prompts.map((p) => (
-                <button key={p} onClick={() => send(p)}>
-                  {p}
-                  <ArrowUpRight size={15} />
-                </button>
-              ))}
-            </div>
-          )}
           <div
             className="ai-messages"
             role="log"
@@ -584,7 +574,10 @@ export function AIView() {
                     {m.contextIds.slice(0, 4).map((id) => {
                       const p = n.projects.find((p) => p.id === id);
                       return p ? (
-                        <Link key={id} href={"/projects/" + id}>
+                        <Link
+                          key={id}
+                          href={"/project?id=" + encodeURIComponent(id)}
+                        >
                           {p.name}
                           <ArrowUpRight size={11} />
                         </Link>
@@ -647,8 +640,8 @@ export function AIView() {
             <div className="system-alert" style={{ marginBottom: 22 }}>
               <strong>NEXUS AI todavía no puede conectar con OpenAI.</strong>
               <p style={{ marginTop: 8 }}>
-                El backend seguro de Firebase Functions debe estar desplegado y
-                tener configurado el secreto OPENAI_API_KEY.
+                {aiStatus.error ||
+                  "Revisa el estado de la conexión en System e inténtalo de nuevo."}
               </p>
             </div>
           )}
@@ -684,103 +677,122 @@ export function AIView() {
             Enter para enviar · Shift + Enter para nueva línea · No se ejecutan
             acciones sin tu confirmación.
           </div>
+          {!n.data.messages.length && (
+            <div className="ai-prompts">
+              {prompts.map((p) => (
+                <button key={p} onClick={() => send(p)}>
+                  {p}
+                  <ArrowUpRight size={15} />
+                </button>
+              ))}
+            </div>
+          )}
         </section>
         <aside className="ai-context">
-          <Section label="CONTEXT WINDOW" title="Tú decides qué comparte." />
-          {contextOptions.map((option) => (
-            <label key={option.id} className="ai-context-option">
-              <option.icon size={16} />
-              <span>{option.label}</span>
-              <input
-                type="checkbox"
-                checked={n.data.user.preferences.aiContext[option.id]}
-                onChange={(e) =>
-                  n.run(() =>
-                    n.actions.updatePreferences({
-                      aiContext: {
-                        ...n.data.user.preferences.aiContext,
-                        [option.id]: e.target.checked,
-                      },
-                    }),
-                  )
-                }
-              />
-            </label>
-          ))}
-          {aiStatus?.quota && (
+          <details open>
+            <summary>Contexto y consumo</summary>
+            <Section label="CONTEXT WINDOW" title="Tú decides qué compartes." />
+            {contextOptions.map((option) => (
+              <label key={option.id} className="ai-context-option">
+                <option.icon size={16} />
+                <span>{option.label}</span>
+                <input
+                  type="checkbox"
+                  checked={n.data.user.preferences.aiContext[option.id]}
+                  onChange={(e) =>
+                    n.run(() =>
+                      n.actions.updatePreferences({
+                        aiContext: {
+                          ...n.data.user.preferences.aiContext,
+                          [option.id]: e.target.checked,
+                        },
+                      }),
+                    )
+                  }
+                />
+              </label>
+            ))}
+            {aiStatus?.quota && (
+              <div className="context-counts">
+                <span>
+                  IA hoy {aiStatus.quota.dailyUsed}/{aiStatus.quota.dailyLimit}
+                </span>
+                <span>
+                  Mes {aiStatus.quota.monthlyUsed}/{aiStatus.quota.monthlyLimit}
+                </span>
+                <span>Costo mes ${aiStatus.quota.monthCostUSD.toFixed(4)}</span>
+              </div>
+            )}
             <div className="context-counts">
-              <span>
-                IA hoy {aiStatus.quota.dailyUsed}/{aiStatus.quota.dailyLimit}
-              </span>
-              <span>
-                Mes {aiStatus.quota.monthlyUsed}/{aiStatus.quota.monthlyLimit}
-              </span>
-              <span>
-                Costo mes ${aiStatus.quota.monthCostUSD.toFixed(4)}
-              </span>
+              <span>{context.projects.length} proyectos</span>
+              <span>{context.events.length} bloques</span>
+              <span>{context.transactions.length} movimientos</span>
+              <span>{context.ideas.length} ideas</span>
+              <span>{context.knowledge.length} referencias</span>
+              <span>{context.memories.length} memorias</span>
             </div>
-          )}
-          <div className="context-counts">
-            <span>{context.projects.length} proyectos</span>
-            <span>{context.events.length} bloques</span>
-            <span>{context.transactions.length} movimientos</span>
-            <span>{context.ideas.length} ideas</span>
-            <span>{context.knowledge.length} referencias</span>
-            <span>{context.memories.length} memorias</span>
-          </div>
-          <Section label="TOOLS" title="Acciones preparadas." />
-          {new NexusToolRegistry().tools.map((t) => (
-            <div className="tool-registry-row" key={t.id}>
-              <span>{t.label}</span>
-              <small>{t.access === "read" ? "CONSULTA" : "CONFIRMACIÓN"}</small>
+          </details>
+          <details>
+            <summary>Herramientas y acciones</summary>
+            <Section label="TOOLS" title="Acciones preparadas." />
+            {new NexusToolRegistry().tools.map((t) => (
+              <div className="tool-registry-row" key={t.id}>
+                <span>{t.label}</span>
+                <small>
+                  {t.access === "read" ? "CONSULTA" : "CONFIRMACIÓN"}
+                </small>
+              </div>
+            ))}
+            <div className="row wrap" style={{ marginTop: 18 }}>
+              <Button variant="secondary" onClick={() => n.openCapture("task")}>
+                Crear tarea
+              </Button>
+              <Link href="/calendar" className="inline-arrow">
+                Planificar
+                <ArrowUpRight size={14} />
+              </Link>
             </div>
-          ))}
-          <div className="row wrap" style={{ marginTop: 18 }}>
-            <Button variant="secondary" onClick={() => n.openCapture("task")}>
-              Crear tarea
-            </Button>
-            <Link href="/calendar" className="inline-arrow">
-              Planificar
-              <ArrowUpRight size={14} />
-            </Link>
-          </div>
-          <Section label="MEMORY" title="Contexto que permanece." />
-          {n.data.memories.map((m) => (
-            <p key={m.id} className="memory-item">
-              {m.content}
-            </p>
-          ))}
-          {!n.data.memories.length && (
-            <p className="form-note">
-              Guarda aquí contexto estable que NEXUS AI debe considerar en
-              conversaciones futuras cuando Conocimiento esté habilitado.
-            </p>
-          )}
-          <form
-            className="memory-form"
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (!memory.trim()) return;
-              const saved = n.update((w) => {
-                w.memories.push({
-                  ...entity(crypto.randomUUID(), "user", w.user.id),
-                  content: memory.trim(),
-                  projectIds: [],
+          </details>
+          <details>
+            <summary>Memoria · {n.data.memories.length}</summary>
+            <Section label="MEMORY" title="Contexto que permanece." />
+            {n.data.memories.map((m) => (
+              <p key={m.id} className="memory-item">
+                {m.content}
+              </p>
+            ))}
+            {!n.data.memories.length && (
+              <p className="form-note">
+                Guarda aquí contexto estable que NEXUS AI debe considerar en
+                conversaciones futuras cuando Conocimiento esté habilitado.
+              </p>
+            )}
+            <form
+              className="memory-form"
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!memory.trim()) return;
+                const saved = n.update((w) => {
+                  w.memories.push({
+                    ...entity(crypto.randomUUID(), "user", w.user.id),
+                    content: memory.trim(),
+                    projectIds: [],
+                  });
                 });
-              });
-              if (saved) setMemory("");
-            }}
-          >
-            <input
-              aria-label="Nueva memoria"
-              placeholder="Añadir contexto…"
-              value={memory}
-              onChange={(e) => setMemory(e.target.value)}
-            />
-            <button className="icon-button" aria-label="Guardar memoria">
-              <Plus size={15} />
-            </button>
-          </form>
+                if (saved) setMemory("");
+              }}
+            >
+              <input
+                aria-label="Nueva memoria"
+                placeholder="Añadir contexto…"
+                value={memory}
+                onChange={(e) => setMemory(e.target.value)}
+              />
+              <button className="icon-button" aria-label="Guardar memoria">
+                <Plus size={15} />
+              </button>
+            </form>
+          </details>
         </aside>
       </div>
     </ModuleFrame>

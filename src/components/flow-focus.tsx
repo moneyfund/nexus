@@ -7,8 +7,8 @@ import {
   Plus,
   ArrowUpRight,
   Check,
-  AudioLines,
 } from "lucide-react";
+import { IntelligenceCore } from "./spatial-environment";
 import { useNexus } from "./nexus-provider";
 import {
   Button,
@@ -188,7 +188,7 @@ export function FlowView() {
       description="Cierra el ruido. Abre espacio para una sola cosa."
     >
       <div className="flow-launch">
-        <AudioLines size={45} strokeWidth={1} />
+        <IntelligenceCore />
         <h2>Elige tu próximo avance.</h2>
         <div className="row wrap">
           {[25, 50, 90].map((m) => (

@@ -5,12 +5,13 @@ import { motion } from "motion/react";
 import { Bell, Search, Plus, Orbit, Menu, X } from "lucide-react";
 import { useNexus } from "./nexus-provider";
 import { navigation } from "@/config/navigation";
-import { Badge, IconButton } from "./ui/primitives";
+import { IconButton } from "./ui/primitives";
 import { CommandPalette, NotificationCenter } from "./command-system";
 import { IdeaPanel } from "./idea-panel";
 import { PwaRegistration } from "./pwa-registration";
 import { AuthScreen } from "./auth-screen";
 import { NexusVoiceOrb } from "./nexus-voice-orb";
+import { SpatialEnvironment, spatialZone } from "./spatial-environment";
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const n = useNexus();
@@ -21,7 +22,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     href === "/" ? pathname === "/" : pathname.startsWith(href);
   const groups = ["workspace", "intelligence", "system"];
   if (!n.authReady) {
-    return <main style={{ minHeight: "100dvh", display: "grid", placeItems: "center" }}>Conectando NEXUS…</main>;
+    return (
+      <main
+        style={{ minHeight: "100dvh", display: "grid", placeItems: "center" }}
+      >
+        Conectando NEXUS…
+      </main>
+    );
   }
   if (!n.session) return <AuthScreen />;
   return (
@@ -29,7 +36,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <a href="#main" className="skip-link">
         Ir al contenido
       </a>
-      <div className="ambient-layer" aria-hidden="true" />
+      <SpatialEnvironment variant={spatialZone(pathname)} />
       <aside className="app-rail">
         <Link href="/" className="brand" aria-label="NEXUS Today">
           <span className="brand-symbol">
@@ -64,7 +71,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     <item.icon size={17} strokeWidth={1.5} />
                     {item.label}
                     {item.href === "/ai" && (
-                      <span className="nav-index">LOCAL</span>
+                      <span className="nav-index">AI</span>
                     )}
                     {item.href === "/settings" && n.sqlReady && (
                       <span className="nav-index">SQL</span>
@@ -75,14 +82,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           ))}
         </nav>
         <div className="rail-bottom">
-          <div className="small muted" style={{ paddingLeft: 10 }}>
-            <span className="status-tick" />
-            FIREBASE · {n.cloudReady ? "SYNC" : "CONNECTING"}
-          </div>
-          <div className="small muted" style={{ paddingLeft: 10, marginTop: 6 }}>
-            <span className="status-tick" />
-            POSTGRES · {n.sqlReady ? (n.sqlSyncing ? "SYNCING" : "LIVE") : "CONNECTING"}
-          </div>
+          <Link href="/settings" className="rail-system-state">
+            <span
+              className={
+                "connection-light " +
+                (n.cloudReady && !n.cloudError ? "connected" : "")
+              }
+            />
+            <span>
+              {n.cloudError
+                ? "Revisar conexión"
+                : n.cloudReady
+                  ? "Espacio sincronizado"
+                  : "Conectando espacio"}
+            </span>
+          </Link>
           <Link href="/settings" className="profile-link">
             <span className="avatar">{n.data.user.initials}</span>
             <span>
@@ -92,7 +106,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </Link>
         </div>
       </aside>
-      <div className="app-content">
+      <div className="app-content" data-zone={spatialZone(pathname)}>
         <header className="topbar">
           <Link href="/" className="mobile-brand">
             <Orbit size={23} className="accent" />
@@ -104,17 +118,32 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <strong>{current?.label.toUpperCase() ?? "PROJECT COMMAND"}</strong>
           </div>
           <div className="topbar-tools">
-            <Badge>FIREBASE · {n.cloudReady ? "SYNC" : "CONNECTING"}</Badge>
-            <Badge active={n.sqlReady}>
-              POSTGRES · {n.sqlReady ? (n.sqlSyncing ? "SYNC" : "LIVE") : "CONNECTING"}
-            </Badge>
+            <Link
+              href="/settings"
+              className="topbar-system-link"
+              title={n.sqlError || n.cloudError || "Estado del sistema"}
+            >
+              <span
+                className={
+                  "connection-light " +
+                  (n.sqlReady && !n.sqlError ? "connected" : "")
+                }
+              />
+              {n.sqlError
+                ? "SQL · REVISAR"
+                : n.sqlReady
+                  ? n.sqlSyncing
+                    ? "SQL · SYNC"
+                    : "SQL · LIVE"
+                  : "SQL · CONECTANDO"}
+            </Link>
             <button
               className="search-trigger"
               onClick={() => n.setCommandOpen(true)}
               aria-label="Buscar en NEXUS"
             >
               <Search size={17} />
-              <span>Buscar cualquier cosa</span>
+              <span>Buscar en tu universo</span>
               <kbd>⌘ K</kbd>
             </button>
             <div style={{ position: "relative" }}>
@@ -134,7 +163,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               onClick={() => n.openCapture()}
             >
               <Plus size={16} />
-              Capture
+              Capturar
             </button>
           </div>
         </header>
@@ -151,10 +180,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 ? false
                 : {
                     opacity: 0,
-                    y: 18,
-                    scale: 0.992,
-                    rotateX: 0.6,
-                    filter: "blur(7px)",
+                    y: 12,
+                    scale: 0.995,
                   }
             }
             animate={{
@@ -165,7 +192,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               filter: "blur(0px)",
             }}
             transition={{ duration: 0.52, ease: [0.22, 1, 0.36, 1] }}
-            style={{ transformOrigin: "50% 18%", perspective: 1200 }}
+            className="zone-content"
+            style={{ transformOrigin: "50% 18%" }}
           >
             {children}
           </motion.div>
@@ -208,7 +236,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               className={isActive(href) ? "active" : ""}
             >
               <item.icon size={19} />
-              {item.label === "Nexus AI" ? "AI" : item.label === "Finance" ? "Dinero" : item.label}
+              {item.label === "Nexus AI"
+                ? "AI"
+                : item.label === "Finance"
+                  ? "Dinero"
+                  : item.label}
             </Link>
           );
         })}

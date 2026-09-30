@@ -1,5 +1,6 @@
 "use client";
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import {
   ArrowUpRight,
@@ -23,6 +24,10 @@ import {
 } from "./ui/primitives";
 import { ProjectCard } from "./project-card";
 import type { ProjectStatus } from "@/domain/models";
+const Galaxy = dynamic(
+  () => import("./nexus-galaxy").then((m) => m.NexusGalaxy),
+  { ssr: false },
+);
 const statuses: { value: ProjectStatus; label: string }[] = [
   { value: "active", label: "Activos" },
   { value: "backlog", label: "Backlog" },
@@ -34,17 +39,23 @@ export function ProjectsView() {
   const [view, setView] = useState("map");
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("all");
-  const visible = n.projects.filter(
-    (p) =>
-      (filter === "all" || p.status === filter) &&
-      (p.name + p.area).toLowerCase().includes(query.toLowerCase()),
+  const projects = n.projects;
+  const visible = useMemo(
+    () =>
+      projects.filter(
+        (p) =>
+          (filter === "all" || p.status === filter) &&
+          (p.name + p.area).toLowerCase().includes(query.toLowerCase()),
+      ),
+    [projects, filter, query],
   );
+  const visibleIds = useMemo(() => visible.map((p) => p.id), [visible]);
   const active = n.projects.filter((p) => p.status === "active").length;
   return (
     <ModuleFrame
-      eyebrow="Execution portfolio / 02"
-      title="Projects"
-      description="Cada frente tiene su lugar. Tu atención tiene un límite."
+      eyebrow="Mission control / 02"
+      title="Tus misiones"
+      description="Prioriza, enfoca y haz avanzar cada frente."
       action={
         <Button onClick={() => n.openCapture("project")}>
           <Plus size={16} />
@@ -76,15 +87,15 @@ export function ProjectsView() {
           value={view}
           onChange={setView}
           items={[
-            { value: "map", label: "Portfolio map", icon: <Orbit size={14} /> },
-            { value: "list", label: "List", icon: <LayoutList size={14} /> },
-            { value: "grid", label: "Grid", icon: <Grid2X2 size={14} /> },
+            { value: "map", label: "Universo", icon: <Orbit size={14} /> },
+            { value: "list", label: "Lista", icon: <LayoutList size={14} /> },
+            { value: "grid", label: "Paneles", icon: <Grid2X2 size={14} /> },
             {
               value: "timeline",
-              label: "Timeline",
+              label: "Cronología",
               icon: <CalendarRange size={14} />,
             },
-            { value: "status", label: "Status", icon: <Columns3 size={14} /> },
+            { value: "status", label: "Estados", icon: <Columns3 size={14} /> },
           ]}
         />
         <div className="search-field">
@@ -122,33 +133,44 @@ export function ProjectsView() {
           action="Crear proyecto"
         />
       ) : view === "map" ? (
-        <div className="portfolio-map">
-          <div className="portfolio-map-axis" aria-hidden="true">
-            <span>EXECUTION NETWORK</span>
-            <div className="map-center">
-              <Orbit size={34} />
-              <small>NEXUS</small>
-            </div>
-          </div>
-          <div className="portfolio-nodes">
-            {visible.map((p, index) => (
+        <div className="mission-map">
+          <Galaxy compact projectIds={visibleIds} includeIdeas={false} />
+          <div className="mission-directory" aria-label="Lista de misiones">
+            {visible.map((p) => (
               <Link
                 key={p.id}
                 href={"/project?id=" + encodeURIComponent(p.id)}
-                className="portfolio-node"
+                className="mission-entry"
               >
-                <span className="portfolio-node-index">
-                  P.{String(index + 1).padStart(2, "0")}
-                </span>
-                <ProgressRing value={p.progress} size={88} />
+                <ProgressRing value={p.progress} size={44} />
                 <div>
                   <Badge active={p.status === "active"}>
-                    {p.status.toUpperCase()}
+                    {statuses.find((s) => s.value === p.status)?.label}
                   </Badge>
                   <h3>{p.name}</h3>
-                  <p>{p.nextAction}</p>
+                  <p>
+                    {p.tasks.find((t) => !t.completed)?.title || p.nextAction}
+                  </p>
+                  <div className="mission-meta">
+                    <span>
+                      {
+                        {
+                          critical: "Crítica",
+                          high: "Alta",
+                          medium: "Media",
+                          low: "Baja",
+                        }[p.priority]
+                      }
+                    </span>
+                    <span>
+                      {p.metadata?.hoursBasis === "flow-only" && p.hours === 0
+                        ? "Sin medir"
+                        : p.hours.toFixed(1) + " h"}
+                    </span>
+                    <span>{p.dueDate ?? "Sin fecha"}</span>
+                  </div>
                 </div>
-                <ArrowUpRight size={17} />
+                <ArrowUpRight size={15} />
               </Link>
             ))}
           </div>

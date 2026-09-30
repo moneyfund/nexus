@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   Minus,
   Plus,
@@ -8,61 +8,71 @@ import {
   Play,
   RotateCcw,
   Move,
-  Maximize2,
+  X,
+  List,
+  Orbit,
 } from "lucide-react";
 import { useNexus } from "./nexus-provider";
 import { IconButton } from "./ui/primitives";
-type Point = {
-  x: number;
-  y: number;
-  z: number;
-  size: number;
-  tint: number;
-  alpha: number;
-};
-type Node = {
+import type { ProjectStatus } from "@/domain/models";
+import {
+  galaxyBudget,
+  orbitLabels,
+  orbitOrder,
+  orbitPosition,
+  orbitRadii,
+} from "@/lib/orbits";
+
+type SpaceNode = {
   id: string;
   label: string;
   category: string;
   kind: "idea" | "project";
-  status?: "active" | "waiting" | "backlog" | "completed";
+  status?: ProjectStatus;
+  progress?: number;
+  nextAction?: string;
   angle: number;
   radius: number;
   speed: number;
-  fresh: boolean;
 };
-function stars(count: number) {
+function makeParticles(count: number) {
   let seed = 67391;
-  const random = () => {
-    seed = (seed * 16807) % 2147483647;
-    return (seed - 1) / 2147483646;
-  };
+  const random = () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646;
   return Array.from({ length: count }, () => {
-    const r = Math.pow(random(), 0.68) * 6.8;
-    const arm = Math.floor(random() * 4);
-    const a = (arm * Math.PI) / 2 + r * 0.68 + (random() - 0.5) * 0.48;
+    const radius = 0.65 + Math.pow(random(), 0.72) * 6.1;
+    const angle =
+      (Math.floor(random() * 3) * Math.PI * 2) / 3 +
+      radius * 0.73 +
+      (random() - 0.5) * 0.55;
     return {
-      x: Math.cos(a) * r,
-      y: (random() - 0.5) * (0.18 + r * 0.1),
-      z: Math.sin(a) * r,
-      size: 0.35 + random() * 1.35,
-      tint: random(),
-      alpha: 0.3 + random() * 0.7,
+      x: Math.cos(angle) * radius,
+      z: Math.sin(angle) * radius,
+      y: (random() - 0.5) * (0.08 + radius * 0.09),
+      size: 0.4 + random() * 1.3,
+      alpha: 0.15 + random() * 0.75,
     };
   });
 }
-const particles = stars(1600);
-export function NexusGalaxy({ compact = false }: { compact?: boolean }) {
+const particles = makeParticles(2600);
+
+export function NexusGalaxy({
+  compact = false,
+  projectIds,
+  includeIdeas = true,
+}: {
+  compact?: boolean;
+  projectIds?: string[];
+  includeIdeas?: boolean;
+}) {
   const n = useNexus();
-  const router = useRouter();
   const canvas = useRef<HTMLCanvasElement>(null);
   const shell = useRef<HTMLDivElement>(null);
   const nodeRefs = useRef(new Map<string, HTMLButtonElement>());
   const view = useRef({
-    yaw: 0.25,
-    targetYaw: 0.25,
-    pitch: 0.6,
-    targetPitch: 0.6,
+    yaw: -0.18,
+    targetYaw: -0.18,
+    pitch: 0.66,
+    targetPitch: 0.66,
     zoom: 1,
     targetZoom: 1,
     px: 0,
@@ -71,262 +81,330 @@ export function NexusGalaxy({ compact = false }: { compact?: boolean }) {
     ty: 0,
   });
   const drag = useRef({ active: false, x: 0, y: 0 });
+  const flightTime = useRef(0);
+  const pointerInside = useRef(false);
   const renderRef = useRef<() => void>(() => {});
   const [paused, setPaused] = useState(false);
   const [orbit, setOrbit] = useState("all");
+  const [inspectedId, setInspectedId] = useState<string | null>(null);
+  const [listOpen, setListOpen] = useState(false);
   const quality = n.data.user.preferences.quality;
   const reduce = n.reduceMotion;
-  const nodes = useMemo<Node[]>(() => {
-    const ideas = n.data.ideas.filter(
-      (i) => i.status !== "archived" && i.status !== "converted",
+  const nodes = useMemo<SpaceNode[]>(() => {
+    const projects = n.projects.filter(
+      (p) => !projectIds || projectIds.includes(p.id),
     );
-    const statusRadius = {
-      active: 2.05,
-      waiting: 3.35,
-      backlog: 4.55,
-      completed: 5.65,
-    } as const;
-    const projects = n.projects;
     return [
-      ...projects.map((p, index) => {
-        const sameStatus = projects.filter((item) => item.status === p.status);
-        const statusIndex = sameStatus.findIndex((item) => item.id === p.id);
-        const radius =
-          statusRadius[p.status] +
-          (statusIndex % 3) * 0.16 +
-          Math.floor(statusIndex / 3) * 0.09;
+      ...projects.map((p) => {
+        const group = projects.filter((item) => item.status === p.status);
         return {
           id: p.id,
           label: p.name,
-          category: "Projects",
+          category: p.area,
           kind: "project" as const,
           status: p.status,
-          angle:
-            (statusIndex / Math.max(sameStatus.length, 1)) * Math.PI * 2 +
-            index * 0.17 +
-            0.8,
-          radius,
-          speed:
-            p.status === "active"
-              ? 0.000032
-              : p.status === "waiting"
-                ? 0.000021
-                : p.status === "backlog"
-                  ? 0.000014
-                  : 0.000009,
-          fresh: false,
+          progress: p.progress,
+          nextAction: p.tasks.find((t) => !t.completed)?.title || p.nextAction,
+          ...orbitPosition(
+            p.status,
+            group.findIndex((item) => item.id === p.id),
+            group.length,
+          ),
         };
       }),
-      ...ideas.slice(0, 18).map((i, index) => ({
-        id: i.id,
-        label: i.title,
-        category: i.category,
-        kind: "idea" as const,
-        angle: index * 2.399 + 0.2,
-        radius: 6.25 + (index % 4) * 0.17,
-        speed: 0.000007,
-        fresh: false,
-      })),
+      ...(includeIdeas
+        ? n.data.ideas
+            .filter((i) => i.status !== "archived" && i.status !== "converted")
+            .slice(0, 24)
+            .map((i, index) => ({
+              id: i.id,
+              label: i.title,
+              category: i.category,
+              kind: "idea" as const,
+              angle: index * 2.399 + 0.2,
+              radius: 6.5 + (index % 3) * 0.12,
+              speed: 0.000006,
+            }))
+        : []),
     ];
-  }, [n.data.ideas, n.projects]);
+  }, [n.projects, n.data.ideas, projectIds, includeIdeas]);
   const filtered = useMemo(
-    () => nodes.filter((p) => orbit === "all" || p.category === orbit),
+    () =>
+      nodes.filter(
+        (p) =>
+          orbit === "all" ||
+          (orbit === "ideas" ? p.kind === "idea" : p.status === orbit),
+      ),
     [nodes, orbit],
   );
+  const inspected = filtered.find((p) => p.id === inspectedId);
+
   useEffect(() => {
-    const el = canvas.current;
-    const container = shell.current;
-    if (!el || !container) return;
-    const ctx = el.getContext("2d");
-    if (!ctx) return;
+    const el = canvas.current,
+      container = shell.current;
+    const ctx = el?.getContext("2d");
+    if (!el || !container || !ctx) return;
     let width = 1,
       height = 1,
       raf = 0,
       visible = true,
       last = 0,
-      frameCost = 0,
-      frames = 0;
-    let count = quality === "low" ? 380 : 1400;
+      lastPaint = 0,
+      frames = 0,
+      cost = 0;
+    let budget = galaxyBudget(quality, 800),
+      count = budget.particles;
     const sprite = document.createElement("canvas");
-    sprite.width = sprite.height = 32;
+    sprite.width = sprite.height = 24;
     const sc = sprite.getContext("2d")!;
-    const g = sc.createRadialGradient(16, 16, 0, 16, 16, 16);
-    g.addColorStop(0, "#fff");
-    g.addColorStop(0.13, "#f4c1ff");
-    g.addColorStop(0.35, "#d64aec70");
-    g.addColorStop(1, "#ad40e000");
-    sc.fillStyle = g;
-    sc.fillRect(0, 0, 32, 32);
-    const project = (p: { x: number; y: number; z: number }) => {
-      const v = view.current;
-      const cy = Math.cos(v.yaw),
+    const glow = sc.createRadialGradient(12, 12, 0, 12, 12, 12);
+    glow.addColorStop(0, "#fff7ff");
+    glow.addColorStop(0.15, "#f4ccff");
+    glow.addColorStop(0.4, "#b571d955");
+    glow.addColorStop(1, "#78289400");
+    sc.fillStyle = glow;
+    sc.fillRect(0, 0, 24, 24);
+    const project = (x: number, y: number, z: number) => {
+      const v = view.current,
+        cy = Math.cos(v.yaw),
         sy = Math.sin(v.yaw);
-      const x = p.x * cy - p.z * sy;
-      const z = p.x * sy + p.z * cy;
-      const y = p.y * Math.cos(v.pitch) - z * Math.sin(v.pitch);
-      const depth = p.y * Math.sin(v.pitch) + z * Math.cos(v.pitch);
-      const perspective = 18 / (18 + depth);
-      const scale = Math.min(width * 0.071, height * 0.125) * v.zoom;
+      const rx = x * cy - z * sy,
+        rz = x * sy + z * cy;
+      const ry = y * Math.cos(v.pitch) - rz * Math.sin(v.pitch);
+      const depth = y * Math.sin(v.pitch) + rz * Math.cos(v.pitch);
+      const perspective = 20 / (20 + depth);
+      const scale = Math.min(width * 0.061, height * 0.125) * v.zoom;
       return {
-        x: width / 2 + (x + v.px * 0.12) * scale * perspective,
-        y: height * 0.48 + (y + v.py * 0.12) * scale * perspective,
+        x: width / 2 + (rx + v.px * 0.16) * scale * perspective,
+        y: height * 0.47 + (ry + v.py * 0.16) * scale * perspective,
         depth,
         perspective,
+        scale,
       };
     };
-    function draw(now = performance.now()) {
+    function draw(now: number) {
       raf = 0;
       if (!visible || document.hidden) return;
-      const started = performance.now();
-      const delta = Math.min(32, now - (last || now));
-      last = now;
-      const v = view.current;
-      if (!reduce && !paused && !drag.current.active)
-        v.targetYaw += delta * 0.000021;
-      const smoothing = reduce ? 1 : 0.09;
-      v.yaw += (v.targetYaw - v.yaw) * smoothing;
-      v.pitch += (v.targetPitch - v.pitch) * smoothing;
-      v.zoom += (v.targetZoom - v.zoom) * smoothing;
-      v.px += (v.tx - v.px) * smoothing;
-      v.py += (v.ty - v.py) * smoothing;
-      ctx!.clearRect(0, 0, width, height);
-      // Deep, stationary star field; the knowledge disk moves through its own 3D coordinates.
-      for (let i = 0; i < 70; i++) {
-        const x = (((i * 277.3) % 1000) / 1000) * width;
-        const y = (((i * 137.7) % 1000) / 1000) * height;
-        ctx!.fillStyle = `rgba(222,199,244,${0.1 + (i % 4) * 0.055})`;
-        ctx!.fillRect(x, y, i % 11 === 0 ? 1.8 : 1, 1);
+      const continuous = !reduce && !paused && !pointerInside.current;
+      if (continuous && now - lastPaint < 1000 / budget.fps - 1) {
+        raf = requestAnimationFrame(draw);
+        return;
       }
-      const cx = width / 2,
-        cy = height * 0.48;
-      const radius = Math.min(width, height) * 0.4;
-      const nebula = ctx!.createRadialGradient(cx, cy, 0, cx, cy, radius);
-      nebula.addColorStop(0, "#d83fcc20");
-      nebula.addColorStop(0.35, "#901dab12");
-      nebula.addColorStop(1, "#00000000");
-      ctx!.fillStyle = nebula;
+      const started = performance.now(),
+        delta = Math.min(50, now - (last || now));
+      last = now;
+      lastPaint = now;
+      const v = view.current;
+      if (continuous && !drag.current.active) {
+        v.targetYaw += delta * 0.000009;
+        flightTime.current += delta;
+      }
+      const smoothing = reduce ? 1 : 0.075;
+      for (const [a, b] of [
+        ["yaw", "targetYaw"],
+        ["pitch", "targetPitch"],
+        ["zoom", "targetZoom"],
+        ["px", "tx"],
+        ["py", "ty"],
+      ] as const)
+        v[a] += (v[b] - v[a]) * smoothing;
+      ctx!.clearRect(0, 0, width, height);
+      const center = project(0, 0, 0);
+      const halo = ctx!.createRadialGradient(
+        center.x,
+        center.y,
+        0,
+        center.x,
+        center.y,
+        width * 0.49,
+      );
+      halo.addColorStop(0, "#b748db28");
+      halo.addColorStop(0.42, "#8b30b911");
+      halo.addColorStop(1, "#10051800");
+      ctx!.fillStyle = halo;
       ctx!.fillRect(0, 0, width, height);
-
-      // Cinematic nucleus: layered accretion light gives the hero real depth
-      // without adding a heavy WebGL dependency to the static GitHub Pages build.
-      ctx!.save();
-      ctx!.translate(cx, cy);
-      ctx!.rotate(v.yaw * 0.18);
-      for (let ring = 0; ring < 5; ring++) {
+      // Perspective tracks are the same coordinates used by the accessible HTML nodes.
+      for (const status of orbitOrder) {
         ctx!.beginPath();
-        ctx!.ellipse(
-          0,
-          0,
-          radius * (0.2 + ring * 0.075),
-          radius * (0.045 + ring * 0.012),
-          0,
-          0,
-          Math.PI * 2,
-        );
-        ctx!.strokeStyle =
-          ring === 0
-            ? "rgba(255,232,255,.42)"
-            : `rgba(221,82,237,${0.2 - ring * 0.026})`;
-        ctx!.lineWidth = ring === 0 ? 1.4 : 0.8;
+        for (let i = 0; i <= 100; i++) {
+          const angle = (i / 100) * Math.PI * 2,
+            r = orbitRadii[status];
+          const p = project(Math.cos(angle) * r, 0, Math.sin(angle) * r);
+          if (!i) ctx!.moveTo(p.x, p.y);
+          else ctx!.lineTo(p.x, p.y);
+        }
+        ctx!.strokeStyle = status === "active" ? "#f8baff50" : "#b6a7e62b";
+        ctx!.lineWidth = 0.75;
         ctx!.stroke();
       }
-      const horizon = ctx!.createRadialGradient(0, 0, 0, 0, 0, radius * 0.23);
-      horizon.addColorStop(0, "rgba(255,255,255,.95)");
-      horizon.addColorStop(0.12, "rgba(252,218,255,.8)");
-      horizon.addColorStop(0.28, "rgba(226,92,241,.46)");
-      horizon.addColorStop(0.56, "rgba(133,39,170,.18)");
-      horizon.addColorStop(1, "rgba(70,18,92,0)");
-      ctx!.fillStyle = horizon;
-      ctx!.beginPath();
-      ctx!.arc(0, 0, radius * 0.23, 0, Math.PI * 2);
-      ctx!.fill();
-      ctx!.restore();
-
-      // Orbit tracks encode project state: active projects live closest to the core.
-      for (const r of [2.05, 3.35, 4.55, 5.65, 6.25]) {
+      ctx!.globalCompositeOperation = "screen";
+      // Three continuous dust arms provide volume at every quality level.
+      for (let arm = 0; arm < 3; arm++) {
+        for (const [lineWidth, alpha] of [
+          [18, 0.024],
+          [7, 0.045],
+          [1, 0.18],
+        ]) {
+          ctx!.beginPath();
+          for (let i = 0; i <= 80; i++) {
+            const r = 0.8 + (i / 80) * 5.8,
+              a = (arm * Math.PI * 2) / 3 + r * 0.73;
+            const p = project(Math.cos(a) * r, 0, Math.sin(a) * r);
+            if (!i) ctx!.moveTo(p.x, p.y);
+            else ctx!.lineTo(p.x, p.y);
+          }
+          ctx!.strokeStyle = `rgba(214,147,242,${alpha})`;
+          ctx!.lineWidth = lineWidth;
+          ctx!.stroke();
+        }
+      }
+      for (let i = 0; i < count; i++) {
+        const star = particles[i],
+          p = project(star.x, star.y, star.z);
+        const size = star.size * 3.7 * p.perspective;
+        ctx!.globalAlpha = star.alpha;
+        ctx!.drawImage(sprite, p.x - size / 2, p.y - size / 2, size, size);
+      }
+      ctx!.globalAlpha = 1;
+      // Accretion rings in world space, with a bright rim and a shaded spherical core.
+      for (let ring = 0; ring < 24; ring++) {
+        const r = 0.95 + ring * 0.032;
         ctx!.beginPath();
-        for (let i = 0; i <= 120; i++) {
-          const a = (i / 120) * Math.PI * 2;
-          const p = project({ x: Math.cos(a) * r, y: 0, z: Math.sin(a) * r });
+        for (let i = 0; i <= 90; i++) {
+          const a = (i / 90) * Math.PI * 2;
+          const p = project(
+            Math.cos(a) * r,
+            Math.sin(a * 3 + ring) * 0.012,
+            Math.sin(a) * r,
+          );
           if (!i) ctx!.moveTo(p.x, p.y);
           else ctx!.lineTo(p.x, p.y);
         }
         ctx!.strokeStyle =
-          r === 2.05
-            ? "#f4a8ff3d"
-            : r === 3.35
-              ? "#c783ff25"
-              : "#c677f016";
-        ctx!.lineWidth = 0.8;
+          ring < 5 ? "#ffe4fb82" : `rgba(217,116,230,${0.24 - ring * 0.007})`;
+        ctx!.lineWidth = ring < 5 ? 1.3 : 0.8;
         ctx!.stroke();
       }
-      ctx!.globalCompositeOperation = "screen";
-      for (let i = 0; i < count; i++) {
-        const star = particles[i];
-        const p = project(star);
-        const size = star.size * 3.7 * p.perspective;
-        ctx!.globalAlpha = star.alpha * 0.65;
-        ctx!.drawImage(sprite, p.x - size / 2, p.y - size / 2, size, size);
-      }
-      ctx!.globalAlpha = 1;
-      const coreSize = Math.min(width, height) * 0.135 * v.zoom;
-      const core = ctx!.createRadialGradient(cx, cy, 0, cx, cy, coreSize * 2.1);
-      core.addColorStop(0, "#fff6ff");
-      core.addColorStop(0.08, "#f8cbfc");
-      core.addColorStop(0.2, "#f18dea99");
-      core.addColorStop(0.5, "#a631c737");
-      core.addColorStop(1, "#7625b000");
-      ctx!.fillStyle = core;
+      const radius = center.scale * 0.82;
+      const corona = ctx!.createRadialGradient(
+        center.x,
+        center.y,
+        radius * 0.45,
+        center.x,
+        center.y,
+        radius * 3.6,
+      );
+      corona.addColorStop(0, "#fff4fbbb");
+      corona.addColorStop(0.16, "#fbb6ed70");
+      corona.addColorStop(0.4, "#e658ee25");
+      corona.addColorStop(1, "#ab39db00");
+      ctx!.fillStyle = corona;
       ctx!.beginPath();
-      ctx!.arc(cx, cy, coreSize * 2.1, 0, Math.PI * 2);
+      ctx!.arc(center.x, center.y, radius * 3.6, 0, Math.PI * 2);
       ctx!.fill();
       ctx!.globalCompositeOperation = "source-over";
-      const labelPositions: { x: number; y: number }[] = [];
+      const sphere = ctx!.createRadialGradient(
+        center.x - radius * 0.4,
+        center.y - radius * 0.5,
+        0,
+        center.x,
+        center.y,
+        radius,
+      );
+      sphere.addColorStop(0, "#fff6fc");
+      sphere.addColorStop(0.23, "#eed5f6");
+      sphere.addColorStop(0.48, "#b672d0");
+      sphere.addColorStop(0.8, "#402154");
+      sphere.addColorStop(1, "#110b23");
+      ctx!.fillStyle = sphere;
+      ctx!.beginPath();
+      ctx!.arc(center.x, center.y, radius, 0, Math.PI * 2);
+      ctx!.fill();
+      ctx!.strokeStyle = "#ffe7ffad";
+      ctx!.lineWidth = 0.85;
+      ctx!.stroke();
+      const positions: {
+        left: number;
+        right: number;
+        top: number;
+        bottom: number;
+      }[] = [
+        {
+          left: center.x - radius * 1.5,
+          right: center.x + radius * 1.5,
+          top: center.y - radius * 1.5,
+          bottom: center.y + radius * 2.2,
+        },
+      ];
       for (const node of filtered) {
-        const orbitAngle =
-          node.angle +
-          (!reduce && !paused ? now * node.speed : 0);
-        const p = project({
-          x: Math.cos(orbitAngle) * node.radius,
-          y:
-            node.kind === "idea"
-              ? 0.34
-              : node.status === "active"
-                ? Math.sin(orbitAngle * 1.7) * 0.08
-                : 0,
-          z: Math.sin(orbitAngle) * node.radius,
-        });
+        const a = node.angle + flightTime.current * node.speed;
+        const p = project(
+          Math.cos(a) * node.radius,
+          node.kind === "idea" ? 0.3 : 0,
+          Math.sin(a) * node.radius,
+        );
         const button = nodeRefs.current.get(node.id);
-        if (button) {
-          button.style.transform = `translate3d(${p.x}px,${p.y}px,0) translate(-50%,-50%) scale(${Math.max(0.8, Math.min(1.05, p.perspective))})`;
-          button.style.zIndex = String(Math.round(30 - p.depth));
-          button.style.opacity = String(
-            Math.max(0.6, Math.min(1, 1 - p.depth * 0.045)),
-          );
-          const overlaps = labelPositions.some(
-            (q) => Math.abs(q.x - p.x) < 128 && Math.abs(q.y - p.y) < 66,
-          );
-          button.style.setProperty("--label-opacity", overlaps ? "0" : "1");
-          if (!overlaps) labelPositions.push(p);
-        }
+        if (!button) continue;
+        const x = Math.max(24, Math.min(width - 24, p.x)),
+          y = Math.max(30, Math.min(height - 40, p.y));
+        button.style.transform = `translate3d(${x}px,${y}px,0) translate(-50%,-50%) scale(${Math.max(0.85, Math.min(1.1, p.perspective))})`;
+        button.style.zIndex = String(Math.round(30 - p.depth));
+        button.style.setProperty(
+          "--node-alpha",
+          String(Math.max(0.6, Math.min(1, 1 - p.depth * 0.04))),
+        );
+        const leftSide = x > width * 0.66;
+        const bounds = {
+          left: leftSide ? x - 180 : x + 27,
+          right: leftSide ? x - 27 : x + 180,
+          top: y - 22,
+          bottom: y + 40,
+        };
+        const overlaps = positions.some(
+          (q) =>
+            bounds.left < q.right + 8 &&
+            bounds.right > q.left - 8 &&
+            bounds.top < q.bottom + 6 &&
+            bounds.bottom > q.top - 6,
+        );
+        const showLabel =
+          width >= 500 &&
+          !overlaps &&
+          (filtered.length <= 8 || node.status === "active");
+        button.style.setProperty("--label-opacity", showLabel ? "1" : "0");
+        button.dataset.side = leftSide ? "left" : "right";
+        if (showLabel) positions.push(bounds);
       }
       frames++;
-      frameCost += performance.now() - started;
-      if (quality === "auto" && frames === 90 && frameCost / frames > 15)
-        count = Math.max(300, Math.floor(count * 0.55));
-      if (!reduce && visible && !document.hidden)
+      cost += performance.now() - started;
+      if (quality === "auto" && frames === 90 && cost / frames > 12) {
+        count = Math.max(420, Math.floor(count * 0.6));
+        budget.fps = 30;
+      }
+      const settling =
+        Math.abs(v.yaw - v.targetYaw) +
+          Math.abs(v.pitch - v.targetPitch) +
+          Math.abs(v.zoom - v.targetZoom) +
+          Math.abs(v.px - v.tx) +
+          Math.abs(v.py - v.ty) >
+        0.001;
+      if (continuous || (!reduce && settling))
         raf = requestAnimationFrame(draw);
     }
     const schedule = () => {
-      if (!raf) raf = requestAnimationFrame(draw);
+      if (!raf) {
+        last = 0;
+        raf = requestAnimationFrame(draw);
+      }
     };
     renderRef.current = schedule;
     const resize = () => {
       const rect = container.getBoundingClientRect();
       width = rect.width;
       height = rect.height;
-      const dpr = Math.min(devicePixelRatio || 1, quality === "high" ? 2 : 1.5);
-      count = quality === "low" || width < 500 ? 380 : 1400;
+      budget = galaxyBudget(quality, width);
+      count = budget.particles;
+      const dpr = Math.min(window.devicePixelRatio || 1, budget.dpr);
       el.width = width * dpr;
       el.height = height * dpr;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -337,23 +415,24 @@ export function NexusGalaxy({ compact = false }: { compact?: boolean }) {
     resize();
     const io = new IntersectionObserver(([entry]) => {
       visible = entry.isIntersecting;
-      if (visible) {
-        last = 0;
-        schedule();
-      } else {
+      container.dataset.running = String(
+        visible && !document.hidden && !reduce && !paused,
+      );
+      if (visible) schedule();
+      else {
         cancelAnimationFrame(raf);
         raf = 0;
       }
     });
     io.observe(container);
     const visibility = () => {
+      container.dataset.running = String(
+        visible && !document.hidden && !reduce && !paused,
+      );
       if (document.hidden) {
         cancelAnimationFrame(raf);
         raf = 0;
-      } else {
-        last = 0;
-        schedule();
-      }
+      } else schedule();
     };
     document.addEventListener("visibilitychange", visibility);
     return () => {
@@ -361,62 +440,61 @@ export function NexusGalaxy({ compact = false }: { compact?: boolean }) {
       ro.disconnect();
       io.disconnect();
       document.removeEventListener("visibilitychange", visibility);
+      renderRef.current = () => {};
     };
   }, [filtered, quality, reduce, paused]);
-  function select(node: Node) {
-    view.current.targetYaw = -node.angle + 0.7;
-    view.current.targetZoom = 1.12;
+
+  const inspect = (node: SpaceNode) => {
+    setInspectedId(node.id);
+    pointerInside.current = true;
     renderRef.current();
-    if (node.kind === "idea") n.setSelectedIdeaId(node.id);
-    else router.push("/project?id=" + encodeURIComponent(node.id));
-  }
+  };
   return (
-    <div className={"galaxy-wrapper " + (compact ? "galaxy-compact" : "")}>
+    <div
+      className={`galaxy-wrapper universe-galaxy ${compact ? "galaxy-compact" : ""}`}
+    >
       <div className="galaxy-category">
-        <span className="status-tick" />
-        <span>NEXUS PROJECT GALAXY</span>
+        <span className="universe-kicker">PROJECT UNIVERSE</span>
         <select
           value={orbit}
           aria-label="Filtrar órbita"
-          onChange={(e) => setOrbit(e.target.value)}
+          onChange={(e) => {
+            setOrbit(e.target.value);
+            setInspectedId(null);
+          }}
         >
           <option value="all">Todas las órbitas</option>
-          <option value="Projects">Todos los proyectos</option>
-          {Array.from(
-            new Set(
-              nodes
-                .filter((node) => node.kind === "idea")
-                .map((node) => node.category),
-            ),
-          ).map((category) => (
-            <option key={category}>{category}</option>
+          {orbitOrder.map((status) => (
+            <option key={status} value={status}>
+              {orbitLabels[status]}
+            </option>
           ))}
+          {includeIdeas && <option value="ideas">Ideas</option>}
         </select>
       </div>
       <div
         className="galaxy-canvas"
         ref={shell}
         role="group"
-        aria-label="Galaxia interactiva. Arrastra o usa las flechas para rotar. Tab para explorar nodos."
         tabIndex={0}
+        aria-label="Universo de proyectos. Flechas para rotar; Tab para explorar los nodos."
         onKeyDown={(e) => {
-          if (e.target !== e.currentTarget) return;
-          if (e.key.startsWith("Arrow")) {
-            e.preventDefault();
-            if (e.key === "ArrowLeft") view.current.targetYaw -= 0.15;
-            if (e.key === "ArrowRight") view.current.targetYaw += 0.15;
-            if (e.key === "ArrowUp")
-              view.current.targetPitch = Math.min(
-                1.3,
-                view.current.targetPitch + 0.1,
-              );
-            if (e.key === "ArrowDown")
-              view.current.targetPitch = Math.max(
-                0.2,
-                view.current.targetPitch - 0.1,
-              );
-            renderRef.current();
-          }
+          if (e.target !== e.currentTarget || !e.key.startsWith("Arrow"))
+            return;
+          e.preventDefault();
+          if (e.key === "ArrowLeft") view.current.targetYaw -= 0.15;
+          if (e.key === "ArrowRight") view.current.targetYaw += 0.15;
+          if (e.key === "ArrowUp")
+            view.current.targetPitch = Math.min(
+              1.25,
+              view.current.targetPitch + 0.1,
+            );
+          if (e.key === "ArrowDown")
+            view.current.targetPitch = Math.max(
+              0.25,
+              view.current.targetPitch - 0.1,
+            );
+          renderRef.current();
         }}
         onPointerDown={(e) => {
           if ((e.target as HTMLElement).closest("button")) return;
@@ -425,17 +503,21 @@ export function NexusGalaxy({ compact = false }: { compact?: boolean }) {
         }}
         onPointerMove={(e) => {
           const r = e.currentTarget.getBoundingClientRect();
-          view.current.tx = (e.clientX - r.left) / r.width - 0.5;
-          view.current.ty = (e.clientY - r.top) / r.height - 0.5;
+          if (!reduce && e.pointerType === "mouse") {
+            view.current.tx = (e.clientX - r.left) / r.width - 0.5;
+            view.current.ty = (e.clientY - r.top) / r.height - 0.5;
+          }
           if (drag.current.active) {
-            view.current.targetYaw += (e.clientX - drag.current.x) * 0.007;
-            view.current.targetPitch = Math.max(
-              0.2,
-              Math.min(
-                1.3,
-                view.current.targetPitch + (e.clientY - drag.current.y) * 0.004,
-              ),
-            );
+            view.current.targetYaw += (e.clientX - drag.current.x) * 0.005;
+            if (e.pointerType === "mouse")
+              view.current.targetPitch = Math.max(
+                0.25,
+                Math.min(
+                  1.25,
+                  view.current.targetPitch +
+                    (e.clientY - drag.current.y) * 0.003,
+                ),
+              );
             drag.current.x = e.clientX;
             drag.current.y = e.clientY;
           }
@@ -445,15 +527,29 @@ export function NexusGalaxy({ compact = false }: { compact?: boolean }) {
           drag.current.active = false;
           if (e.currentTarget.hasPointerCapture(e.pointerId))
             e.currentTarget.releasePointerCapture(e.pointerId);
+          renderRef.current();
         }}
         onPointerCancel={() => {
           drag.current.active = false;
+          renderRef.current();
+        }}
+        onPointerLeave={() => {
+          pointerInside.current = false;
+          view.current.tx = 0;
+          view.current.ty = 0;
+          renderRef.current();
+        }}
+        onBlur={(e) => {
+          if (!e.currentTarget.contains(e.relatedTarget)) {
+            pointerInside.current = false;
+            renderRef.current();
+          }
         }}
       >
         <canvas ref={canvas} aria-hidden="true" />
-        <div className="galaxy-core-label" aria-hidden="true">
-          <span>N</span>
-          <small>NEXUS CORE</small>
+        <div className="universe-core-caption" aria-hidden="true">
+          <b>NEXUS</b>
+          <span>INTELLIGENCE CORE</span>
         </div>
         {filtered.map((node) => (
           <button
@@ -462,55 +558,129 @@ export function NexusGalaxy({ compact = false }: { compact?: boolean }) {
               if (el) nodeRefs.current.set(node.id, el);
               else nodeRefs.current.delete(node.id);
             }}
-            onClick={() => select(node)}
-            className={
-              "galaxy-node " +
-              node.kind +
-              (node.status ? " status-" + node.status : "")
-            }
-            aria-label={`${node.kind === "idea" ? "Abrir idea" : "Abrir proyecto"}: ${node.label}`}
-            title={node.label}
+            onPointerEnter={() => inspect(node)}
+            onFocus={() => inspect(node)}
+            onClick={() => inspect(node)}
+            className={`galaxy-node ${node.kind} status-${node.status ?? "idea"} ${inspected?.id === node.id ? "is-inspected" : ""}`}
+            aria-label={`${node.label}${node.status ? `, ${orbitLabels[node.status]}, ${node.progress}%` : ", idea"}. Ver detalles.`}
+            aria-pressed={inspected?.id === node.id}
           >
-            <span className="node-dot" />
+            <span className="node-satellite">
+              <svg viewBox="0 0 36 36" aria-hidden="true">
+                <circle cx="18" cy="18" r="15" />
+                <circle
+                  className="node-progress"
+                  cx="18"
+                  cy="18"
+                  r="15"
+                  pathLength="100"
+                  strokeDasharray={`${node.progress ?? 0} 100`}
+                />
+              </svg>
+              <span className="node-dot" />
+            </span>
             <span className="node-label">
               {node.label}
               <small>
-                {node.kind === "idea"
-                  ? node.category
-                  : node.status === "active"
-                    ? "ACTIVE · INNER ORBIT"
-                    : (node.status ?? "PROJECT").toUpperCase()}
+                {node.status
+                  ? `${orbitLabels[node.status]} · ${node.progress}%`
+                  : node.category}
               </small>
             </span>
           </button>
         ))}
         {!nodes.length && (
-          <div className="galaxy-empty">
-            <p>Tu universo todavía está en silencio.</p>
+          <div className="universe-empty">
+            <span>Todo empieza con una idea.</span>
             <button
               className="button button-secondary"
-              onClick={() => n.openCapture()}
+              onClick={() => n.openCapture("project")}
             >
-              Captura tu primera idea
+              <Plus size={14} />
+              Crear primer proyecto
             </button>
           </div>
         )}
-        <span className="galaxy-coordinate galaxy-coordinate-left">
-          α 00.24
-          <br />N / {String(nodes.length).padStart(2, "0")}
-        </span>
-        <span className="galaxy-coordinate galaxy-coordinate-right">
-          PROJECT FIELD
-          <br />
-          {n.projects.filter((p) => p.status === "active").length} INNER / {n.projects.length} TOTAL
-        </span>
+        <div className="universe-coordinate" aria-hidden="true">
+          N / {String(filtered.length).padStart(2, "0")}
+          <span>ORBITAL FIELD</span>
+        </div>
+      </div>
+      <div className="universe-inspector">
+        {inspected ? (
+          <>
+            <span className="inspector-number">
+              {inspected.kind === "project"
+                ? String(inspected.progress).padStart(2, "0")
+                : "✧"}
+              <small>{inspected.kind === "project" ? "%" : "IDEA"}</small>
+            </span>
+            <div>
+              <span className="hud-label">
+                {inspected.status
+                  ? orbitLabels[inspected.status]
+                  : inspected.category}
+              </span>
+              <strong>{inspected.label}</strong>
+              <p>
+                {inspected.nextAction ||
+                  (inspected.kind === "idea"
+                    ? "Explora esta idea y sus conexiones."
+                    : "Define la próxima acción.")}
+              </p>
+            </div>
+            {inspected.kind === "project" ? (
+              <Link
+                className="button button-secondary"
+                href={"/project?id=" + encodeURIComponent(inspected.id)}
+              >
+                Abrir
+              </Link>
+            ) : (
+              <button
+                className="button button-secondary"
+                onClick={() => n.setSelectedIdeaId(inspected.id)}
+              >
+                Abrir
+              </button>
+            )}
+            <IconButton
+              label="Cerrar detalle orbital"
+              onClick={() => {
+                setInspectedId(null);
+                pointerInside.current = false;
+                renderRef.current();
+              }}
+            >
+              <X size={14} />
+            </IconButton>
+          </>
+        ) : (
+          <>
+            <Orbit size={23} strokeWidth={1} />
+            <div>
+              <strong>Tu atención tiene su propia gravedad.</strong>
+              <p>
+                Explora un proyecto. Los activos están más cerca del núcleo.
+              </p>
+            </div>
+          </>
+        )}
       </div>
       <div className="galaxy-controls">
-        <span>
-          <Move size={12} />
-          Arrastra para explorar
-        </span>
-        <div className="row" style={{ gap: 5 }}>
+        <button
+          className="universe-list-toggle"
+          onClick={() => setListOpen(!listOpen)}
+          aria-expanded={listOpen}
+        >
+          <List size={15} />
+          {listOpen ? "Cerrar lista" : `Explorar ${filtered.length} nodos`}
+        </button>
+        <div className="row" style={{ gap: 3 }}>
+          <span className="galaxy-drag-hint">
+            <Move size={12} />
+            Arrastra
+          </span>
           <IconButton
             label="Alejar galaxia"
             onClick={() => {
@@ -527,7 +697,7 @@ export function NexusGalaxy({ compact = false }: { compact?: boolean }) {
             label="Acercar galaxia"
             onClick={() => {
               view.current.targetZoom = Math.min(
-                1.5,
+                1.35,
                 view.current.targetZoom + 0.15,
               );
               renderRef.current();
@@ -537,6 +707,7 @@ export function NexusGalaxy({ compact = false }: { compact?: boolean }) {
           </IconButton>
           <IconButton
             label={paused ? "Animar galaxia" : "Pausar galaxia"}
+            aria-pressed={paused}
             onClick={() => setPaused(!paused)}
           >
             {paused ? <Play size={13} /> : <Pause size={13} />}
@@ -545,23 +716,35 @@ export function NexusGalaxy({ compact = false }: { compact?: boolean }) {
             label="Restablecer vista"
             onClick={() => {
               view.current.targetZoom = 1;
-              view.current.targetPitch = 0.6;
-              view.current.targetYaw = 0.25;
+              view.current.targetPitch = 0.66;
+              view.current.targetYaw = -0.18;
               renderRef.current();
             }}
           >
             <RotateCcw size={13} />
           </IconButton>
-          {!compact && (
-            <IconButton
-              label="Abrir universo de ideas"
-              onClick={() => router.push("/ideas")}
-            >
-              <Maximize2 size={13} />
-            </IconButton>
-          )}
         </div>
       </div>
+      {listOpen && (
+        <div className="universe-node-list">
+          {filtered.map((node) => (
+            <button
+              key={node.id}
+              onClick={() => {
+                inspect(node);
+                setListOpen(false);
+              }}
+            >
+              <span>{node.label}</span>
+              <small>
+                {node.status
+                  ? `${orbitLabels[node.status]} · ${node.progress}%`
+                  : "Idea"}
+              </small>
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

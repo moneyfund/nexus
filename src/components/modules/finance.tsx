@@ -20,6 +20,7 @@ import {
   Label,
   Modal,
   Empty,
+  Tabs,
 } from "../ui/primitives";
 import { CashflowChart } from "../ui/charts";
 import {
@@ -132,6 +133,7 @@ function TransactionEditor({
 }
 export function FinanceView() {
   const n = useNexus();
+  const [view, setView] = useState("overview");
   const [scope, setScope] = useState<"all" | "user">("user");
   const [goalOpen, setGoalOpen] = useState(false);
   const [goalName, setGoalName] = useState("");
@@ -237,7 +239,7 @@ export function FinanceView() {
     <ModuleFrame
       eyebrow="Financial command center / 07"
       title="Finance"
-      description="Entiende qué produce tu trabajo y hacia dónde va tu capital."
+      description="Dinero disponible, compromisos y movimientos en una sola dirección."
       action={
         <div className="row">
           <Button variant="secondary" onClick={() => n.openCapture("expense")}>
@@ -273,302 +275,352 @@ export function FinanceView() {
           </select>
         </label>
       </div>
-      {(cashNIO != null || cardUSD != null) && (
-        <section className="section">
-          <SectionHeading
-            label="LIQUIDEZ REAL"
-            title="Dinero disponible al corte."
-            action={cutoverDate ? <Badge>CORTE {cutoverDate}</Badge> : undefined}
-          />
-          <div className="data-band">
-            <DataMetric
-              label={cashAccount?.name ?? "Efectivo"}
-              value={cashNIO == null ? "—" : cordobas(cashNIO)}
-              meta={
-                cashNIO == null
-                  ? "Saldo no definido"
-                  : "≈ " + money(cashNIO / rate) + " · tipo oficial BCN"
-              }
-            />
-            <DataMetric
-              label={cardAccount?.name ?? "Tarjeta / banco"}
-              value={cardUSD == null ? "—" : money(cardUSD)}
-              meta={
-                cardUSD == null
-                  ? "Saldo no definido"
-                  : "≈ " + cordobas(cardUSD * rate) + " · tipo oficial BCN"
-              }
-            />
-            <DataMetric
-              label="Histórico"
-              value={historyReconciled ? "Conciliado" : "Desde el corte"}
-              meta={
-                historyReconciled
-                  ? "Movimientos históricos verificados"
-                  : "No reconstruye gastos anteriores sin importe confirmado"
-              }
-            />
-          </div>
-        </section>
-      )}
-      <section className="section">
-        <SectionHeading
-          label="DEUDAS"
-          title="Obligaciones pendientes."
-          action={<Badge>{pendingDebts.length} ABIERTA{pendingDebts.length === 1 ? "" : "S"}</Badge>}
+      <div className="finance-view-tabs">
+        <Tabs
+          value={view}
+          onChange={setView}
+          label="Vista financiera"
+          items={[
+            { value: "overview", label: "Panorama" },
+            { value: "movements", label: "Movimientos" },
+            { value: "projects", label: "Por proyecto" },
+            { value: "goals", label: "Metas" },
+          ]}
         />
-        {pendingDebts.length ? (
-          <>
-            <div className="data-band">
-              <DataMetric
-                label="Deuda total"
-                value={money(debtUSD)}
-                meta={"≈ " + cordobas(debtUSD * rate) + " al tipo oficial"}
+      </div>
+      {view === "overview" && (
+        <>
+          <section className="finance-chart-command">
+            <SectionHeading
+              label="MONTHLY PERFORMANCE"
+              title="El movimiento de tu dinero."
+              action={<Badge>ÚLTIMOS 6 MESES</Badge>}
+            />
+            <CashflowChart values={values} />
+          </section>
+          {(cashNIO != null || cardUSD != null) && (
+            <section className="section">
+              <SectionHeading
+                label="LIQUIDEZ REAL"
+                title="Dinero disponible al corte."
+                action={
+                  cutoverDate ? <Badge>CORTE {cutoverDate}</Badge> : undefined
+                }
               />
-              {pendingDebts.slice(0, 3).map((debt) => (
+              <div className="data-band">
                 <DataMetric
-                  key={debt.id}
-                  label={debt.creditor}
-                  value={formatNative(debt.balance, debt.currency)}
+                  label={cashAccount?.name ?? "Efectivo"}
+                  value={cashNIO == null ? "—" : cordobas(cashNIO)}
                   meta={
-                    (debt.currency === "USD"
-                      ? "≈ " + cordobas(amountToNIO(n.data, debt.balance, debt.currency))
-                      : "≈ " + money(amountToUSD(n.data, debt.balance, debt.currency))) +
-                    (debt.dueDate ? " · vence " + debt.dueDate : "")
+                    cashNIO == null
+                      ? "Saldo no definido"
+                      : "≈ " + money(cashNIO / rate) + " · tipo oficial BCN"
                   }
                 />
-              ))}
-            </div>
-            {pendingDebts.length > 3 && (
-              <p className="form-note">
-                +{pendingDebts.length - 3} deuda{pendingDebts.length - 3 === 1 ? "" : "s"} adicional{pendingDebts.length - 3 === 1 ? "" : "es"}.
-              </p>
-            )}
-          </>
-        ) : (
-          <Empty
-            title="Sin deudas pendientes."
-            text="Cuando registres una obligación aparecerá aquí."
-          />
-        )}
-      </section>
-      <div className="data-band">
-        <DataMetric
-          label="Cobrado confirmado"
-          value={money(income)}
-          meta={
-            historicalIncome
-              ? money(historicalIncome) + " del histórico confirmado"
-              : `${incomes.length} cobros registrados`
-          }
-        />
-        <DataMetric
-          label="Por cobrar"
-          value={money(receivable)}
-          meta="Valor acordado menos cobrado"
-        />
-        <DataMetric
-          label="Gastos"
-          value={money(expense)}
-          meta={`${expenses.length} movimientos`}
-        />
-        <DataMetric
-          label="Flujo desde corte"
-          value={money(currentIncome - expense - savings)}
-          meta="Movimientos nuevos; la liquidez real se muestra arriba"
-        />
-      </div>
-      <section className="section">
-        <SectionHeading
-          label="MONTHLY PERFORMANCE"
-          title="El movimiento de tu dinero."
-          action={<Badge>ÚLTIMOS 6 MESES</Badge>}
-        />
-        <CashflowChart values={values} />
-      </section>
-      <section className="section">
-        <SectionHeading
-          label="INCOME BY PROJECT"
-          title="El valor de cada frente."
-        />
-        <div className="finance-table-scroll">
-          <table className="finance-table">
-            <thead>
-              <tr>
-                <th>Proyecto</th>
-                <th>Valor</th>
-                <th>Horas</th>
-                <th>Valor / h</th>
-                <th>Cobrado</th>
-                <th>Pendiente</th>
-                <th>Vencido</th>
-                <th>Margen cobrado</th>
-              </tr>
-            </thead>
-            <tbody>
-              {projects
-                .filter(
-                  (p) => p.value || records.some((i) => i.projectId === p.id),
-                )
-                .map((p) => {
-                  const f = projectFinance(scoped, p);
-                  return (
-                    <tr key={p.id}>
-                      <td>
-                        <Link href={"/project?id=" + encodeURIComponent(p.id)}>
-                          {p.name}
-                          <ArrowUpRight size={12} />
-                        </Link>
-                        {p.source === "demo" && <small>DEMO</small>}
-                      </td>
-                      <td>{p.value == null ? "—" : money(p.value)}</td>
-                      <td>
-                        {p.metadata?.hoursBasis === "flow-only" && p.hours === 0
-                          ? "Sin medir"
-                          : p.hours.toFixed(1)}
-                      </td>
-                      <td>
-                        {p.value == null || !p.hours
-                          ? "—"
-                          : money(f.contractedHour)}
-                      </td>
-                      <td>{money(f.paid)}</td>
-                      <td className="accent">{money(f.receivable)}</td>
-              <td>{f.overdue ? money(f.overdue) : "—"}</td>
-                      <td>{money(f.profit)}</td>
-                    </tr>
-                  );
-                })}
-            </tbody>
-          </table>
-        </div>
-        <p className="form-note" style={{ marginTop: 14 }}>
-          Valor / h = valor acordado ÷ horas acumuladas. El margen usa lo
-          cobrado menos los gastos del proyecto; no es una previsión fiscal.
-          {scope === "user" &&
-            " Los valores y horas de demostración se excluyen; tus movimientos vinculados a esos proyectos se conservan."}
-        </p>
-      </section>
-      <div className="split section">
-        <section>
-          <SectionHeading
-            label="CAPITAL & GOALS"
-            title="Construye lo que sigue."
-            action={
-              <Button variant="ghost" onClick={() => setGoalOpen(true)}>
-                <Plus size={15} />
-                Meta
-              </Button>
-            }
-          />
-          {financialGoals.map((g) => (
-            <div key={g.id} className="financial-goal">
-              <div className="row between">
-                <h3>{g.title}</h3>
-                <Badge>{g.kind === "savings" ? "AHORRO" : "INVERSIÓN"}</Badge>
-              </div>
-              <div className="goal-track">
-                <span
-                  style={{
-                    width: Math.min(100, (g.saved / g.target) * 100) + "%",
-                  }}
+                <DataMetric
+                  label={cardAccount?.name ?? "Tarjeta / banco"}
+                  value={cardUSD == null ? "—" : money(cardUSD)}
+                  meta={
+                    cardUSD == null
+                      ? "Saldo no definido"
+                      : "≈ " + cordobas(cardUSD * rate) + " · tipo oficial BCN"
+                  }
+                />
+                <DataMetric
+                  label="Histórico"
+                  value={historyReconciled ? "Conciliado" : "Desde el corte"}
+                  meta={
+                    historyReconciled
+                      ? "Movimientos históricos verificados"
+                      : "No reconstruye gastos anteriores sin importe confirmado"
+                  }
                 />
               </div>
-              <div className="row between">
-                <span className="small muted">
-                  {money(g.saved)} / {money(g.target)}
-                </span>
-                <label className="field">
-                  <span className="sr-only">
-                    Capital reservado para {g.title}
-                  </span>
-                  <input
-                    type="number"
-                    min="0"
-                    step=".01"
-                    defaultValue={g.saved}
-                    style={{ width: 100 }}
-                    onBlur={(e) => {
-                      const value = Number(e.target.value);
-                      if (Number.isFinite(value) && value >= 0)
-                        n.update((w) => {
-                          const goal = w.financialGoals.find(
-                            (x) => x.id === g.id,
-                          )!;
-                          goal.saved = value;
-                          goal.updatedAt = Date.now();
-                        });
-                    }}
-                  />
-                </label>
-              </div>
-            </div>
-          ))}
-          {!financialGoals.length && (
-            <Empty
-              title="Dale una dirección al capital."
-              text="Define una reserva de ahorro o una meta de inversión."
-              onAction={() => setGoalOpen(true)}
-              action="Crear meta"
-            />
+            </section>
           )}
-        </section>
-        <section className="forecast-panel">
-          <TrendingUp size={28} strokeWidth={1} />
-          <Label>FORECAST / PREPARADO</Label>
-          <h3>El futuro necesita una base.</h3>
-          <p>
-            Las proyecciones se habilitarán cuando exista historial suficiente y
-            un modelo definido. Por ahora, NEXUS muestra los movimientos
-            registrados.
-          </p>
-          <Badge>PROYECCIÓN NO DISPONIBLE</Badge>
-        </section>
-      </div>
-      <section className="section">
-        <SectionHeading
-          label="TRANSACTION STREAM"
-          title="Cada movimiento cuenta."
-        />
-        {records.slice(0, 30).map((r) => (
-          <div key={r.id} className="transaction-row">
-            <span className="transaction-icon">
-              {r.kind === "income" ? (
-                <ArrowDownLeft size={18} />
-              ) : (
-                <Out size={18} />
-              )}
-            </span>
-            <div>
-              <h3>{r.title}</h3>
-              <span className="small muted">
-                {r.date} ·{" "}
-                {n.projects.find((p) => p.id === r.projectId)?.name ??
-                  r.category}
-                {r.source === "demo" ? " · Demo" : ""}
-              </span>
-            </div>
-            <strong>
-              {r.kind === "expense" ? "−" : "+"}
-              {formatNative(r.amount, r.currency)}
-            </strong>
-            <button
-              className="icon-button"
-              aria-label={"Editar movimiento " + r.title}
-              onClick={() => setEditingRecord(r)}
-            >
-              <Pencil size={14} />
-            </button>
+          <section className="section">
+            <SectionHeading
+              label="DEUDAS"
+              title="Obligaciones pendientes."
+              action={
+                <Badge>
+                  {pendingDebts.length} ABIERTA
+                  {pendingDebts.length === 1 ? "" : "S"}
+                </Badge>
+              }
+            />
+            {pendingDebts.length ? (
+              <>
+                <div className="data-band">
+                  <DataMetric
+                    label="Deuda total"
+                    value={money(debtUSD)}
+                    meta={"≈ " + cordobas(debtUSD * rate) + " al tipo oficial"}
+                  />
+                  {pendingDebts.slice(0, 3).map((debt) => (
+                    <DataMetric
+                      key={debt.id}
+                      label={debt.creditor}
+                      value={formatNative(debt.balance, debt.currency)}
+                      meta={
+                        (debt.currency === "USD"
+                          ? "≈ " +
+                            cordobas(
+                              amountToNIO(n.data, debt.balance, debt.currency),
+                            )
+                          : "≈ " +
+                            money(
+                              amountToUSD(n.data, debt.balance, debt.currency),
+                            )) +
+                        (debt.dueDate ? " · vence " + debt.dueDate : "")
+                      }
+                    />
+                  ))}
+                </div>
+                {pendingDebts.length > 3 && (
+                  <p className="form-note">
+                    +{pendingDebts.length - 3} deuda
+                    {pendingDebts.length - 3 === 1 ? "" : "s"} adicional
+                    {pendingDebts.length - 3 === 1 ? "" : "es"}.
+                  </p>
+                )}
+              </>
+            ) : (
+              <Empty
+                title="Sin deudas pendientes."
+                text="Cuando registres una obligación aparecerá aquí."
+              />
+            )}
+          </section>
+          <div className="data-band">
+            <DataMetric
+              label="Cobrado confirmado"
+              value={money(income)}
+              meta={
+                historicalIncome
+                  ? money(historicalIncome) + " del histórico confirmado"
+                  : `${incomes.length} cobros registrados`
+              }
+            />
+            <DataMetric
+              label="Por cobrar"
+              value={money(receivable)}
+              meta="Valor acordado menos cobrado"
+            />
+            <DataMetric
+              label="Gastos"
+              value={money(expense)}
+              meta={`${expenses.length} movimientos`}
+            />
+            <DataMetric
+              label="Flujo desde corte"
+              value={money(currentIncome - expense - savings)}
+              meta="Movimientos nuevos; la liquidez real se muestra arriba"
+            />
           </div>
-        ))}
-        {!records.length && (
-          <Empty
-            title="Tu historia financiera empieza aquí."
-            text="Registra un ingreso o un gasto para comenzar."
-            onAction={() => n.openCapture("income")}
-          />
-        )}
-      </section>
+        </>
+      )}
+      {view === "projects" && (
+        <>
+          <section className="section">
+            <SectionHeading
+              label="INCOME BY PROJECT"
+              title="El valor de cada frente."
+            />
+            <div className="finance-table-scroll">
+              <table className="finance-table">
+                <thead>
+                  <tr>
+                    <th>Proyecto</th>
+                    <th>Valor</th>
+                    <th>Horas</th>
+                    <th>Valor / h</th>
+                    <th>Cobrado</th>
+                    <th>Pendiente</th>
+                    <th>Vencido</th>
+                    <th>Margen cobrado</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {projects
+                    .filter(
+                      (p) =>
+                        p.value || records.some((i) => i.projectId === p.id),
+                    )
+                    .map((p) => {
+                      const f = projectFinance(scoped, p);
+                      return (
+                        <tr key={p.id}>
+                          <td>
+                            <Link
+                              href={"/project?id=" + encodeURIComponent(p.id)}
+                            >
+                              {p.name}
+                              <ArrowUpRight size={12} />
+                            </Link>
+                            {p.source === "demo" && <small>DEMO</small>}
+                          </td>
+                          <td>{p.value == null ? "—" : money(p.value)}</td>
+                          <td>
+                            {p.metadata?.hoursBasis === "flow-only" &&
+                            p.hours === 0
+                              ? "Sin medir"
+                              : p.hours.toFixed(1)}
+                          </td>
+                          <td>
+                            {p.value == null || !p.hours
+                              ? "—"
+                              : money(f.contractedHour)}
+                          </td>
+                          <td>{money(f.paid)}</td>
+                          <td className="accent">{money(f.receivable)}</td>
+                          <td>{f.overdue ? money(f.overdue) : "—"}</td>
+                          <td>{money(f.profit)}</td>
+                        </tr>
+                      );
+                    })}
+                </tbody>
+              </table>
+            </div>
+            <p className="form-note" style={{ marginTop: 14 }}>
+              Valor / h = valor acordado ÷ horas acumuladas. El margen usa lo
+              cobrado menos los gastos del proyecto; no es una previsión fiscal.
+              {scope === "user" &&
+                " Los valores y horas de demostración se excluyen; tus movimientos vinculados a esos proyectos se conservan."}
+            </p>
+          </section>
+        </>
+      )}
+      {view === "goals" && (
+        <>
+          <div className="split section">
+            <section>
+              <SectionHeading
+                label="CAPITAL & GOALS"
+                title="Construye lo que sigue."
+                action={
+                  <Button variant="ghost" onClick={() => setGoalOpen(true)}>
+                    <Plus size={15} />
+                    Meta
+                  </Button>
+                }
+              />
+              {financialGoals.map((g) => (
+                <div key={g.id} className="financial-goal">
+                  <div className="row between">
+                    <h3>{g.title}</h3>
+                    <Badge>
+                      {g.kind === "savings" ? "AHORRO" : "INVERSIÓN"}
+                    </Badge>
+                  </div>
+                  <div className="goal-track">
+                    <span
+                      style={{
+                        width: Math.min(100, (g.saved / g.target) * 100) + "%",
+                      }}
+                    />
+                  </div>
+                  <div className="row between">
+                    <span className="small muted">
+                      {money(g.saved)} / {money(g.target)}
+                    </span>
+                    <label className="field">
+                      <span className="sr-only">
+                        Capital reservado para {g.title}
+                      </span>
+                      <input
+                        type="number"
+                        min="0"
+                        step=".01"
+                        defaultValue={g.saved}
+                        style={{ width: 100 }}
+                        onBlur={(e) => {
+                          const value = Number(e.target.value);
+                          if (Number.isFinite(value) && value >= 0)
+                            n.update((w) => {
+                              const goal = w.financialGoals.find(
+                                (x) => x.id === g.id,
+                              )!;
+                              goal.saved = value;
+                              goal.updatedAt = Date.now();
+                            });
+                        }}
+                      />
+                    </label>
+                  </div>
+                </div>
+              ))}
+              {!financialGoals.length && (
+                <Empty
+                  title="Dale una dirección al capital."
+                  text="Define una reserva de ahorro o una meta de inversión."
+                  onAction={() => setGoalOpen(true)}
+                  action="Crear meta"
+                />
+              )}
+            </section>
+            <section className="forecast-panel">
+              <TrendingUp size={28} strokeWidth={1} />
+              <Label>FORECAST / PREPARADO</Label>
+              <h3>El futuro necesita una base.</h3>
+              <p>
+                Las proyecciones se habilitarán cuando exista historial
+                suficiente y un modelo definido. Por ahora, NEXUS muestra los
+                movimientos registrados.
+              </p>
+              <Badge>PROYECCIÓN NO DISPONIBLE</Badge>
+            </section>
+          </div>
+        </>
+      )}
+      {view === "movements" && (
+        <>
+          <section className="section">
+            <SectionHeading
+              label="TRANSACTION STREAM"
+              title="Cada movimiento cuenta."
+            />
+            {records.slice(0, 30).map((r) => (
+              <div key={r.id} className="transaction-row">
+                <span className="transaction-icon">
+                  {r.kind === "income" ? (
+                    <ArrowDownLeft size={18} />
+                  ) : (
+                    <Out size={18} />
+                  )}
+                </span>
+                <div>
+                  <h3>{r.title}</h3>
+                  <span className="small muted">
+                    {r.date} ·{" "}
+                    {n.projects.find((p) => p.id === r.projectId)?.name ??
+                      r.category}
+                    {r.source === "demo" ? " · Demo" : ""}
+                  </span>
+                </div>
+                <strong>
+                  {r.kind === "expense" ? "−" : "+"}
+                  {formatNative(r.amount, r.currency)}
+                </strong>
+                <button
+                  className="icon-button"
+                  aria-label={"Editar movimiento " + r.title}
+                  onClick={() => setEditingRecord(r)}
+                >
+                  <Pencil size={14} />
+                </button>
+              </div>
+            ))}
+            {!records.length && (
+              <Empty
+                title="Tu historia financiera empieza aquí."
+                text="Registra un ingreso o un gasto para comenzar."
+                onAction={() => n.openCapture("income")}
+              />
+            )}
+          </section>
+        </>
+      )}
       <Modal
         open={!!editingRecord}
         onClose={() => setEditingRecord(null)}

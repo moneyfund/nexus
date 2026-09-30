@@ -119,7 +119,7 @@ export function IdeasView() {
           {inbox.map((i) => {
             const href =
               i.type === "project"
-                ? "/projects/" + i.targetId
+                ? "/project?id=" + encodeURIComponent(i.targetId ?? "")
                 : ["note", "link", "file"].includes(i.type)
                   ? "/knowledge?item=" + i.targetId
                   : ["income", "expense"].includes(i.type)

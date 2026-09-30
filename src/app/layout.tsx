@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Orbitron, Space_Grotesk } from "next/font/google";
 import "./globals.css";
+import "./spatial.css";
 import { NexusProvider } from "@/components/nexus-provider";
 import { AppShell } from "@/components/app-shell";
 import { CaptureModal } from "@/components/capture-modal";

@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { Orbit, LockKeyhole, ArrowRight, LogIn } from "lucide-react";
+import { IntelligenceCore, SpatialEnvironment } from "./spatial-environment";
 import { useNexus } from "./nexus-provider";
 
 export function AuthScreen() {
@@ -25,9 +26,7 @@ export function AuthScreen() {
       }
     } catch (cause) {
       setError(
-        cause instanceof Error
-          ? cause.message
-          : "No se pudo iniciar sesión.",
+        cause instanceof Error ? cause.message : "No se pudo iniciar sesión.",
       );
     } finally {
       setBusy(null);
@@ -35,20 +34,18 @@ export function AuthScreen() {
   }
 
   return (
-    <main
-      style={{
-        minHeight: "100dvh",
-        display: "grid",
-        placeItems: "center",
-        padding: 24,
-        background:
-          "radial-gradient(circle at 50% 30%, rgba(217,70,239,.15), transparent 35%), #020203",
-      }}
-    >
-      <section
-        className="surface"
-        style={{ width: "min(460px, 100%)", padding: 32 }}
-      >
+    <main className="auth-gateway">
+      <SpatialEnvironment variant="core" />
+      <div className="auth-identity">
+        <IntelligenceCore />
+        <h1>
+          Tu universo.
+          <br />
+          <em>Tu dirección.</em>
+        </h1>
+        <p>Conecta lo que piensas con lo que haces.</p>
+      </div>
+      <section className="auth-panel">
         <div className="brand" style={{ marginBottom: 28 }}>
           <span className="brand-symbol">
             <Orbit size={24} />
@@ -64,27 +61,9 @@ export function AuthScreen() {
           <strong>Accede a tu universo</strong>
         </div>
 
-        <p className="muted" style={{ marginBottom: 16 }}>
-          Tu cuenta crea un espacio independiente para proyectos, ideas,
-          finanzas, calendario y NEXUS AI.
+        <p className="auth-caption">
+          Proyectos, ideas y decisiones en tu espacio personal.
         </p>
-        <div
-          className="surface"
-          style={{
-            padding: 14,
-            marginBottom: 22,
-            background: "rgba(255,255,255,.025)",
-          }}
-        >
-          <div className="row" style={{ gap: 10 }}>
-            <LockKeyhole size={15} className="accent" />
-            <small className="muted">
-              Tus datos están aislados por cuenta. Otros usuarios no pueden ver
-              ni modificar tu workspace.
-            </small>
-          </div>
-        </div>
-
         <button
           className="button button-primary"
           type="button"
@@ -93,7 +72,9 @@ export function AuthScreen() {
           onClick={() => void runAuth("google")}
         >
           <LogIn size={17} />
-          {busy === "google" ? "Conectando con Google…" : "Continuar con Google"}
+          {busy === "google"
+            ? "Conectando con Google…"
+            : "Continuar con Google"}
           {busy !== "google" && <ArrowRight size={16} />}
         </button>
 
@@ -102,9 +83,23 @@ export function AuthScreen() {
           aria-hidden="true"
           style={{ gap: 12, margin: "20px 0", fontSize: 12 }}
         >
-          <span style={{ height: 1, flex: 1, background: "currentColor", opacity: 0.16 }} />
+          <span
+            style={{
+              height: 1,
+              flex: 1,
+              background: "currentColor",
+              opacity: 0.16,
+            }}
+          />
           <span>O CON CORREO</span>
-          <span style={{ height: 1, flex: 1, background: "currentColor", opacity: 0.16 }} />
+          <span
+            style={{
+              height: 1,
+              flex: 1,
+              background: "currentColor",
+              opacity: 0.16,
+            }}
+          />
         </div>
 
         <form
