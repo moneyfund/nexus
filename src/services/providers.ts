@@ -257,11 +257,31 @@ export interface NexusContext {
     kind: "income" | "expense";
     title: string;
     amount: number;
+    currency: "USD" | "NIO";
+    accountId?: string;
     date: string;
     projectId?: string;
     category: string;
     updatedAt: number;
   }>;
+  financialAccounts: Array<{
+    id: string;
+    name: string;
+    kind: "cash" | "bank" | "card" | "wallet";
+    currency: "USD" | "NIO";
+    balance: number;
+  }>;
+  debts: Array<{
+    id: string;
+    creditor: string;
+    title: string;
+    balance: number;
+    originalAmount: number;
+    currency: "USD" | "NIO";
+    dueDate?: string;
+    status: "pending" | "paid";
+  }>;
+  exchangeRateNIOPerUSD: number;
   ideas: Array<{
     id: string;
     title: string;
@@ -348,6 +368,8 @@ export class NexusContextBuilder {
               kind: "income" as const,
               title: record.title,
               amount: record.amount,
+              currency: record.currency,
+              accountId: record.accountId,
               date: record.date,
               projectId: record.projectId,
               category: record.category,
@@ -358,6 +380,8 @@ export class NexusContextBuilder {
               kind: "expense" as const,
               title: record.title,
               amount: record.amount,
+              currency: record.currency,
+              accountId: record.accountId,
               date: record.date,
               projectId: record.projectId,
               category: record.category,
@@ -367,6 +391,44 @@ export class NexusContextBuilder {
             .sort((a, b) => b.updatedAt - a.updatedAt)
             .slice(0, 100)
         : [],
+      financialAccounts: c.finance
+        ? (w.financialAccounts ?? []).map(
+            ({ id, name, kind, currency, balance }) => ({
+              id,
+              name,
+              kind,
+              currency,
+              balance,
+            }),
+          )
+        : [],
+      debts: c.finance
+        ? (w.debts ?? []).map(
+            ({
+              id,
+              creditor,
+              title,
+              balance,
+              originalAmount,
+              currency,
+              dueDate,
+              status,
+            }) => ({
+              id,
+              creditor,
+              title,
+              balance,
+              originalAmount,
+              currency,
+              dueDate,
+              status,
+            }),
+          )
+        : [],
+      exchangeRateNIOPerUSD:
+        typeof w.user.metadata?.exchangeRateNIOPerUSD === "number"
+          ? w.user.metadata.exchangeRateNIOPerUSD
+          : 36.6243,
       ideas: c.knowledge
         ? w.ideas
             .slice()
