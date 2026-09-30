@@ -502,26 +502,112 @@ export function AIView() {
       setPendingActions((items) => items.filter((item) => item.id !== id));
   }
 
+  function selectConversation(conversationId: string) {
+    setActiveConversationId(conversationId);
+    setPendingActions([]);
+  }
+
+  function newConversation() {
+    const conversationId = n.actions.createAIConversation();
+    selectConversation(conversationId);
+    setPrompt("");
+  }
+
+  function openProjectConversation(projectId: string) {
+    const project = n.projects.find((item) => item.id === projectId);
+    if (!project) return;
+    const conversationId = n.actions.createAIConversation(
+      projectId,
+      project.name,
+    );
+    selectConversation(conversationId);
+    setPrompt("");
+  }
+
+  function deleteConversation(conversationId: string) {
+    const conversation = n.data.conversations.find(
+      (item) => item.id === conversationId,
+    );
+    if (!conversation) return;
+    if (
+      typeof window !== "undefined" &&
+      !window.confirm(
+        `¿Eliminar "${conversation.title}" y todos sus mensajes? Esta acción también se sincronizará con Firestore.`,
+      )
+    )
+      return;
+    const removed = n.run(
+      () => n.actions.deleteAIConversation(conversationId),
+      "Conversación eliminada de NEXUS.",
+    );
+    if (!removed) return;
+    if (activeConversationId === conversationId) {
+      const next = [...n.store.getSnapshot().conversations].sort(
+        (a, b) => b.updatedAt - a.updatedAt,
+      )[0];
+      setActiveConversationId(next?.id ?? null);
+    }
+    setPendingActions([]);
+  }
+
+  function deleteMessage(messageId: string) {
+    if (
+      typeof window !== "undefined" &&
+      !window.confirm(
+        "¿Eliminar este mensaje? Se quitará de esta conversación y de tu workspace sincronizado.",
+      )
+    )
+      return;
+    n.run(
+      () => n.actions.deleteAIMessage(messageId),
+      "Mensaje eliminado de NEXUS.",
+    );
+  }
+
   async function send(text: string) {
     if (!text.trim() || requestRef.current) return;
     requestRef.current = true;
     setBusy(true);
-    const message = {
-      ...entity(crypto.randomUUID(), "user", n.data.user.id),
-      conversationId: "local-conversation",
-      role: "user" as const,
-      content: text.trim(),
-      contextIds: [],
-      simulated: false,
-    };
     try {
-      n.store.update((w) => {
-        w.messages.push(message);
+      let conversationId = activeConversationId;
+      if (
+        !conversationId ||
+        !n.store
+          .getSnapshot()
+          .conversations.some((conversation) => conversation.id === conversationId)
+      ) {
+        conversationId = n.actions.createAIConversation();
+        setActiveConversationId(conversationId);
+      }
+
+      const snapshot = n.store.getSnapshot();
+      const conversation = snapshot.conversations.find(
+        (item) => item.id === conversationId,
+      );
+      if (!conversation) throw new Error("No se pudo abrir la conversación.");
+
+      const scopedContext = n.services.context.build(snapshot, {
+        conversationId,
+        projectId: conversation.projectId,
       });
+      const message = {
+        ...entity(crypto.randomUUID(), "user", snapshot.user.id),
+        conversationId,
+        role: "user" as const,
+        content: text.trim(),
+        contextIds: [],
+        simulated: false,
+      };
+
+      n.actions.appendAIMessage(conversationId, message);
       setPrompt("");
-      const result = await n.services.ai.respondDetailed(text, context);
+
+      const result = await n.services.ai.respondDetailed(text, scopedContext);
+      n.actions.appendAIMessage(conversationId, {
+        ...result.message,
+        conversationId,
+      });
       n.store.update((w) => {
-        w.messages.push(result.message);
         w.aiUsage.push({
           ...entity(crypto.randomUUID(), "user", w.user.id),
           provider: "openai",
