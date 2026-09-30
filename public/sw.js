@@ -1,11 +1,14 @@
 /* NEXUS offline shell. Never cache API responses, conversations or user documents. */
-const CACHE = "nexus-shell-v2";
+const CACHE = "nexus-shell-v3";
+const SCOPE_PATH = new URL(self.registration.scope).pathname.replace(/\/$/, "");
+const path = (value) => SCOPE_PATH + value;
 const SHELL = [
-  "/offline.html",
-  "/icon.svg",
-  "/icons/icon-192.png",
-  "/icons/icon-512.png",
+  path("/offline.html"),
+  path("/icon.svg"),
+  path("/icons/icon-192.png"),
+  path("/icons/icon-512.png"),
 ];
+
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches
@@ -14,6 +17,7 @@ self.addEventListener("install", (event) => {
       .then(() => self.skipWaiting()),
   );
 });
+
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches
@@ -28,20 +32,26 @@ self.addEventListener("activate", (event) => {
       .then(() => self.clients.claim()),
   );
 });
+
 self.addEventListener("fetch", (event) => {
   if (
     event.request.method !== "GET" ||
     new URL(event.request.url).origin !== self.location.origin
   )
     return;
-  if (event.request.mode === "navigate")
+
+  if (event.request.mode === "navigate") {
     event.respondWith(
-      fetch(event.request).catch(() => caches.match("/offline.html")),
+      fetch(event.request).catch(() => caches.match(path("/offline.html"))),
     );
-  else if (SHELL.includes(new URL(event.request.url).pathname))
+    return;
+  }
+
+  if (SHELL.includes(new URL(event.request.url).pathname)) {
     event.respondWith(
       caches
         .match(event.request)
         .then((cached) => cached || fetch(event.request)),
     );
+  }
 });
