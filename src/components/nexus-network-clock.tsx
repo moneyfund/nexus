@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Wifi } from "lucide-react";
 import { useNexus } from "./nexus-provider";
 
 export function NexusNetworkClock() {
   const n = useNexus();
   const [now, setNow] = useState(() => new Date());
-  const [networkOffset, setNetworkOffset] = useState(0);
+  const networkOffset = useRef(0);
   const [networkSynced, setNetworkSynced] = useState(false);
   const formatter = useMemo(
     () =>
@@ -46,7 +46,8 @@ export function NexusNetworkClock() {
         const server = new Date(header).getTime();
         if (!Number.isFinite(server)) return;
         const midpoint = started + (finished - started) / 2;
-        setNetworkOffset(server - midpoint);
+        networkOffset.current = server - midpoint;
+        setNow(new Date(Date.now() + networkOffset.current));
         setNetworkSynced(true);
       } catch {
         // Device time remains a safe fallback when the network is unavailable.
@@ -54,7 +55,7 @@ export function NexusNetworkClock() {
     };
     void syncNetworkTime();
     const timer = window.setInterval(
-      () => setNow(new Date(Date.now() + networkOffset)),
+      () => setNow(new Date(Date.now() + networkOffset.current)),
       1000,
     );
     const resync = window.setInterval(() => void syncNetworkTime(), 5 * 60_000);
@@ -63,7 +64,7 @@ export function NexusNetworkClock() {
       window.clearInterval(timer);
       window.clearInterval(resync);
     };
-  }, [networkOffset]);
+  }, []);
 
   return (
     <div className="network-clock" aria-label="Hora actual">
