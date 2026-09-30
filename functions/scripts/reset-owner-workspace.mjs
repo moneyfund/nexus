@@ -144,6 +144,10 @@ function prepareWorkspace(original, user) {
       ...(project.metadata || {}),
       hoursBasis: "flow-only",
     };
+    project.metadata = {
+      ...(project.metadata || {}),
+      hoursBasis: "flow-only",
+    };
     for (const task of project.tasks || []) {
       task.userId = userId;
       task.source = "user";
