@@ -11,6 +11,7 @@ import { IdeaPanel } from "./idea-panel";
 import { PwaRegistration } from "./pwa-registration";
 import { AuthScreen } from "./auth-screen";
 import { NexusVoiceOrb } from "./nexus-voice-orb";
+import { NexusAudioPlayer } from "./nexus-audio-player";
 import { SpatialEnvironment, spatialZone } from "./spatial-environment";
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -257,6 +258,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <IdeaPanel />
       <PwaRegistration />
       <NexusVoiceOrb />
+      <NexusAudioPlayer />
       {n.toast && (
         <div
           className={"toast " + (n.toast.error ? "toast-error" : "")}
