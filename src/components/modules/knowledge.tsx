@@ -516,8 +516,9 @@ export function KnowledgeView({
           )}
           <p className="form-note">
             NEXUS indexa el texto legible de Google Docs, Sheets, Slides y archivos
-            de texto dentro de Knowledge para que la IA pueda usarlo. PDF y otros
-            formatos no extraíbles se conservan como referencia y enlace.
+            de texto dentro de Knowledge para que la IA pueda usarlo. Ese extracto
+            pasa a tu workspace privado y se sincroniza con Firestore. PDF y otros
+            formatos no extraíbles se conservan solo como referencia y enlace.
           </p>
         </div>
       </Modal>
