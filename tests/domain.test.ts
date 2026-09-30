@@ -493,9 +493,7 @@ test("Firebase migration rewrites ownership across the entire workspace graph", 
 
 
 test("legacy AI messages are migrated into a real conversation", () => {
-  const original = seedWorkspace() as ReturnType<typeof seedWorkspace> & {
-    conversations?: ReturnType<typeof seedWorkspace>["conversations"];
-  };
+  const original = seedWorkspace();
   original.messages.push({
     ...entity("legacy-ai-message", "user", original.user.id),
     conversationId: "local-conversation",
@@ -504,10 +502,13 @@ test("legacy AI messages are migrated into a real conversation", () => {
     contextIds: [],
     simulated: false,
   });
-  delete original.conversations;
+  const legacy = original as unknown as {
+    conversations?: unknown;
+  } & Omit<typeof original, "conversations">;
+  delete legacy.conversations;
 
   const migrated = reassignWorkspaceUser(
-    original as ReturnType<typeof seedWorkspace>,
+    legacy as unknown as ReturnType<typeof seedWorkspace>,
     "firebase-user-legacy",
   );
 
