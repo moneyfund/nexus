@@ -149,6 +149,7 @@ export interface FinancialAccount extends Entity {
 export interface Debt extends Entity {
   creditor: string;
   title: string;
+  projectId?: ID;
   originalAmount: number;
   balance: number;
   currency: Currency;
