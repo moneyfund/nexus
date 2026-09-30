@@ -129,7 +129,7 @@ function TransactionEditor({
 }
 export function FinanceView() {
   const n = useNexus();
-  const [scope, setScope] = useState<"all" | "user">("all");
+  const [scope, setScope] = useState<"all" | "user">("user");
   const [goalOpen, setGoalOpen] = useState(false);
   const [goalName, setGoalName] = useState("");
   const [goalTarget, setGoalTarget] = useState("");
@@ -144,6 +144,26 @@ export function FinanceView() {
     0,
   );
   const savings = financialGoals.reduce((s, g) => s + g.saved, 0);
+  const cutoverDate =
+    typeof n.data.user.metadata?.financeCutoverDate === "string"
+      ? n.data.user.metadata.financeCutoverDate
+      : "";
+  const cashNIO =
+    typeof n.data.user.metadata?.cashNIO === "number"
+      ? n.data.user.metadata.cashNIO
+      : null;
+  const cardUSD =
+    typeof n.data.user.metadata?.cardUSD === "number"
+      ? n.data.user.metadata.cardUSD
+      : null;
+  const historyReconciled =
+    n.data.user.metadata?.financeHistoryReconciled === true;
+  const cordobas = (amount: number) =>
+    new Intl.NumberFormat("es-NI", {
+      style: "currency",
+      currency: "NIO",
+      maximumFractionDigits: 2,
+    }).format(amount);
   const currentMonth = dateKey().slice(0, 7);
   const [baseMonth] = useState(() => currentMonth);
   const values = Array.from({ length: 6 }, (_, i) => {
@@ -203,6 +223,36 @@ export function FinanceView() {
           </select>
         </label>
       </div>
+      {(cashNIO != null || cardUSD != null) && (
+        <section className="section">
+          <SectionHeading
+            label="LIQUIDEZ REAL"
+            title="Dinero disponible al corte."
+            action={cutoverDate ? <Badge>CORTE {cutoverDate}</Badge> : undefined}
+          />
+          <div className="data-band">
+            <DataMetric
+              label="Efectivo"
+              value={cashNIO == null ? "—" : cordobas(cashNIO)}
+              meta="Saldo declarado · NIO"
+            />
+            <DataMetric
+              label="Tarjeta / banco"
+              value={cardUSD == null ? "—" : money(cardUSD)}
+              meta="Saldo declarado · USD"
+            />
+            <DataMetric
+              label="Histórico"
+              value={historyReconciled ? "Conciliado" : "Desde el corte"}
+              meta={
+                historyReconciled
+                  ? "Movimientos históricos verificados"
+                  : "No reconstruye gastos anteriores sin importe confirmado"
+              }
+            />
+          </div>
+        </section>
+      )}
       <div className="data-band">
         <DataMetric
           label="Ingresos"
@@ -220,9 +270,9 @@ export function FinanceView() {
           meta={`${expenses.length} movimientos`}
         />
         <DataMetric
-          label="Capital disponible"
+          label="Flujo registrado"
           value={money(income - expense - savings)}
-          meta="Flujo neto menos reservas declaradas"
+          meta="No equivale a liquidez cuando existe un corte financiero"
         />
       </div>
       <section className="section">
@@ -248,6 +298,7 @@ export function FinanceView() {
                 <th>Valor / h</th>
                 <th>Cobrado</th>
                 <th>Pendiente</th>
+                <th>Vencido</th>
                 <th>Margen cobrado</th>
               </tr>
             </thead>
@@ -276,6 +327,7 @@ export function FinanceView() {
                       </td>
                       <td>{money(f.paid)}</td>
                       <td className="accent">{money(f.receivable)}</td>
+              <td>{f.overdue ? money(f.overdue) : "—"}</td>
                       <td>{money(f.profit)}</td>
                     </tr>
                   );
