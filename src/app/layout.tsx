@@ -21,6 +21,8 @@ const orbitron = Orbitron({
   variable: "--font-tech",
   display: "swap",
 });
+const assetBase = process.env.GITHUB_PAGES === "true" ? "/nexus" : "";
+
 export const metadata: Metadata = {
   title: {
     default: "NEXUS OS · Tu universo conectado",
@@ -34,7 +36,10 @@ export const metadata: Metadata = {
     statusBarStyle: "black-translucent",
     title: "NEXUS",
   },
-  icons: { icon: "/icon.svg", apple: "/apple-touch-icon.png" },
+  icons: {
+    icon: assetBase + "/icon.svg",
+    apple: assetBase + "/icons/icon-192.png",
+  },
   robots: { index: false, follow: false },
 };
 export const viewport: Viewport = {
