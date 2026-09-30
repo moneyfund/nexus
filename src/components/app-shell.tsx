@@ -149,10 +149,23 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             initial={
               n.reduceMotion
                 ? false
-                : { opacity: 0, y: 12, filter: "blur(3px)" }
+                : {
+                    opacity: 0,
+                    y: 18,
+                    scale: 0.992,
+                    rotateX: 0.6,
+                    filter: "blur(7px)",
+                  }
             }
-            animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-            transition={{ duration: 0.38, ease: [0.22, 1, 0.36, 1] }}
+            animate={{
+              opacity: 1,
+              y: 0,
+              scale: 1,
+              rotateX: 0,
+              filter: "blur(0px)",
+            }}
+            transition={{ duration: 0.52, ease: [0.22, 1, 0.36, 1] }}
+            style={{ transformOrigin: "50% 18%", perspective: 1200 }}
           >
             {children}
           </motion.div>
