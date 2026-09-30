@@ -3016,6 +3016,47 @@ html[data-motion="reduced"] *:after {
 .chart-legend i.expense {
   background: #8a7297;
 }
+.chart-legend i.available {
+  background: #ffffffb8;
+}
+.finance-cut-band {
+  margin-top: 0;
+  background: linear-gradient(90deg, #d946ef08, transparent 42%, #ffffff03);
+}
+.finance-cut-band .data-metric:first-child strong {
+  color: var(--accent-bright);
+}
+.finance-ledger-note {
+  max-width: 760px;
+  margin: -6px 0 24px;
+}
+.finance-movement-month {
+  margin-top: 32px;
+}
+.finance-movement-month > .label {
+  display: block;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line);
+}
+.transaction-neutral {
+  color: var(--muted) !important;
+}
+.transaction-audit-mark {
+  min-width: 44px;
+  text-align: right;
+  font-size: 0.58rem;
+  letter-spacing: 0.08em;
+  color: var(--faint);
+}
+.transaction-in {
+  border-color: #d946ef35;
+}
+.transaction-out {
+  border-color: #ffffff18;
+}
+.transaction-neutral {
+  border-color: #ffffff10;
+}
 .chart-legend strong {
   font-weight: 400;
   margin-left: auto;
