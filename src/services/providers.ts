@@ -521,17 +521,20 @@ export class NexusContextBuilder {
                 !item.projectId ||
                 item.projectId === focusProjectId,
             )
+            .slice()
+            .sort((a, b) => b.updatedAt - a.updatedAt)
+            .slice(0, 24)
             .map(
-            ({ id, title, category, tags, content, url, projectId }) => ({
-              id,
-              title,
-              category,
-              tags,
-              content: content.slice(0, 4000),
-              url,
-              projectId,
-            }),
-          )
+              ({ id, title, category, tags, content, url, projectId }) => ({
+                id,
+                title,
+                category,
+                tags,
+                content: content.slice(0, 6000),
+                url,
+                projectId,
+              }),
+            )
         : [],
       memories: c.knowledge
         ? w.memories
