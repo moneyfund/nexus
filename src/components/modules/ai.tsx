@@ -155,6 +155,11 @@ export function AIView() {
     const debt = action.debtId
       ? (n.data.debts ?? []).find((item) => item.id === action.debtId)
       : undefined;
+    const account = action.accountId
+      ? (n.data.financialAccounts ?? []).find(
+          (item) => item.id === action.accountId,
+        )
+      : undefined;
     const task =
       action.projectId && action.taskId
         ? n.projects
@@ -174,17 +179,17 @@ export function AIView() {
       case "delete_task":
         return "Eliminar tarea · " + (task?.title ?? action.title ?? "tarea") + " · " + projectName;
       case "record_income":
-        return "Registrar ingreso · " + (action.currency ?? "USD") + " " + (action.amount ?? 0) + " · " + projectName;
+        return "Registrar ingreso · " + (action.currency ?? "USD") + " " + (action.amount ?? 0) + (account ? " · a " + account.name : "") + " · " + projectName;
       case "record_expense":
-        return "Registrar gasto · " + (action.currency ?? "USD") + " " + (action.amount ?? 0) + " · " + projectName;
+        return "Registrar gasto · " + (action.currency ?? "USD") + " " + (action.amount ?? 0) + (account ? " · desde " + account.name : "") + " · " + projectName;
       case "create_debt":
         return "Crear deuda · " + (action.creditor ?? action.title ?? "Deuda") + " · " + (action.currency ?? "USD") + " " + (action.amount ?? 0);
       case "update_debt":
         return "Editar deuda · " + (debt?.creditor ?? action.creditor ?? "Deuda");
       case "pay_debt":
-        return "Registrar pago · " + (debt?.creditor ?? "Deuda") + " · " + (action.currency ?? debt?.currency ?? "USD") + " " + (action.amount ?? 0);
+        return "Registrar pago · " + (debt?.creditor ?? "Deuda") + " · " + (action.currency ?? debt?.currency ?? "USD") + " " + (action.amount ?? 0) + (account ? " · desde " + account.name : "");
       case "mark_debt_paid":
-        return "Marcar pagada · " + (debt?.creditor ?? "Deuda");
+        return "Marcar pagada · " + (debt?.creditor ?? "Deuda") + (account ? " · cargar saldo a " + account.name : " · conciliación");
       case "update_transaction":
         return "Editar " + (action.transactionKind === "income" ? "ingreso" : "gasto") + " · " + (transaction?.title ?? action.title ?? "movimiento");
       case "delete_transaction":
