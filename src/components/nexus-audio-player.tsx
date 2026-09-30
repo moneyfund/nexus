@@ -253,6 +253,7 @@ export function NexusAudioPlayer() {
                 setAuthor(data.author || "YouTube");
               } else if (event.data === YT.PlayerState.PAUSED) {
                 setPlaying(false);
+                setReady(false);
                 setPanelOpen(false);
               } else if (event.data === YT.PlayerState.ENDED) {
                 const next = clampIndex(indexRef.current + 1);
@@ -283,7 +284,6 @@ export function NexusAudioPlayer() {
       disposed = true;
       playerRef.current?.destroy();
       playerRef.current = null;
-      setReady(false);
     };
   }, [panelOpen]);
 
@@ -353,6 +353,7 @@ export function NexusAudioPlayer() {
   function closePlayer() {
     playerRef.current?.pauseVideo();
     setPlaying(false);
+    setReady(false);
     setPanelOpen(false);
   }
 
@@ -426,6 +427,7 @@ export function NexusAudioPlayer() {
         className="nexus-audio-launcher"
         onClick={() => {
           setError("");
+          setReady(false);
           setPanelOpen(true);
         }}
         aria-label="Abrir NEXUS Audio"
