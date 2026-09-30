@@ -581,6 +581,17 @@ export class NexusActions {
       debt.balance = Math.round((debt.balance - applied) * 100) / 100;
       debt.status = debt.balance <= 0 ? "paid" : "pending";
       debt.updatedAt = Date.now();
+      w.expenses.unshift({
+        ...entity(id(), "user", w.user.id),
+        title: "Pago de deuda · " + debt.creditor,
+        amount: applied,
+        currency: debt.currency,
+        date: new Intl.DateTimeFormat("en-CA", {
+          timeZone: w.user.preferences.timezone,
+        }).format(new Date()),
+        category: "Pago de deuda",
+        accountId: account?.id,
+      });
       log(
         w,
         "Pago de deuda: " + debt.creditor + " · " + applied + " " + debt.currency,
