@@ -113,16 +113,37 @@ function formatTime(seconds: number) {
   return minutes + ":" + String(whole % 60).padStart(2, "0");
 }
 
+function initialTrackIndex() {
+  if (typeof window === "undefined") return 0;
+  try {
+    const saved = Number(window.localStorage.getItem("nexus-audio-track"));
+    return Number.isInteger(saved) ? clampIndex(saved) : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function initialVolume() {
+  if (typeof window === "undefined") return 72;
+  try {
+    const saved = Number(window.localStorage.getItem("nexus-audio-volume"));
+    return Number.isFinite(saved) && saved >= 0 && saved <= 100 ? saved : 72;
+  } catch {
+    return 72;
+  }
+}
+
 export function NexusAudioPlayer() {
   const pathname = usePathname();
   const playerMount = useRef<HTMLDivElement>(null);
   const playerRef = useRef<YouTubePlayer | null>(null);
-  const indexRef = useRef(0);
-  const [trackIndex, setTrackIndex] = useState(0);
+  const [trackIndex, setTrackIndex] = useState(initialTrackIndex);
+  const indexRef = useRef(trackIndex);
   const [ready, setReady] = useState(false);
   const [playing, setPlaying] = useState(false);
   const [muted, setMuted] = useState(false);
-  const [volume, setVolume] = useState(72);
+  const [volume, setVolume] = useState(initialVolume);
+  const startupRef = useRef({ trackIndex, volume });
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [title, setTitle] = useState("NEXUS SIGNAL 01");
@@ -136,19 +157,9 @@ export function NexusAudioPlayer() {
   );
 
   useEffect(() => {
-    const savedIndex = Number(window.localStorage.getItem("nexus-audio-track"));
-    const savedVolume = Number(window.localStorage.getItem("nexus-audio-volume"));
-    const nextIndex = Number.isInteger(savedIndex)
-      ? clampIndex(savedIndex)
-      : 0;
-    const nextVolume =
-      Number.isFinite(savedVolume) && savedVolume >= 0 && savedVolume <= 100
-        ? savedVolume
-        : 72;
-
+    const nextIndex = startupRef.current.trackIndex;
+    const nextVolume = startupRef.current.volume;
     indexRef.current = nextIndex;
-    setTrackIndex(nextIndex);
-    setVolume(nextVolume);
 
     let disposed = false;
 
