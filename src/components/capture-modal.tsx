@@ -12,7 +12,7 @@ import {
   Link2,
 } from "lucide-react";
 import { useNexus } from "./nexus-provider";
-import type { CaptureType } from "@/domain/models";
+import type { CaptureType, Currency } from "@/domain/models";
 import { Button, Modal } from "./ui/primitives";
 import { interfaceSound } from "@/services/sound";
 const options = [
@@ -45,6 +45,9 @@ function CaptureForm() {
     ].map((value) => value.trim()).filter(Boolean)),
   );
   const [amount, setAmount] = useState("");
+  const [currency, setCurrency] = useState<Currency>("USD");
+  const [accountId, setAccountId] = useState("");
+  const accounts = n.data.financialAccounts ?? [];
   const [url, setUrl] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [error, setError] = useState("");
@@ -59,6 +62,8 @@ function CaptureForm() {
         projectId: projectId || undefined,
         category,
         amount: Number(amount),
+        currency,
+        accountId: accountId || undefined,
         url,
         file: file
           ? { name: file.name, type: file.type, size: file.size }
@@ -184,17 +189,57 @@ function CaptureForm() {
           </label>
         </div>
         {(type === "income" || type === "expense") && (
-          <label className="field">
-            Importe en USD
-            <input
-              type="number"
-              min="0.01"
-              step="0.01"
-              required
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-            />
-          </label>
+          <>
+            <div className="form-grid">
+              <label className="field">
+                Importe
+                <input
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  required
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                />
+              </label>
+              <label className="field">
+                Moneda
+                <select
+                  value={currency}
+                  onChange={(e) => {
+                    const next = e.target.value as Currency;
+                    setCurrency(next);
+                    const current = accounts.find((item) => item.id === accountId);
+                    if (current && current.currency !== next) setAccountId("");
+                  }}
+                >
+                  <option value="USD">USD · Dólares</option>
+                  <option value="NIO">NIO · Córdobas</option>
+                </select>
+              </label>
+            </div>
+            <label className="field">
+              Cuenta {type === "expense" ? "de salida" : "de entrada"} (opcional)
+              <select
+                value={accountId}
+                onChange={(e) => {
+                  const nextId = e.target.value;
+                  setAccountId(nextId);
+                  const account = accounts.find((item) => item.id === nextId);
+                  if (account) setCurrency(account.currency);
+                }}
+              >
+                <option value="">Solo registrar movimiento</option>
+                {accounts
+                  .filter((item) => item.currency === currency)
+                  .map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.name} · {item.currency} {item.balance.toFixed(2)}
+                    </option>
+                  ))}
+              </select>
+            </label>
+          </>
         )}
         {type === "link" && (
           <label className="field">
