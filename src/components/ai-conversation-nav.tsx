@@ -27,6 +27,11 @@ export function AIConversationNav({
     (a, b) => b.updatedAt - a.updatedAt,
   );
   const history = conversations;
+  const orderedProjects = [...n.projects].sort(
+    (a, b) =>
+      ({ active: 0, waiting: 1, backlog: 2, completed: 3 })[a.status] -
+      ({ active: 0, waiting: 1, backlog: 2, completed: 3 })[b.status],
+  );
   const projectConversation = (projectId: string) =>
     conversations.find(
       (conversation) =>
@@ -50,7 +55,7 @@ export function AIConversationNav({
           <ChevronRight size={14} className="ai-thread-chevron" />
         </summary>
         <div className="ai-thread-list">
-          {n.projects.map((project) => {
+          {orderedProjects.map((project) => {
             const conversation = projectConversation(project.id);
             const active = conversation?.id === activeConversationId;
             return (
