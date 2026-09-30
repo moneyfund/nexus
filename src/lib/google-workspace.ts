@@ -95,13 +95,30 @@ export function saveGoogleWorkspaceGrant(grant: GoogleWorkspaceGrant) {
     ...grant,
     connectedAt: grant.connectedAt ?? Date.now(),
   };
-  localStorageSafe()?.setItem(STORAGE_KEY, JSON.stringify(normalized));
-  sessionStorageSafe()?.removeItem(LEGACY_SESSION_KEY);
+  const serialized = JSON.stringify(normalized);
+  const local = localStorageSafe();
+  const session = sessionStorageSafe();
+
+  try {
+    local?.setItem(STORAGE_KEY, serialized);
+    session?.removeItem(LEGACY_SESSION_KEY);
+  } catch {
+    // Some privacy modes disable localStorage. Keep the grant session-only.
+    session?.setItem(LEGACY_SESSION_KEY, serialized);
+  }
 }
 
 export function clearGoogleWorkspaceGrant() {
-  localStorageSafe()?.removeItem(STORAGE_KEY);
-  sessionStorageSafe()?.removeItem(LEGACY_SESSION_KEY);
+  try {
+    localStorageSafe()?.removeItem(STORAGE_KEY);
+  } catch {
+    // Ignore browser storage restrictions while disconnecting.
+  }
+  try {
+    sessionStorageSafe()?.removeItem(LEGACY_SESSION_KEY);
+  } catch {
+    // Ignore browser storage restrictions while disconnecting.
+  }
 }
 
 async function googleError(response: Response) {
