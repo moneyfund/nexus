@@ -11,20 +11,14 @@ import {
   ArrowDown,
   Orbit,
   Database,
-  Mic,
   Wallet,
   ListTodo,
-  Lightbulb,
-  CalendarPlus,
 } from "lucide-react";
 import { motion } from "motion/react";
 import { useNexus } from "./nexus-provider";
 import { Badge, Button, Empty, Label, SectionHeading } from "./ui/primitives";
 import { dateKey, money, projectFinance } from "@/domain/selectors";
-function ArrowDownRightIcon() {
-  return <ArrowRight size={18} style={{ transform: "rotate(45deg)" }} />;
-}
-
+import { NexusNetworkClock } from "./nexus-network-clock";
 const Galaxy = dynamic(
   () => import("./nexus-galaxy").then((m) => m.NexusGalaxy),
   {
@@ -72,50 +66,45 @@ export function Dashboard() {
       };
   return (
     <div className="today-view">
-      <div className="today-intro">
-        <span className="hud-label">
-          TU ESPACIO, {n.data.user.name.split(" ")[0].toUpperCase()}
-        </span>
-        <span className="date-label" suppressHydrationWarning>
-          {new Intl.DateTimeFormat("es-NI", {
-            weekday: "long",
-            day: "numeric",
-            month: "long",
-            timeZone: n.data.user.preferences.timezone,
-          }).format(new Date())}
-        </span>
-      </div>
-      <section className="core-stage">
+      <section className="core-stage immersive-core">
+        <div className="core-hud-line">
+          <span className="hud-label">
+            NEXUS // {n.data.user.name.split(" ")[0].toUpperCase()} // PERSONAL OS
+          </span>
+          <NexusNetworkClock />
+        </div>
         <div className="core-copy">
           <div className="core-eyebrow">
-            <span className="core-index">01 /</span>
-            <Label>NEXUS CORE</Label>
+            <span className="core-index">01 //</span>
+            <Label>INTELLIGENCE CORE</Label>
           </div>
           <h1>
-            Todo tiene
+            Tu universo,
             <br />
-            su <em>órbita.</em>
+            <em>en movimiento.</em>
           </h1>
           <p>
-            Ideas que conectan.
-            <br />
-            Proyectos que avanzan.
-            <br />
-            Tu mente, con espacio para más.
+            Proyectos, decisiones y capital orbitando un mismo núcleo.
           </p>
-          <button className="core-capture" onClick={() => n.openCapture()}>
-            <Plus size={16} />
-            <span>Expandir mi universo</span>
-            <ArrowUpRight size={16} />
-          </button>
+          <div className="core-primary-actions">
+            <button className="core-capture" onClick={() => n.openCapture()}>
+              <Plus size={16} />
+              <span>Capturar</span>
+            </button>
+            <button className="core-capture secondary" onClick={() => router.push("/ai")}>
+              <Orbit size={16} />
+              <span>Entrar a NEXUS AI</span>
+            </button>
+          </div>
           <div className="core-stats">
             <span>
-              <strong>{String(active.length).padStart(2, "0")}</strong>PROYECTOS
-              ACTIVOS
+              <strong>{String(active.length).padStart(2, "0")}</strong>ACTIVOS
             </span>
             <span>
-              <strong>{String(ideas.length).padStart(2, "0")}</strong>IDEAS EN
-              ÓRBITA
+              <strong>{String(n.projects.length).padStart(2, "0")}</strong>PROYECTOS
+            </span>
+            <span>
+              <strong>{String(ideas.length).padStart(2, "0")}</strong>IDEAS
             </span>
           </div>
         </div>
@@ -123,9 +112,9 @@ export function Dashboard() {
           <Galaxy />
         </div>
         <div className="core-bottom-label">
-          <span>PERSONAL INTELLIGENCE SYSTEM</span>
+          <span>INNER ORBIT = ACTIVE</span>
           <ArrowDown size={13} />
-          <span>FROM THOUGHT TO ACTION</span>
+          <span>DRAG · EXPLORE · OPEN</span>
         </div>
       </section>
       {n.projects.length === 0 && (
@@ -151,36 +140,22 @@ export function Dashboard() {
           </div>
         </motion.section>
       )}
-      <motion.section {...reveal} className="nexus-command-deck">
-        <button type="button" onClick={() => n.openCapture("expense")}>
-          <span><Wallet size={18} /></span>
-          <strong>Gasto</strong>
-          <small>Registrar salida</small>
-        </button>
-        <button type="button" onClick={() => n.openCapture("income")}>
-          <span><ArrowDownRightIcon /></span>
-          <strong>Ingreso</strong>
-          <small>Registrar cobro</small>
-        </button>
-        <button type="button" onClick={() => n.openCapture("task")}>
-          <span><ListTodo size={18} /></span>
-          <strong>Tarea</strong>
-          <small>Nueva acción</small>
-        </button>
-        <button type="button" onClick={() => n.openCapture("idea")}>
-          <span><Lightbulb size={18} /></span>
-          <strong>Idea</strong>
-          <small>Capturar ahora</small>
-        </button>
-        <button type="button" onClick={() => router.push("/calendar")}>
-          <span><CalendarPlus size={18} /></span>
-          <strong>Planificar</strong>
-          <small>Bloquear tiempo</small>
+      <motion.section {...reveal} className="nexus-action-dock" aria-label="Accesos rápidos">
+        <button type="button" onClick={() => n.openCapture()}>
+          <Plus size={17} />
+          <span>CAPTURE</span>
         </button>
         <button type="button" onClick={() => router.push("/ai")}>
-          <span><Mic size={18} /></span>
-          <strong>NEXUS</strong>
-          <small>Hablar / preguntar</small>
+          <Orbit size={17} />
+          <span>NEXUS AI</span>
+        </button>
+        <button type="button" onClick={() => router.push("/projects")}>
+          <ListTodo size={17} />
+          <span>PROJECTS</span>
+        </button>
+        <button type="button" onClick={() => router.push("/finance")}>
+          <Wallet size={17} />
+          <span>FINANCE</span>
         </button>
       </motion.section>
       <motion.section {...reveal} className="directive-band">
