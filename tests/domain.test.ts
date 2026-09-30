@@ -470,6 +470,7 @@ test("Firebase migration rewrites ownership across the entire workspace graph", 
     ...migrated.attachments,
     ...migrated.notifications,
     ...migrated.activity,
+    ...migrated.conversations,
     ...migrated.messages,
     ...migrated.memories,
     ...migrated.aiUsage,
@@ -490,6 +491,34 @@ test("Firebase migration rewrites ownership across the entire workspace graph", 
   );
 });
 
+
+test("legacy AI messages are migrated into a real conversation", () => {
+  const original = seedWorkspace() as ReturnType<typeof seedWorkspace> & {
+    conversations?: ReturnType<typeof seedWorkspace>["conversations"];
+  };
+  original.messages.push({
+    ...entity("legacy-ai-message", "user", original.user.id),
+    conversationId: "local-conversation",
+    role: "user",
+    content: "Mensaje anterior de NEXUS",
+    contextIds: [],
+    simulated: false,
+  });
+  delete original.conversations;
+
+  const migrated = reassignWorkspaceUser(
+    original as ReturnType<typeof seedWorkspace>,
+    "firebase-user-legacy",
+  );
+
+  assert.equal(migrated.conversations.length, 1);
+  assert.equal(migrated.conversations[0].id, "local-conversation");
+  assert.equal(migrated.conversations[0].messageIds[0], "legacy-ai-message");
+  assert.equal(
+    migrated.messages[0].conversationId,
+    migrated.conversations[0].id,
+  );
+});
 
 test("known portfolio sync updates curated projects without deleting user projects", () => {
   const original = reassignWorkspaceUser(seedWorkspace(), "firebase-user-123");
