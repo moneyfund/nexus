@@ -372,10 +372,6 @@ export function FinanceView() {
     (s, p) => s + projectFinance(scoped, p).receivable,
     0,
   );
-  const cutoverDate =
-    typeof n.data.user.metadata?.financeCutoverDate === "string"
-      ? n.data.user.metadata.financeCutoverDate
-      : "";
   const cashAccount = accounts.find(
     (item) => item.kind === "cash" && item.currency === "NIO",
   );
