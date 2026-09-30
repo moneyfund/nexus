@@ -283,6 +283,17 @@ function prepareWorkspace(original, user) {
   }
 
   const thesis = findProject(workspace, "tesis-civil");
+  for (const milestone of thesis.milestones || []) {
+    if (/Correcciones y predefensa/i.test(milestone.title)) {
+      milestone.progress = 100;
+      milestone.baselineProgress = 100;
+    }
+    if (/Defensa final/i.test(milestone.title)) {
+      milestone.progress = 20;
+      milestone.baselineProgress = 20;
+    }
+    milestone.updatedAt = Date.now();
+  }
   for (const task of thesis.tasks) {
     if (
       /predefensa|observaciones del primer documento/i.test(task.title)
@@ -317,6 +328,17 @@ function prepareWorkspace(original, user) {
   });
 
   const amy = findProject(workspace, "amy-blandon");
+  for (const milestone of amy.milestones || []) {
+    if (/Identidad|Web comercial|Funciones y contenido/i.test(milestone.title)) {
+      milestone.progress = 100;
+      milestone.baselineProgress = 100;
+    }
+    if (/Cierre/i.test(milestone.title)) {
+      milestone.progress = 80;
+      milestone.baselineProgress = 80;
+    }
+    milestone.updatedAt = Date.now();
+  }
   for (const task of amy.tasks) {
     if (/esperar revisión final/i.test(task.title)) {
       task.completed = true;
@@ -331,6 +353,25 @@ function prepareWorkspace(original, user) {
   });
 
   const nexus = findProject(workspace, "nexus");
+  for (const milestone of nexus.milestones || []) {
+    if (/Sistema visual y navegación/i.test(milestone.title)) {
+      milestone.progress = 100;
+      milestone.baselineProgress = 100;
+    }
+    if (/Firebase y persistencia/i.test(milestone.title)) {
+      milestone.progress = 100;
+      milestone.baselineProgress = 100;
+    }
+    if (/Datos y automatización/i.test(milestone.title)) {
+      milestone.progress = 70;
+      milestone.baselineProgress = 70;
+    }
+    if (/IA e integraciones/i.test(milestone.title)) {
+      milestone.progress = 30;
+      milestone.baselineProgress = 30;
+    }
+    milestone.updatedAt = Date.now();
+  }
   upsertTask(nexus, userId, "Validar cuenta multiusuario con Oliver", {
     completed: false,
     priority: "high",
