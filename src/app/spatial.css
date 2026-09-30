@@ -2465,6 +2465,7 @@ h3 {
   display: block;
   width: 3px;
   height: 4px;
+  transform-origin: bottom;
   border-radius: 4px 4px 0 0;
   background: linear-gradient(#f1b5ff, #a747c5);
   box-shadow: 0 0 6px #d946ef35;
@@ -2583,11 +2584,11 @@ h3 {
 }
 @keyframes nexus-audio-bar {
   from {
-    height: 4px;
-    opacity: 0.45;
+    transform: scaleY(0.38);
+    opacity: 0.4;
   }
   to {
-    height: calc(8px + (var(--bar) % 5) * 2px);
+    transform: scaleY(1.18);
     opacity: 1;
   }
 }
