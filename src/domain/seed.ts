@@ -144,6 +144,7 @@ export function seedWorkspace(): Workspace {
       },
      ],
     activity: [],
+    conversations: [],
     messages: [],
     memories: [],
     aiUsage: [],
