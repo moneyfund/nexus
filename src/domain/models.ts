@@ -287,8 +287,8 @@ export interface Workspace {
   goals: Goal[];
   incomes: Income[];
   expenses: Expense[];
-  financialAccounts?: FinancialAccount[];
-  debts?: Debt[];
+  financialAccounts: FinancialAccount[];
+  debts: Debt[];
   financialGoals: FinancialGoal[];
   contacts: Contact[];
   knowledge: KnowledgeItem[];
