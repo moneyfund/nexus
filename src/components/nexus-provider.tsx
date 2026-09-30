@@ -333,10 +333,6 @@ function useSystem() {
 
   const syncNow = async () => {
     if (!session || !store.ready) return;
-    if (syncTimer.current) {
-      clearTimeout(syncTimer.current);
-      syncTimer.current = null;
-    }
     try {
       await firebaseClient.writeWorkspace(store.getSnapshot());
       setCloudReady(true);
