@@ -26,9 +26,7 @@ export function AIConversationNav({
   const conversations = [...n.data.conversations].sort(
     (a, b) => b.updatedAt - a.updatedAt,
   );
-  const general = conversations.filter(
-    (conversation) => conversation.kind === "general",
-  );
+  const history = conversations;
   const projectConversation = (projectId: string) =>
     conversations.find(
       (conversation) =>
@@ -86,12 +84,12 @@ export function AIConversationNav({
             Historial
           </span>
           <span className="ai-thread-summary-meta">
-            {general.length}
+            {history.length}
             <ChevronRight size={14} className="ai-thread-chevron" />
           </span>
         </summary>
         <div className="ai-thread-list">
-          {general.map((conversation) => (
+          {history.map((conversation) => (
             <div
               key={conversation.id}
               className={
@@ -105,6 +103,7 @@ export function AIConversationNav({
               >
                 <strong>{conversation.title}</strong>
                 <small>
+                  {conversation.kind === "project" ? "Proyecto · " : ""}
                   {conversation.messageIds.length} mensaje
                   {conversation.messageIds.length === 1 ? "" : "s"}
                 </small>
@@ -118,7 +117,7 @@ export function AIConversationNav({
               </button>
             </div>
           ))}
-          {!general.length && (
+          {!history.length && (
             <p className="ai-thread-empty">
               Tus conversaciones generales aparecerán aquí.
             </p>
