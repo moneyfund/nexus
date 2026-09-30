@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Space_Grotesk } from "next/font/google";
+import { Geist, Orbitron, Space_Grotesk } from "next/font/google";
 import "./globals.css";
 import { NexusProvider } from "@/components/nexus-provider";
 import { AppShell } from "@/components/app-shell";
@@ -13,6 +13,11 @@ const geist = Geist({
 const space = Space_Grotesk({
   subsets: ["latin"],
   variable: "--font-display",
+  display: "swap",
+});
+const orbitron = Orbitron({
+  subsets: ["latin"],
+  variable: "--font-tech",
   display: "swap",
 });
 export const metadata: Metadata = {
@@ -40,7 +45,10 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="es" className={`${geist.variable} ${space.variable}`}>
+    <html
+      lang="es"
+      className={`${geist.variable} ${space.variable} ${orbitron.variable}`}
+    >
       <body>
         <NexusProvider>
           <AppShell>{children}</AppShell>
