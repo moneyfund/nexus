@@ -14,6 +14,7 @@ import type {
   UserPreferences,
   Milestone,
   MoneyRecord,
+  Debt,
   AIMessage,
 } from "@/domain/models";
 const id = () => crypto.randomUUID();
@@ -550,6 +551,138 @@ export class NexusActions {
         "Movimiento eliminado: " + record.title,
         "finance",
         record.projectId,
+      );
+    });
+
+
+  createDebt = (input: {
+    creditor: string;
+    title?: string;
+    amount: number;
+    balance?: number;
+    currency: Debt["currency"];
+    dueDate?: string;
+    notes?: string;
+    projectId?: string;
+  }) => {
+    const debtId = id();
+    this.store.update((w) => {
+      const creditor = input.creditor.trim();
+      const title = input.title?.trim() || creditor || "Deuda";
+      if (!creditor) throw new Error("La deuda necesita un acreedor.");
+      if (!Number.isFinite(input.amount) || input.amount <= 0)
+        throw new Error("El importe de la deuda debe ser mayor que cero.");
+      if (
+        input.balance != null &&
+        (!Number.isFinite(input.balance) || input.balance < 0)
+      )
+        throw new Error("El saldo pendiente no puede ser negativo.");
+      if (
+        input.projectId &&
+        !w.projects.some((project) => project.id === input.projectId)
+      )
+        throw new Error("Proyecto no encontrado.");
+
+      const originalAmount = Math.round(input.amount * 100) / 100;
+      const balance =
+        input.balance == null
+          ? originalAmount
+          : Math.round(input.balance * 100) / 100;
+
+      w.debts ??= [];
+      w.debts.unshift({
+        ...entity(debtId, "user", w.user.id),
+        creditor,
+        title,
+        projectId: input.projectId || undefined,
+        originalAmount,
+        balance,
+        currency: input.currency,
+        dueDate: input.dueDate || undefined,
+        status: balance <= 0 ? "paid" : "pending",
+        notes: input.notes?.trim() || undefined,
+      });
+      log(
+        w,
+        "Deuda registrada: " + creditor + " · " + balance + " " + input.currency,
+        "debt",
+        input.projectId,
+      );
+    });
+    return debtId;
+  };
+
+  updateDebt = (
+    debtId: string,
+    patch: Partial<
+      Pick<
+        Debt,
+        | "creditor"
+        | "title"
+        | "projectId"
+        | "originalAmount"
+        | "balance"
+        | "dueDate"
+        | "notes"
+      >
+    >,
+  ) =>
+    this.store.update((w) => {
+      const debt = (w.debts ?? []).find((item) => item.id === debtId);
+      if (!debt) throw new Error("Deuda no encontrada.");
+
+      if (patch.creditor != null) {
+        const creditor = patch.creditor.trim();
+        if (!creditor) throw new Error("La deuda necesita un acreedor.");
+        debt.creditor = creditor;
+      }
+      if (patch.title != null) {
+        const title = patch.title.trim();
+        if (!title) throw new Error("La deuda necesita un concepto.");
+        debt.title = title;
+      }
+      if (patch.originalAmount != null) {
+        if (!Number.isFinite(patch.originalAmount) || patch.originalAmount <= 0)
+          throw new Error("El importe original debe ser mayor que cero.");
+        debt.originalAmount = Math.round(patch.originalAmount * 100) / 100;
+      }
+      if (patch.balance != null) {
+        if (!Number.isFinite(patch.balance) || patch.balance < 0)
+          throw new Error("El saldo pendiente no puede ser negativo.");
+        debt.balance = Math.round(patch.balance * 100) / 100;
+        debt.status = debt.balance <= 0 ? "paid" : "pending";
+      }
+      if ("projectId" in patch) {
+        if (
+          patch.projectId &&
+          !w.projects.some((project) => project.id === patch.projectId)
+        )
+          throw new Error("Proyecto no encontrado.");
+        debt.projectId = patch.projectId || undefined;
+      }
+      if ("dueDate" in patch) debt.dueDate = patch.dueDate || undefined;
+      if ("notes" in patch) debt.notes = patch.notes?.trim() || undefined;
+      debt.updatedAt = Date.now();
+      log(
+        w,
+        "Deuda actualizada: " + debt.creditor,
+        "debt",
+        debt.projectId,
+      );
+    });
+
+  markDebtPaid = (debtId: string) =>
+    this.store.update((w) => {
+      const debt = (w.debts ?? []).find((item) => item.id === debtId);
+      if (!debt) throw new Error("Deuda no encontrada.");
+      debt.balance = 0;
+      debt.status = "paid";
+      debt.updatedAt = Date.now();
+      log(
+        w,
+        "Deuda marcada como pagada: " + debt.creditor,
+        "debt",
+        debt.projectId,
       );
     });
 
