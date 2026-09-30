@@ -10,8 +10,6 @@ import {
   SkipForward,
   Volume2,
   VolumeX,
-  X,
-  RadioTower,
 } from "lucide-react";
 import { NEXUS_AUDIO_TRACKS } from "@/config/audio";
 
@@ -129,7 +127,6 @@ export function NexusAudioPlayer() {
   const [duration, setDuration] = useState(0);
   const [title, setTitle] = useState("NEXUS SIGNAL 01");
   const [author, setAuthor] = useState("YouTube");
-  const [collapsed, setCollapsed] = useState(false);
   const [error, setError] = useState("");
   const currentTrack = NEXUS_AUDIO_TRACKS[trackIndex];
 
@@ -141,9 +138,6 @@ export function NexusAudioPlayer() {
   useEffect(() => {
     const savedIndex = Number(window.localStorage.getItem("nexus-audio-track"));
     const savedVolume = Number(window.localStorage.getItem("nexus-audio-volume"));
-    const savedCollapsed =
-      window.localStorage.getItem("nexus-audio-collapsed") === "true";
-
     const nextIndex = Number.isInteger(savedIndex)
       ? clampIndex(savedIndex)
       : 0;
@@ -155,7 +149,6 @@ export function NexusAudioPlayer() {
     indexRef.current = nextIndex;
     setTrackIndex(nextIndex);
     setVolume(nextVolume);
-    setCollapsed(savedCollapsed);
 
     let disposed = false;
 
@@ -231,7 +224,7 @@ export function NexusAudioPlayer() {
   }, []);
 
   useEffect(() => {
-    if (!ready || collapsed) return;
+    if (!ready) return;
     const timer = window.setInterval(() => {
       const player = playerRef.current;
       if (!player) return;
@@ -243,7 +236,7 @@ export function NexusAudioPlayer() {
       }
     }, 500);
     return () => window.clearInterval(timer);
-  }, [ready, collapsed]);
+  }, [ready]);
 
   function switchTrack(delta: number) {
     const player = playerRef.current;
@@ -267,8 +260,6 @@ export function NexusAudioPlayer() {
     if (!player || !ready) return;
     if (playing) player.pauseVideo();
     else {
-      setCollapsed(false);
-      window.localStorage.setItem("nexus-audio-collapsed", "false");
       player.playVideo();
     }
   }
@@ -296,22 +287,9 @@ export function NexusAudioPlayer() {
     }
   }
 
-  function collapsePlayer() {
-    playerRef.current?.pauseVideo();
-    setPlaying(false);
-    setCollapsed(true);
-    window.localStorage.setItem("nexus-audio-collapsed", "true");
-  }
-
-  function expandPlayer() {
-    setCollapsed(false);
-    window.localStorage.setItem("nexus-audio-collapsed", "false");
-  }
-
   if (!NEXUS_AUDIO_TRACKS.length) return null;
 
-  if (collapsed) {
-    return (
+  return (
       <button
         className={"nexus-audio-mini " + positionClass}
         onClick={expandPlayer}
@@ -345,13 +323,7 @@ export function NexusAudioPlayer() {
           SIGNAL {String(trackIndex + 1).padStart(2, "0")} /{" "}
           {String(NEXUS_AUDIO_TRACKS.length).padStart(2, "0")}
         </span>
-        <button
-          onClick={collapsePlayer}
-          className="nexus-audio-close"
-          aria-label="Minimizar reproductor"
-        >
-          <X size={13} />
-        </button>
+        <span className="nexus-audio-state">{playing ? "LIVE" : "STANDBY"}</span>
       </div>
 
       <div className="nexus-audio-grid">
@@ -375,7 +347,13 @@ export function NexusAudioPlayer() {
             data-playing={playing ? "true" : "false"}
           >
             {Array.from({ length: 14 }, (_, index) => (
-              <i key={index} style={{ "--bar": index } as React.CSSProperties} />
+              <i
+                key={index}
+                style={{
+                  height: 5 + ((index * 7) % 13),
+                  animationDelay: index * -0.055 + "s",
+                }}
+              />
             ))}
           </div>
 
