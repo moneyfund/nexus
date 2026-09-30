@@ -74,7 +74,7 @@ function TransactionEditor({
       </label>
       <div className="form-grid">
         <label className="field">
-          Importe USD
+          Importe {record.currency}
           <input
             type="number"
             min=".01"
