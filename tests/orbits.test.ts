@@ -17,13 +17,20 @@ test("project orbit bands stay ordered for empty, small and crowded workspaces",
   }
 });
 
-test("mobile retains a rendered universe with a bounded quality budget", () => {
+test("galaxy quality budgets favor low idle cost and short interaction boosts", () => {
   for (const quality of ["auto", "low", "high"] as const) {
     const mobile = galaxyBudget(quality, 390);
+    const desktop = galaxyBudget(quality, 1200);
     assert.ok(mobile.particles > 0);
-    assert.ok(mobile.particles <= galaxyBudget(quality, 1200).particles);
+    assert.ok(mobile.particles <= desktop.particles);
     assert.ok(mobile.dpr <= 1.25);
-    assert.equal(mobile.fps, 30);
+    assert.ok(mobile.fps <= 20);
+    assert.ok(mobile.interactionFps >= mobile.fps);
+    assert.ok(desktop.interactionFps >= desktop.fps);
+    assert.ok(desktop.ringCount <= 16);
   }
-  assert.equal(galaxyBudget("auto", 1200).fps, 60);
+  const auto = galaxyBudget("auto", 1200);
+  assert.ok(auto.particles <= 1000);
+  assert.ok(auto.fps <= 24);
+  assert.ok(auto.dpr <= 1.25);
 });
