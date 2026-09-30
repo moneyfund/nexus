@@ -49,7 +49,7 @@ export function galaxyBudget(
     return {
       particles: 320,
       dpr: 1,
-      fps: 20,
+      fps: 16,
       interactionFps: 30,
       ringCount: 10,
       armSamples: 42,
@@ -58,7 +58,7 @@ export function galaxyBudget(
     return {
       particles: 520,
       dpr: 1.1,
-      fps: 24,
+      fps: 20,
       interactionFps: 30,
       ringCount: 10,
       armSamples: 48,
@@ -67,7 +67,7 @@ export function galaxyBudget(
     return {
       particles: 1600,
       dpr: 1.5,
-      fps: 40,
+      fps: 30,
       interactionFps: 60,
       ringCount: 16,
       armSamples: 64,
@@ -75,7 +75,7 @@ export function galaxyBudget(
   return {
     particles: 980,
     dpr: 1.25,
-    fps: 30,
+    fps: 22,
     interactionFps: 45,
     ringCount: 12,
     armSamples: 52,
