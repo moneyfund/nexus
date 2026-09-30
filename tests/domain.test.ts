@@ -8,7 +8,7 @@ import {
   syncKnownPortfolio,
 } from "../src/repositories/workspace";
 import { NexusActions } from "../src/services/actions";
-import { seedWorkspace } from "../src/domain/seed";
+import { entity, seedWorkspace } from "../src/domain/seed";
 import {
   financialScope,
   flowElapsed,
@@ -281,6 +281,100 @@ test("AI context includes editable financial records with stable IDs", () => {
   });
   const hidden = new NexusContextBuilder().build(store.getSnapshot());
   assert.deepEqual(hidden.transactions, []);
+});
+
+test("AI conversations isolate project context and support deletion", () => {
+  const { store, actions } = setup();
+  const projectConversationId = actions.createAIConversation(
+    "nexus",
+    "NEXUS",
+  );
+  const sameProjectConversationId = actions.createAIConversation(
+    "nexus",
+    "NEXUS duplicado",
+  );
+  assert.equal(projectConversationId, sameProjectConversationId);
+
+  const userMessageId = "ai-user-1";
+  actions.appendAIMessage(projectConversationId, {
+    ...entity(userMessageId, "user", store.userId),
+    conversationId: projectConversationId,
+    role: "user",
+    content: "¿Qué sigue en este proyecto?",
+    contextIds: [],
+    simulated: false,
+  });
+  actions.appendAIMessage(projectConversationId, {
+    ...entity("ai-assistant-1", "user", store.userId),
+    conversationId: projectConversationId,
+    role: "assistant",
+    content: "Revisa la siguiente tarea.",
+    contextIds: ["nexus"],
+    simulated: false,
+  });
+
+  const projectContext = new NexusContextBuilder().build(
+    store.getSnapshot(),
+    {
+      conversationId: projectConversationId,
+      projectId: "nexus",
+    },
+  );
+  assert.equal(projectContext.focusProjectId, "nexus");
+  assert.deepEqual(
+    projectContext.projects.map((project) => project.id),
+    ["nexus"],
+  );
+  assert.equal(projectContext.recentMessages.length, 2);
+
+  const generalConversationId = actions.createAIConversation();
+  actions.appendAIMessage(generalConversationId, {
+    ...entity("ai-user-2", "user", store.userId),
+    conversationId: generalConversationId,
+    role: "user",
+    content: "Conversación general",
+    contextIds: [],
+    simulated: false,
+  });
+  const generalContext = new NexusContextBuilder().build(
+    store.getSnapshot(),
+    { conversationId: generalConversationId },
+  );
+  assert.equal(generalContext.recentMessages.length, 1);
+  assert.equal(generalContext.recentMessages[0].content, "Conversación general");
+
+  actions.deleteAIMessage(userMessageId);
+  assert.equal(
+    store.getSnapshot().messages.some((message) => message.id === userMessageId),
+    false,
+  );
+  assert.equal(
+    store
+      .getSnapshot()
+      .conversations.find(
+        (conversation) => conversation.id === projectConversationId,
+      )
+      ?.messageIds.includes(userMessageId),
+    false,
+  );
+
+  actions.deleteAIConversation(projectConversationId);
+  assert.equal(
+    store
+      .getSnapshot()
+      .conversations.some(
+        (conversation) => conversation.id === projectConversationId,
+      ),
+    false,
+  );
+  assert.equal(
+    store
+      .getSnapshot()
+      .messages.some(
+        (message) => message.conversationId === projectConversationId,
+      ),
+    false,
+  );
 });
 
 test("AI-operable memories and project activity are persistent and auditable", () => {
