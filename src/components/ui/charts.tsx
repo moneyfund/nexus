@@ -4,11 +4,23 @@ import { money } from "@/domain/selectors";
 export function CashflowChart({
   values,
 }: {
-  values: { label: string; income: number; expense: number }[];
+  values: {
+    label: string;
+    income: number;
+    expense: number;
+    available?: number;
+  }[];
 }) {
   const id = useId();
   const [selected, setSelected] = useState(values.length - 1);
-  const max = Math.max(100, ...values.flatMap((v) => [v.income, v.expense]));
+  const max = Math.max(
+    100,
+    ...values.flatMap((v) => [
+      v.income,
+      v.expense,
+      typeof v.available === "number" ? v.available : 0,
+    ]),
+  );
   const width = 720,
     height = 210,
     gap = width / Math.max(1, values.length - 1);
@@ -17,6 +29,14 @@ export function CashflowChart({
     .join(" ");
   const expenses = values
     .map((v, i) => `${i * gap},${height - (v.expense / max) * (height - 20)}`)
+    .join(" ");
+  const availablePoints = values
+    .map((v, i) =>
+      typeof v.available === "number"
+        ? `${i * gap},${height - (v.available / max) * (height - 20)}`
+        : null,
+    )
+    .filter((point): point is string => !!point)
     .join(" ");
   const current = values[selected];
   return (
@@ -30,9 +50,15 @@ export function CashflowChart({
           <i className="expense" />
           Gastos
         </span>
+        <span>
+          <i className="available" />
+          Disponible
+        </span>
         <strong>
           {current?.label}:{" "}
-          {money((current?.income ?? 0) - (current?.expense ?? 0))} neto
+          {typeof current?.available === "number"
+            ? money(current.available) + " disponible"
+            : money((current?.income ?? 0) - (current?.expense ?? 0)) + " neto"}
         </strong>
       </div>
       <div className="chart-body">
@@ -82,6 +108,16 @@ export function CashflowChart({
             strokeDasharray="5 5"
             vectorEffect="non-scaling-stroke"
           />
+          {availablePoints && (
+            <polyline
+              points={availablePoints}
+              fill="none"
+              stroke="#ffffff"
+              strokeOpacity=".72"
+              strokeWidth="1.4"
+              vectorEffect="non-scaling-stroke"
+            />
+          )}
           {values.map((v, i) => (
             <circle
               key={i}
