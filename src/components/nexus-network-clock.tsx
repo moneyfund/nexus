@@ -7,6 +7,8 @@ import { useNexus } from "./nexus-provider";
 export function NexusNetworkClock() {
   const n = useNexus();
   const [now, setNow] = useState(() => new Date());
+  const [networkOffset, setNetworkOffset] = useState(0);
+  const [networkSynced, setNetworkSynced] = useState(false);
   const formatter = useMemo(
     () =>
       new Intl.DateTimeFormat("es-NI", {
@@ -30,16 +32,45 @@ export function NexusNetworkClock() {
   );
 
   useEffect(() => {
-    const timer = window.setInterval(() => setNow(new Date()), 1000);
-    return () => window.clearInterval(timer);
-  }, []);
+    let active = true;
+    const syncNetworkTime = async () => {
+      try {
+        const started = Date.now();
+        const response = await fetch(window.location.href, {
+          method: "HEAD",
+          cache: "no-store",
+        });
+        const finished = Date.now();
+        const header = response.headers.get("date");
+        if (!header || !active) return;
+        const server = new Date(header).getTime();
+        if (!Number.isFinite(server)) return;
+        const midpoint = started + (finished - started) / 2;
+        setNetworkOffset(server - midpoint);
+        setNetworkSynced(true);
+      } catch {
+        // Device time remains a safe fallback when the network is unavailable.
+      }
+    };
+    void syncNetworkTime();
+    const timer = window.setInterval(
+      () => setNow(new Date(Date.now() + networkOffset)),
+      1000,
+    );
+    const resync = window.setInterval(() => void syncNetworkTime(), 5 * 60_000);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+      window.clearInterval(resync);
+    };
+  }, [networkOffset]);
 
   return (
     <div className="network-clock" aria-label="Hora actual">
       <div className="network-clock-status">
         <span className="network-clock-pulse" />
         <Wifi size={12} />
-        ONLINE / {n.data.user.preferences.timezone}
+        {networkSynced ? "NETWORK SYNC" : "LOCAL FALLBACK"} / {n.data.user.preferences.timezone}
       </div>
       <time dateTime={now.toISOString()} suppressHydrationWarning>
         {formatter.format(now)}
