@@ -376,7 +376,7 @@ export function NexusGalaxy({
         // an explicit touch/click reveals project identity and progress.
         button.style.setProperty("--label-opacity", "0");
         button.dataset.side = leftSide ? "left" : "right";
-        if (!overlaps && inspectedId === node.id) positions.push(bounds);
+        if (!overlaps && button.matches(":hover, :focus-visible")) positions.push(bounds);
       }
       frames++;
       cost += performance.now() - started;
@@ -647,7 +647,7 @@ export function NexusGalaxy({
                 setInspectedId(null);
                 pointerInside.current = false;
                 interactionUntil.current = performance.now() + 900;
-              renderRef.current();
+                renderRef.current();
               }}
             >
               <X size={14} />
