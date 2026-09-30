@@ -15,12 +15,14 @@ export function AIConversationNav({
   onNew,
   onProject,
   onDelete,
+  disabled = false,
 }: {
   activeConversationId: string | null;
   onSelect: (conversationId: string) => void;
   onNew: () => void;
   onProject: (projectId: string) => void;
   onDelete: (conversationId: string) => void;
+  disabled?: boolean;
 }) {
   const n = useNexus();
   const conversations = [...n.data.conversations].sort(
@@ -41,7 +43,7 @@ export function AIConversationNav({
 
   return (
     <aside className="ai-thread-nav" aria-label="Conversaciones de NEXUS AI">
-      <button className="ai-new-thread" onClick={onNew}>
+      <button className="ai-new-thread" onClick={onNew} disabled={disabled}>
         <MessageSquarePlus size={16} />
         <span>Nueva conversación</span>
       </button>
@@ -63,6 +65,7 @@ export function AIConversationNav({
                 key={project.id}
                 className={"ai-thread-row " + (active ? "active" : "")}
                 onClick={() => onProject(project.id)}
+                disabled={disabled}
               >
                 <span className="ai-thread-dot" data-status={project.status} />
                 <span>
@@ -105,6 +108,7 @@ export function AIConversationNav({
               <button
                 className="ai-thread-history-main"
                 onClick={() => onSelect(conversation.id)}
+                disabled={disabled}
               >
                 <strong>{conversation.title}</strong>
                 <small>
@@ -117,6 +121,7 @@ export function AIConversationNav({
                 className="ai-thread-delete"
                 aria-label={"Eliminar conversación " + conversation.title}
                 onClick={() => onDelete(conversation.id)}
+                disabled={disabled}
               >
                 <Trash2 size={13} />
               </button>
