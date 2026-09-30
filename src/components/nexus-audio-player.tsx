@@ -290,22 +290,6 @@ export function NexusAudioPlayer() {
   if (!NEXUS_AUDIO_TRACKS.length) return null;
 
   return (
-      <button
-        className={"nexus-audio-mini " + positionClass}
-        onClick={expandPlayer}
-        aria-label="Abrir NEXUS Audio"
-      >
-        <span className="nexus-audio-mini-orbit" />
-        <RadioTower size={16} />
-        <span>
-          NEXUS AUDIO
-          <small>SIGNAL {String(trackIndex + 1).padStart(2, "0")}</small>
-        </span>
-      </button>
-    );
-  }
-
-  return (
     <aside
       className={
         "nexus-audio-player " +
