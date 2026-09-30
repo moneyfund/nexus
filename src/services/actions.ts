@@ -222,6 +222,8 @@ export class NexusActions {
           };
           w[input.type === "income" ? "incomes" : "expenses"].unshift(record);
           if (account) {
+            if (input.type === "expense" && account.balance < amount)
+              throw new Error("La cuenta no tiene saldo suficiente.");
             account.balance = Math.round(
               (account.balance + (input.type === "income" ? amount : -amount)) *
                 100,
