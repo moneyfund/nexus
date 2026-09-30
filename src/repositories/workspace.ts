@@ -46,8 +46,11 @@ export function validateWorkspace(
     keys.some((k) => !Array.isArray(w[k]))
   )
     throw new Error("La copia no es compatible con este perfil.");
-  for (const key of keys)
-    for (const record of w[key]) {
+  for (const key of keys) {
+    const records = w[key];
+    if (!Array.isArray(records))
+      throw new Error("La copia no es compatible con este perfil.");
+    for (const record of records) {
       if (
         !record.id ||
         record.userId !== userId ||
@@ -55,6 +58,7 @@ export function validateWorkspace(
       )
         throw new Error("La copia contiene registros sin propietario válido.");
     }
+  }
   if (w.activeFlow && w.activeFlow.userId !== userId)
     throw new Error("Sesión de otro perfil.");
   const prefs = w.user.preferences;
