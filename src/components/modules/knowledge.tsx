@@ -244,7 +244,7 @@ export function KnowledgeView({
         ? extracted.text
         : reference + (extracted.reason ? "\n" + extracted.reason : "");
 
-      n.update((w) => {
+      const saved = n.update((w) => {
         const existing = w.knowledge.find(
           (item) => item.metadata?.googleDriveId === file.id,
         );
@@ -285,6 +285,7 @@ export function KnowledgeView({
           metadata,
         });
       });
+      if (!saved) return;
 
       n.notify(
         extracted.readable
