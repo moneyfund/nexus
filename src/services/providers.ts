@@ -117,6 +117,10 @@ export class GoogleCalendarProvider implements CalendarProvider {
       to,
     );
     const existing = await this.repository.list(userId);
+    const remoteProviderIds = new Set(
+      remote.map((event) => event.providerId).filter(Boolean),
+    );
+
     for (const event of remote) {
       const local = existing.find(
         (item) => item.providerId && item.providerId === event.providerId,
@@ -133,6 +137,22 @@ export class GoogleCalendarProvider implements CalendarProvider {
         },
       });
     }
+
+    for (const local of existing) {
+      const isGoogle =
+        local.metadata?.provider === "google" && !!local.providerId;
+      const overlapsWindow =
+        new Date(local.start) < new Date(to) &&
+        new Date(local.end) > new Date(from);
+      if (
+        isGoogle &&
+        overlapsWindow &&
+        !remoteProviderIds.has(local.providerId)
+      ) {
+        await this.repository.remove(userId, local.id);
+      }
+    }
+
     return remote;
   }
 
