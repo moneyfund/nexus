@@ -14,6 +14,7 @@ import {
   Code2,
   Palette,
   Smartphone,
+  RefreshCw,
 } from "lucide-react";
 import { useNexus } from "../nexus-provider";
 import { ModuleFrame, Button, Label, Badge } from "../ui/primitives";
@@ -21,6 +22,7 @@ import { SYSTEM } from "@/config/system";
 import { nexusDataModeInfo } from "@/config/data-backend";
 import { buildSqlMigrationPlan, summarizeSqlMigrationPlan } from "@/migrations/sql-connect";
 import { sqlConnectClient, type SqlWorkspaceSummary } from "@/lib/sql-connect";
+import { DesktopUpdateSettings } from "../desktop-update-settings";
 const sections = [
   { id: "profile", label: "Profile", icon: UserRound },
   { id: "appearance", label: "Appearance", icon: Palette },
@@ -30,6 +32,7 @@ const sections = [
   { id: "integrations", label: "Integrations", icon: PlugZap },
   { id: "ai", label: "AI", icon: BrainCircuit },
   { id: "data", label: "Data", icon: Database },
+  { id: "updates", label: "Updates", icon: RefreshCw },
   { id: "privacy", label: "Privacy", icon: ShieldCheck },
   { id: "developer", label: "Developer", icon: Code2 },
 ];
@@ -856,6 +859,7 @@ export function SettingsView() {
               </p>
             </>
           )}
+          {section === "updates" && <DesktopUpdateSettings />}
           {section === "privacy" && (
             <>
               <h2>Un espacio privado y sincronizado.</h2>
