@@ -21,7 +21,6 @@ struct UpdaterRuntimeStatus {
 }
 
 #[tauri::command]
-#[tauri::command]
 fn updater_runtime_status() -> UpdaterRuntimeStatus {
     let configured = option_env!("NEXUS_UPDATER_PUBKEY")
         .map(|value| !value.trim().is_empty())
@@ -35,6 +34,7 @@ fn updater_runtime_status() -> UpdaterRuntimeStatus {
     }
 }
 
+#[tauri::command]
 fn device_status() -> DeviceStatus {
     let device_name = env::var("COMPUTERNAME")
         .or_else(|_| env::var("HOSTNAME"))
