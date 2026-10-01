@@ -1,0 +1,56 @@
+name: NEXUS Desktop
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src-tauri/**"
+      - "src/lib/device-bridge.ts"
+      - "src/components/modules/device.tsx"
+      - "src/app/device/**"
+      - "src/config/navigation.ts"
+      - "package.json"
+      - "next.config.ts"
+      - ".github/workflows/desktop.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install JavaScript dependencies
+        run: npm install
+
+      - name: Verify web application
+        run: |
+          npm test
+          npm run typecheck
+          npm run lint
+
+      - name: Build NEXUS Companion
+        run: npm run desktop:build
+
+      - name: Upload Windows installers
+        uses: actions/upload-artifact@v4
+        with:
+          name: nexus-companion-windows
+          path: |
+            src-tauri/target/release/bundle/nsis/*.exe
+            src-tauri/target/release/bundle/msi/*.msi
+          if-no-files-found: error
+          retention-days: 14
