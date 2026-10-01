@@ -1,13 +1,16 @@
 import { getApp, getApps, initializeApp } from "firebase/app";
 import {
+  EmailAuthProvider,
   GoogleAuthProvider,
   createUserWithEmailAndPassword,
   getAuth,
   onAuthStateChanged,
+  linkWithCredential,
   reauthenticateWithPopup,
   signInWithEmailAndPassword,
   signInWithPopup,
   signOut as firebaseSignOut,
+  updatePassword,
   type User,
 } from "firebase/auth";
 import {
@@ -85,6 +88,12 @@ function friendlyFirebaseError(error: unknown) {
     "auth/email-already-in-use": "Ese correo ya tiene una cuenta.",
     "auth/weak-password": "La contraseña debe tener al menos 6 caracteres.",
     "auth/invalid-email": "El correo no es válido.",
+    "auth/requires-recent-login":
+      "Por seguridad, vuelve a iniciar sesión con Google y repite esta acción.",
+    "auth/provider-already-linked":
+      "Esta cuenta ya tiene acceso con correo y contraseña.",
+    "auth/credential-already-in-use":
+      "Estas credenciales ya están vinculadas a otra cuenta.",
   };
 
   return new Error(known[code] ?? raw);
@@ -185,6 +194,49 @@ export const firebaseClient = {
   async getIdToken() {
     const user = await requireUser();
     return user.getIdToken();
+  },
+
+  async desktopPasswordStatus() {
+    const user = await requireUser();
+    return {
+      email: user.email ?? "",
+      enabled: user.providerData.some(
+        (provider) => provider.providerId === EmailAuthProvider.PROVIDER_ID,
+      ),
+    };
+  },
+
+  async setDesktopPassword(password: string) {
+    try {
+      if (password.length < 8)
+        throw new Error("Usa una contraseña de al menos 8 caracteres.");
+
+      const user = await requireUser();
+      const email = user.email?.trim();
+      if (!email)
+        throw new Error(
+          "Tu cuenta de Google no tiene un correo disponible para vincular.",
+        );
+
+      const hasPassword = user.providerData.some(
+        (provider) => provider.providerId === EmailAuthProvider.PROVIDER_ID,
+      );
+
+      if (hasPassword) {
+        await updatePassword(user, password);
+      } else {
+        const credential = EmailAuthProvider.credential(email, password);
+        await linkWithCredential(user, credential);
+      }
+
+      await user.reload();
+      return {
+        email,
+        enabled: true,
+      };
+    } catch (error) {
+      throw friendlyFirebaseError(error);
+    }
   },
 
   async signIn(email: string, password: string) {
