@@ -379,8 +379,10 @@ function useSystem() {
     return () => clearTimeout(timer);
   }, [toast]);
 
-  const notify = (message: string, error = false) =>
-    setToast({ message, error });
+  const notify = useCallback(
+    (message: string, error = false) => setToast({ message, error }),
+    [],
+  );
 
   const run = <T,>(action: () => T, message?: string): T | undefined => {
     try {
@@ -432,13 +434,19 @@ function useSystem() {
     notify("Cuenta creada y NEXUS sincronizado.");
   };
 
-  const desktopPasswordStatus = () => firebaseClient.desktopPasswordStatus();
+  const desktopPasswordStatus = useCallback(
+    () => firebaseClient.desktopPasswordStatus(),
+    [],
+  );
 
-  const setDesktopPassword = async (password: string) => {
-    const result = await firebaseClient.setDesktopPassword(password);
-    notify("Acceso de NEXUS Companion actualizado.");
-    return result;
-  };
+  const setDesktopPassword = useCallback(
+    async (password: string) => {
+      const result = await firebaseClient.setDesktopPassword(password);
+      notify("Acceso de NEXUS Companion actualizado.");
+      return result;
+    },
+    [notify],
+  );
 
   const connectGoogleWorkspace = async () => {
     const grant = await firebaseClient.connectGoogleWorkspace();
