@@ -17,7 +17,8 @@
     "ai:deploy": "bash scripts/deploy-nexus-ai.sh",
     "build:native": "node scripts/build-native.mjs",
     "desktop:dev": "tauri dev",
-    "desktop:build": "tauri build"
+    "desktop:build": "npm run desktop:icons && tauri build",
+    "desktop:icons": "tauri icon public/icons/icon-512.png"
   },
   "dependencies": {
     "lucide-react": "1.47.0",
