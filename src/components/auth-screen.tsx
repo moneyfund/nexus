@@ -1,11 +1,19 @@
 "use client";
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { Orbit, LockKeyhole, ArrowRight, LogIn } from "lucide-react";
 import { IntelligenceCore, SpatialEnvironment } from "./spatial-environment";
 import { useNexus } from "./nexus-provider";
+import { deviceBridge } from "@/lib/device-bridge";
+
+const subscribeRuntime = () => () => {};
 
 export function AuthScreen() {
   const n = useNexus();
+  const nativeRuntime = useSyncExternalStore(
+    subscribeRuntime,
+    () => deviceBridge.isNativeRuntime(),
+    () => false,
+  );
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -64,43 +72,53 @@ export function AuthScreen() {
         <p className="auth-caption">
           Proyectos, ideas y decisiones en tu espacio personal.
         </p>
-        <button
-          className="button button-primary"
-          type="button"
-          style={{ width: "100%", justifyContent: "center" }}
-          disabled={busy !== null}
-          onClick={() => void runAuth("google")}
-        >
-          <LogIn size={17} />
-          {busy === "google"
-            ? "Conectando con Google…"
-            : "Continuar con Google"}
-          {busy !== "google" && <ArrowRight size={16} />}
-        </button>
+        {!nativeRuntime ? (
+          <>
+            <button
+              className="button button-primary"
+              type="button"
+              style={{ width: "100%", justifyContent: "center" }}
+              disabled={busy !== null}
+              onClick={() => void runAuth("google")}
+            >
+              <LogIn size={17} />
+              {busy === "google"
+                ? "Conectando con Google…"
+                : "Continuar con Google"}
+              {busy !== "google" && <ArrowRight size={16} />}
+            </button>
 
-        <div
-          className="row muted"
-          aria-hidden="true"
-          style={{ gap: 12, margin: "20px 0", fontSize: 12 }}
-        >
-          <span
-            style={{
-              height: 1,
-              flex: 1,
-              background: "currentColor",
-              opacity: 0.16,
-            }}
-          />
-          <span>O CON CORREO</span>
-          <span
-            style={{
-              height: 1,
-              flex: 1,
-              background: "currentColor",
-              opacity: 0.16,
-            }}
-          />
-        </div>
+            <div
+              className="row muted"
+              aria-hidden="true"
+              style={{ gap: 12, margin: "20px 0", fontSize: 12 }}
+            >
+              <span
+                style={{
+                  height: 1,
+                  flex: 1,
+                  background: "currentColor",
+                  opacity: 0.16,
+                }}
+              />
+              <span>O CON CORREO</span>
+              <span
+                style={{
+                  height: 1,
+                  flex: 1,
+                  background: "currentColor",
+                  opacity: 0.16,
+                }}
+              />
+            </div>
+          </>
+        ) : (
+          <div className="system-alert" style={{ marginBottom: 18 }}>
+            NEXUS Companion usa acceso de escritorio para conservar el mismo UID
+            de Firebase. Actívalo una vez desde NEXUS Web → System → Profile y
+            luego entra aquí con ese correo y contraseña.
+          </div>
+        )}
 
         <form
           className="stack"
@@ -154,20 +172,22 @@ export function AuthScreen() {
           </button>
         </form>
 
-        <button
-          type="button"
-          className="button button-ghost"
-          style={{ width: "100%", marginTop: 12 }}
-          disabled={busy !== null}
-          onClick={() => {
-            setMode(mode === "signin" ? "signup" : "signin");
-            setError("");
-          }}
-        >
-          {mode === "signin"
-            ? "Primera vez · crear cuenta con correo"
-            : "Ya tengo cuenta · iniciar sesión"}
-        </button>
+        {!nativeRuntime && (
+          <button
+            type="button"
+            className="button button-ghost"
+            style={{ width: "100%", marginTop: 12 }}
+            disabled={busy !== null}
+            onClick={() => {
+              setMode(mode === "signin" ? "signup" : "signin");
+              setError("");
+            }}
+          >
+            {mode === "signin"
+              ? "Primera vez · crear cuenta con correo"
+              : "Ya tengo cuenta · iniciar sesión"}
+          </button>
+        )}
       </section>
     </main>
   );
