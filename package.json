@@ -15,7 +15,7 @@
     "dataconnect:deploy": "npx --yes firebase-tools@latest deploy --only dataconnect --project nexus-96795",
     "dataconnect:cloud-shell": "bash scripts/deploy-dataconnect-cloud-shell.sh",
     "ai:deploy": "bash scripts/deploy-nexus-ai.sh",
-    "build:native": "cross-env NEXUS_NATIVE=true next build",
+    "build:native": "node scripts/build-native.mjs",
     "desktop:dev": "tauri dev",
     "desktop:build": "tauri build"
   },
@@ -38,7 +38,6 @@
     "tailwindcss": "4.3.3",
     "typescript": "6.0.3",
     "tsx": "^4.21.0",
-    "@tauri-apps/cli": "^2.0.0",
-    "cross-env": "^7.0.3"
+    "@tauri-apps/cli": "^2.0.0"
   }
 }
