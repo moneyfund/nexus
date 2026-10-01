@@ -17,8 +17,8 @@ if (existsSync(disabledApiDir)) {
 try {
   if (hadApiRoutes) renameSync(apiDir, disabledApiDir);
 
-  const command = process.platform === "win32" ? "npx.cmd" : "npx";
-  const result = spawnSync(command, ["next", "build"], {
+  const nextBin = join(root, "node_modules", "next", "dist", "bin", "next");
+  const result = spawnSync(process.execPath, [nextBin, "build"], {
     stdio: "inherit",
     env: {
       ...process.env,
