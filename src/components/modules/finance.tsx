@@ -124,6 +124,7 @@ function TransactionEditor({
   const [date, setDate] = useState(record.date);
   const [projectId, setProjectId] = useState(record.projectId ?? "");
   const [category, setCategory] = useState(record.category);
+  const [accountId, setAccountId] = useState(record.accountId ?? "");
   const [deleting, setDeleting] = useState(false);
 
   return (
@@ -138,6 +139,7 @@ function TransactionEditor({
             date,
             projectId: projectId || undefined,
             category,
+            accountId: accountId || undefined,
           });
           close();
         }, "Movimiento actualizado.");
@@ -177,10 +179,23 @@ function TransactionEditor({
           </select>
         </label>
         <label className="field">
-          Categoría
-          <input value={category} onChange={(e) => setCategory(e.target.value)} />
+          Cuenta
+          <select value={accountId} onChange={(e) => setAccountId(e.target.value)}>
+            <option value="">Sin afectar una cuenta</option>
+            {(n.data.financialAccounts ?? [])
+              .filter((account) => account.currency === record.currency)
+              .map((account) => (
+                <option key={account.id} value={account.id}>
+                  {account.name} · {account.currency}
+                </option>
+              ))}
+          </select>
         </label>
       </div>
+      <label className="field">
+        Categoría
+        <input value={category} onChange={(e) => setCategory(e.target.value)} />
+      </label>
       <div className="row between">
         <Button type="submit">Guardar movimiento</Button>
         <Button
