@@ -789,20 +789,22 @@ test("finance cut reconstructs opening balance and monthly availability from acc
     ];
   });
 
-  actions.capture({
+  const incomeId = actions.capture({
     type: "income",
     content: "Ingreso septiembre",
     amount: 40,
     currency: "USD",
     accountId: "bank-cut",
   });
-  actions.capture({
+  const expenseId = actions.capture({
     type: "expense",
     content: "Gasto septiembre",
     amount: 400,
     currency: "NIO",
     accountId: "cash-cut",
   });
+  actions.updateMoneyRecord("income", incomeId, { date: "2026-09-15" });
+  actions.updateMoneyRecord("expense", expenseId, { date: "2026-09-20" });
 
   const summary = financeCutSummary(
     store.getSnapshot(),
