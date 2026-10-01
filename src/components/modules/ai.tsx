@@ -191,7 +191,15 @@ export function AIView() {
       case "mark_debt_paid":
         return "Marcar pagada · " + (debt?.creditor ?? "Deuda") + (account ? " · cargar saldo a " + account.name : " · conciliación");
       case "update_transaction":
-        return "Editar " + (action.transactionKind === "income" ? "ingreso" : "gasto") + " · " + (transaction?.title ?? action.title ?? "movimiento");
+        return "Editar " +
+          (action.transactionKind === "income" ? "ingreso" : "gasto") +
+          " · " +
+          (transaction?.title ?? action.title ?? "movimiento") +
+          (account
+            ? action.transactionKind === "income"
+              ? " · asignar a " + account.name
+              : " · descontar de " + account.name
+            : "");
       case "delete_transaction":
         return "Eliminar " + (action.transactionKind === "income" ? "ingreso" : "gasto") + " · " + (transaction?.title ?? action.title ?? "movimiento");
       case "update_project_status":
@@ -475,6 +483,7 @@ export function AIView() {
             ...(action.itemCategory
               ? { category: action.itemCategory }
               : {}),
+            ...(action.accountId ? { accountId: action.accountId } : {}),
           });
           break;
         }
