@@ -14,7 +14,11 @@
     "dataconnect:migrate": "npx --yes firebase-tools@latest dataconnect:sql:migrate --service nexus-core --location us-east4 --force --project nexus-96795",
     "dataconnect:deploy": "npx --yes firebase-tools@latest deploy --only dataconnect --project nexus-96795",
     "dataconnect:cloud-shell": "bash scripts/deploy-dataconnect-cloud-shell.sh",
-    "ai:deploy": "bash scripts/deploy-nexus-ai.sh"
+    "ai:deploy": "bash scripts/deploy-nexus-ai.sh",
+    "build:native": "node scripts/build-native.mjs",
+    "desktop:dev": "tauri dev",
+    "desktop:build": "npm run desktop:icons && tauri build",
+    "desktop:icons": "tauri icon public/icons/icon-512.png"
   },
   "dependencies": {
     "lucide-react": "1.47.0",
@@ -22,7 +26,8 @@
     "next": "16.3.3",
     "react": "19.3.0",
     "react-dom": "19.3.0",
-    "firebase": "12.19.0"
+    "firebase": "12.19.0",
+    "@tauri-apps/api": "^2.0.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "4.3.3",
@@ -33,6 +38,7 @@
     "eslint-config-next": "16.3.3",
     "tailwindcss": "4.3.3",
     "typescript": "6.0.3",
-    "tsx": "^4.21.0"
+    "tsx": "^4.21.0",
+    "@tauri-apps/cli": "^2.0.0"
   }
 }

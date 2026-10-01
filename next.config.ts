@@ -1,18 +1,25 @@
 import type { NextConfig } from "next";
 
 const githubPages = process.env.GITHUB_PAGES === "true";
+const nativeApp = process.env.NEXUS_NATIVE === "true";
 const repositoryBasePath = "/nexus";
+
+const staticExport = githubPages || nativeApp;
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
   reactStrictMode: true,
-  ...(githubPages
+  ...(staticExport
     ? {
         output: "export",
-        basePath: repositoryBasePath,
-        assetPrefix: repositoryBasePath + "/",
         trailingSlash: true,
         images: { unoptimized: true },
+        ...(githubPages
+          ? {
+              basePath: repositoryBasePath,
+              assetPrefix: repositoryBasePath + "/",
+            }
+          : {}),
       }
     : {}),
 };

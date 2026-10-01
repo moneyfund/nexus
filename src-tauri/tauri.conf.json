@@ -1,0 +1,49 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "NEXUS",
+  "version": "0.2.0",
+  "identifier": "com.xarcon.nexus",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:3000",
+    "beforeBuildCommand": "npm run build:native",
+    "frontendDist": "../out"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "NEXUS · Personal Intelligence",
+        "width": 1440,
+        "height": 900,
+        "minWidth": 1080,
+        "minHeight": 700,
+        "resizable": true,
+        "fullscreen": false,
+        "center": true
+      }
+    ],
+    "security": {
+      "capabilities": [
+        "main-capability"
+      ]
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": [
+      "nsis",
+      "msi"
+    ],
+    "category": "Productivity",
+    "shortDescription": "NEXUS Personal Intelligence",
+    "longDescription": "NEXUS conecta proyectos, finanzas, conocimiento, calendario, inteligencia y herramientas del dispositivo.",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.ico",
+      "icons/icon.icns"
+    ]
+  }
+}
