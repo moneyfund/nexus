@@ -648,6 +648,116 @@ test("multi-currency account balances follow captured movements", () => {
   );
 });
 
+test("assigning an existing untracked expense to cash debits the account exactly once", () => {
+  const { store, actions } = setup();
+  store.update((w) => {
+    w.financialAccounts = [
+      {
+        ...w.user,
+        id: "cash-link-test",
+        userId: w.user.id,
+        name: "Efectivo",
+        kind: "cash",
+        currency: "NIO",
+        balance: 2350,
+      },
+    ];
+  });
+
+  const expenseId = actions.capture({
+    type: "expense",
+    content: "Gasto de alimentación en casa",
+    amount: 700,
+    currency: "NIO",
+    category: "Alimentación",
+  });
+
+  assert.equal(store.getSnapshot().financialAccounts[0].balance, 2350);
+  assert.equal(
+    store.getSnapshot().expenses.find((item) => item.id === expenseId)?.accountId,
+    undefined,
+  );
+
+  actions.updateMoneyRecord("expense", expenseId, {
+    accountId: "cash-link-test",
+  });
+
+  assert.equal(store.getSnapshot().financialAccounts[0].balance, 1650);
+  assert.equal(
+    store.getSnapshot().expenses.find((item) => item.id === expenseId)?.accountId,
+    "cash-link-test",
+  );
+
+  const auditCount = store
+    .getSnapshot()
+    .activity.filter(
+      (item) =>
+        item.metadata?.financeType === "expense_updated" &&
+        item.metadata?.referenceId === expenseId,
+    ).length;
+
+  actions.updateMoneyRecord("expense", expenseId, {
+    accountId: "cash-link-test",
+  });
+
+  assert.equal(store.getSnapshot().financialAccounts[0].balance, 1650);
+  assert.equal(
+    store
+      .getSnapshot()
+      .activity.filter(
+        (item) =>
+          item.metadata?.financeType === "expense_updated" &&
+          item.metadata?.referenceId === expenseId,
+      ).length,
+    auditCount,
+  );
+});
+
+test("reassigning a transaction moves its cash impact between accounts", () => {
+  const { store, actions } = setup();
+  store.update((w) => {
+    w.financialAccounts = [
+      {
+        ...w.user,
+        id: "cash-a",
+        userId: w.user.id,
+        name: "Efectivo A",
+        kind: "cash",
+        currency: "NIO",
+        balance: 2000,
+      },
+      {
+        ...w.user,
+        id: "cash-b",
+        userId: w.user.id,
+        name: "Efectivo B",
+        kind: "cash",
+        currency: "NIO",
+        balance: 1000,
+      },
+    ];
+  });
+
+  const expenseId = actions.capture({
+    type: "expense",
+    content: "Compra",
+    amount: 300,
+    currency: "NIO",
+    accountId: "cash-a",
+  });
+
+  assert.equal(store.getSnapshot().financialAccounts[0].balance, 1700);
+  assert.equal(store.getSnapshot().financialAccounts[1].balance, 1000);
+
+  actions.updateMoneyRecord("expense", expenseId, {
+    accountId: "cash-b",
+    amount: 400,
+  });
+
+  assert.equal(store.getSnapshot().financialAccounts[0].balance, 2000);
+  assert.equal(store.getSnapshot().financialAccounts[1].balance, 600);
+});
+
 test("finance cut reconstructs opening balance and monthly availability from account movements", () => {
   const { store, actions } = setup();
   store.update((w) => {
