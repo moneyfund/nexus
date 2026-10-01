@@ -107,7 +107,7 @@ export function SettingsView() {
     return () => {
       active = false;
     };
-  }, [n]);
+  }, [n.desktopPasswordStatus]);
   function exportData() {
     const blob = new Blob([JSON.stringify(n.data, null, 2)], {
       type: "application/json",
