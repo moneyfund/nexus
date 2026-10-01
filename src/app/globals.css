@@ -4863,3 +4863,83 @@ html[data-motion="reduced"] *:after {
     flex-direction: column;
   }
 }
+
+
+/* NEXUS Desktop Updater */
+.nexus-update-toast {
+  position: fixed;
+  right: 28px;
+  bottom: 28px;
+  z-index: 1250;
+  width: min(390px, calc(100vw - 32px));
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid rgba(220, 82, 237, 0.28);
+  border-radius: 20px;
+  background:
+    linear-gradient(180deg, rgba(31, 16, 40, 0.96), rgba(12, 8, 18, 0.97));
+  box-shadow:
+    0 22px 70px rgba(0, 0, 0, 0.42),
+    0 0 38px rgba(220, 82, 237, 0.08);
+  backdrop-filter: blur(22px);
+}
+.nexus-update-head {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: start;
+  gap: 12px;
+}
+.nexus-update-head > div {
+  display: grid;
+  gap: 4px;
+}
+.nexus-update-head strong {
+  font-size: 0.96rem;
+}
+.nexus-update-head span {
+  color: var(--text-muted, #8f8998);
+  font-size: 0.8rem;
+}
+.nexus-update-head > button {
+  border: 0;
+  background: transparent;
+  color: var(--text-muted, #8f8998);
+  cursor: pointer;
+}
+.nexus-update-icon {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  color: var(--accent, #dc52ed);
+  background: rgba(220, 82, 237, 0.1);
+  border: 1px solid rgba(220, 82, 237, 0.2);
+}
+.nexus-update-toast p {
+  margin: 0;
+  color: var(--text-secondary, #bbb5c3);
+  line-height: 1.55;
+  font-size: 0.86rem;
+}
+.nexus-update-progress {
+  height: 5px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+}
+.nexus-update-progress > span {
+  display: block;
+  height: 100%;
+  min-width: 18%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #a86bf0, #ef70df);
+  transition: width 180ms ease;
+}
+@media (max-width: 760px) {
+  .nexus-update-toast {
+    right: 16px;
+    bottom: calc(92px + env(safe-area-inset-bottom));
+  }
+}

@@ -11,6 +11,29 @@ struct DeviceStatus {
     capabilities: Vec<String>,
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct UpdaterRuntimeStatus {
+    configured: bool,
+    current_version: String,
+    channel: String,
+    endpoint: String,
+}
+
+#[tauri::command]
+fn updater_runtime_status() -> UpdaterRuntimeStatus {
+    let configured = option_env!("NEXUS_UPDATER_PUBKEY")
+        .map(|value| !value.trim().is_empty())
+        .unwrap_or(false);
+
+    UpdaterRuntimeStatus {
+        configured,
+        current_version: env!("CARGO_PKG_VERSION").to_string(),
+        channel: "beta".to_string(),
+        endpoint: "GitHub Releases".to_string(),
+    }
+}
+
 #[tauri::command]
 fn device_status() -> DeviceStatus {
     let device_name = env::var("COMPUTERNAME")
@@ -76,12 +99,30 @@ fn lock_device() -> Result<(), String> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let builder = tauri::Builder::default()
+        .setup(|app| {
+            #[cfg(desktop)]
+            if let Some(pubkey) = option_env!("NEXUS_UPDATER_PUBKEY")
+                .filter(|value| !value.trim().is_empty())
+            {
+                app.handle().plugin(
+                    tauri_plugin_updater::Builder::new()
+                        .pubkey(pubkey)
+                        .build(),
+                )?;
+                app.handle().plugin(tauri_plugin_process::init())?;
+            }
+
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             device_status,
+            updater_runtime_status,
             open_app,
             lock_device
-        ])
+        ]);
+
+    builder
         .run(tauri::generate_context!())
         .expect("error while running NEXUS Companion");
 }
