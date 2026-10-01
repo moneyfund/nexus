@@ -1,0 +1,80 @@
+name: NEXUS Desktop Release
+
+on:
+  push:
+    branches: [release]
+    paths:
+      - "src-tauri/**"
+      - "src/**"
+      - "public/**"
+      - "scripts/**"
+      - "package.json"
+      - "next.config.ts"
+      - ".github/workflows/desktop-release.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish-windows:
+    runs-on: windows-latest
+    env:
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+      NEXUS_UPDATER_PUBKEY: ${{ secrets.NEXUS_UPDATER_PUBKEY }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify updater signing configuration
+        shell: pwsh
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:TAURI_SIGNING_PRIVATE_KEY)) {
+            throw "Missing TAURI_SIGNING_PRIVATE_KEY"
+          }
+          if ([string]::IsNullOrWhiteSpace($env:NEXUS_UPDATER_PUBKEY)) {
+            throw "Missing NEXUS_UPDATER_PUBKEY"
+          }
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "./src-tauri -> target"
+
+      - name: Install JavaScript dependencies
+        run: npm install
+
+      - name: Generate native icons
+        run: npm run desktop:icons
+
+      - name: Verify NEXUS
+        run: |
+          npm test
+          npm run typecheck
+          npm run lint
+
+      - name: Build and publish signed NEXUS release
+        uses: tauri-apps/tauri-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          NEXUS_UPDATER_PUBKEY: ${{ secrets.NEXUS_UPDATER_PUBKEY }}
+        with:
+          tagName: nexus-v__VERSION__
+          releaseName: "NEXUS v__VERSION__"
+          releaseBody: "Actualización beta de NEXUS Companion. El cliente valida criptográficamente el paquete antes de instalarlo."
+          releaseDraft: false
+          prerelease: true
+          args: "--config src-tauri/tauri.release.conf.json"
