@@ -49,7 +49,23 @@ export function DeviceView() {
   }
 
   useEffect(() => {
-    void refresh();
+    let active = true;
+    void deviceBridge
+      .status()
+      .then((next) => {
+        if (active) setStatus(next);
+      })
+      .catch((cause) => {
+        if (!active) return;
+        setError(
+          cause instanceof Error
+            ? cause.message
+            : "No se pudo comprobar el dispositivo.",
+        );
+      });
+    return () => {
+      active = false;
+    };
   }, []);
 
   async function run(label: string, action: () => Promise<unknown>) {
