@@ -24,17 +24,26 @@
       }
     ],
     "security": {
-      "capabilities": ["main-capability"]
+      "capabilities": [
+        "main-capability"
+      ]
     }
   },
   "bundle": {
     "active": true,
-    "targets": ["nsis", "msi"],
+    "targets": [
+      "nsis",
+      "msi"
+    ],
     "category": "Productivity",
     "shortDescription": "NEXUS Personal Intelligence",
     "longDescription": "NEXUS conecta proyectos, finanzas, conocimiento, calendario, inteligencia y herramientas del dispositivo.",
     "icon": [
-      "../public/icons/icon-512.png"
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.ico",
+      "icons/icon.icns"
     ]
   }
 }
