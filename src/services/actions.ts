@@ -512,7 +512,7 @@ export class NexusActions {
     patch: Partial<
       Pick<
         MoneyRecord,
-        "title" | "amount" | "date" | "projectId" | "category"
+        "title" | "amount" | "date" | "projectId" | "category" | "accountId"
       >
     >,
   ) =>
@@ -520,30 +520,93 @@ export class NexusActions {
       const collection = kind === "income" ? w.incomes : w.expenses;
       const record = collection.find((item) => item.id === recordId);
       if (!record) throw new Error("Movimiento no encontrado.");
+
+      const previous = {
+        title: record.title,
+        amount: record.amount,
+        date: record.date,
+        projectId: record.projectId,
+        category: record.category,
+        accountId: record.accountId,
+      };
+
+      const nextAmount =
+        patch.amount != null
+          ? Math.round(patch.amount * 100) / 100
+          : record.amount;
+      if (!Number.isFinite(nextAmount) || nextAmount <= 0)
+        throw new Error("El importe debe ser mayor que cero.");
+
+      const accountWasPatched = Object.prototype.hasOwnProperty.call(
+        patch,
+        "accountId",
+      );
+      const nextAccountId = accountWasPatched
+        ? patch.accountId || undefined
+        : record.accountId;
+      const accounts = w.financialAccounts ?? [];
+      const previousAccount = record.accountId
+        ? accounts.find((item) => item.id === record.accountId)
+        : undefined;
+      const nextAccount = nextAccountId
+        ? accounts.find((item) => item.id === nextAccountId)
+        : undefined;
+
+      if (nextAccountId && !nextAccount)
+        throw new Error("Cuenta financiera no encontrada.");
+      if (nextAccount && nextAccount.currency !== record.currency)
+        throw new Error("La moneda del movimiento no coincide con la cuenta.");
+
+      const moneyChanged =
+        nextAmount !== record.amount || nextAccountId !== record.accountId;
+
+      if (moneyChanged) {
+        const projectedBalances = new Map(
+          accounts.map((account) => [account.id, account.balance]),
+        );
+
+        if (previousAccount) {
+          const reversed =
+            (projectedBalances.get(previousAccount.id) ?? previousAccount.balance) +
+            (kind === "income" ? -record.amount : record.amount);
+          projectedBalances.set(
+            previousAccount.id,
+            Math.round(reversed * 100) / 100,
+          );
+        }
+
+        if (nextAccount) {
+          const applied =
+            (projectedBalances.get(nextAccount.id) ?? nextAccount.balance) +
+            (kind === "income" ? nextAmount : -nextAmount);
+          projectedBalances.set(nextAccount.id, Math.round(applied * 100) / 100);
+        }
+
+        for (const account of [previousAccount, nextAccount]) {
+          if (!account) continue;
+          const projected = projectedBalances.get(account.id);
+          if (projected != null && projected < 0)
+            throw new Error(
+              "La cuenta " + account.name + " no tiene saldo suficiente.",
+            );
+        }
+
+        for (const account of [previousAccount, nextAccount]) {
+          if (!account) continue;
+          const projected = projectedBalances.get(account.id);
+          if (projected == null || projected === account.balance) continue;
+          account.balance = projected;
+          account.updatedAt = Date.now();
+        }
+
+        record.amount = nextAmount;
+        record.accountId = nextAccountId;
+      }
+
       if (patch.title != null) {
         const clean = patch.title.trim();
         if (!clean) throw new Error("El movimiento necesita un título.");
         record.title = clean;
-      }
-      if (patch.amount != null) {
-        if (!Number.isFinite(patch.amount) || patch.amount <= 0)
-          throw new Error("El importe debe ser mayor que cero.");
-        const nextAmount = Math.round(patch.amount * 100) / 100;
-        const account = record.accountId
-          ? (w.financialAccounts ?? []).find(
-              (item) => item.id === record.accountId,
-            )
-          : undefined;
-        if (account) {
-          const delta =
-            (nextAmount - record.amount) * (kind === "income" ? 1 : -1);
-          const nextBalance = Math.round((account.balance + delta) * 100) / 100;
-          if (nextBalance < 0)
-            throw new Error("La cuenta no tiene saldo suficiente.");
-          account.balance = nextBalance;
-          account.updatedAt = Date.now();
-        }
-        record.amount = nextAmount;
       }
       if (patch.date != null) record.date = patch.date;
       if ("projectId" in patch) {
@@ -554,7 +617,19 @@ export class NexusActions {
           throw new Error("Proyecto no encontrado.");
         record.projectId = patch.projectId || undefined;
       }
-      if (patch.category != null) record.category = patch.category.trim() || "General";
+      if (patch.category != null)
+        record.category = patch.category.trim() || "General";
+
+      const changed =
+        previous.title !== record.title ||
+        previous.amount !== record.amount ||
+        previous.date !== record.date ||
+        previous.projectId !== record.projectId ||
+        previous.category !== record.category ||
+        previous.accountId !== record.accountId;
+
+      if (!changed) return;
+
       record.updatedAt = Date.now();
       log(
         w,
@@ -568,8 +643,22 @@ export class NexusActions {
           amount: record.amount,
           currency: record.currency,
           date: record.date,
-          cashImpact: 0,
+          cashImpact:
+            previous.accountId !== record.accountId
+              ? record.accountId
+                ? kind === "income"
+                  ? record.amount
+                  : -record.amount
+                : 0
+              : previous.amount !== record.amount && record.accountId
+                ? (record.amount - previous.amount) *
+                  (kind === "income" ? 1 : -1)
+                : 0,
           ...(record.accountId ? { accountId: record.accountId } : {}),
+          ...(previous.accountId
+            ? { previousAccountId: previous.accountId }
+            : {}),
+          accountChanged: previous.accountId !== record.accountId,
         },
       );
     });
