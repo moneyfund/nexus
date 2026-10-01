@@ -60,6 +60,14 @@ export function SettingsView() {
     model: string;
     error?: string;
   } | null>(null);
+  const [desktopAccess, setDesktopAccess] = useState<{
+    email: string;
+    enabled: boolean;
+  } | null>(null);
+  const [desktopPassword, setDesktopPassword] = useState("");
+  const [desktopPasswordConfirm, setDesktopPasswordConfirm] = useState("");
+  const [desktopBusy, setDesktopBusy] = useState(false);
+  const [desktopError, setDesktopError] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
   const prefs = n.data.user.preferences;
 
@@ -85,6 +93,21 @@ export function SettingsView() {
       active = false;
     };
   }, [n.services.ai]);
+
+  useEffect(() => {
+    let active = true;
+    void n
+      .desktopPasswordStatus()
+      .then((status) => {
+        if (active) setDesktopAccess(status);
+      })
+      .catch(() => {
+        if (active) setDesktopAccess(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, [n]);
   function exportData() {
     const blob = new Blob([JSON.stringify(n.data, null, 2)], {
       type: "application/json",
@@ -195,6 +218,104 @@ export function SettingsView() {
                 El acceso está protegido por Firebase Authentication. Google es
                 el método principal; correo y contraseña quedan como alternativa.
               </p>
+              <div className="surface">
+                <div className="row between wrap">
+                  <div>
+                    <Label>NEXUS COMPANION / DESKTOP BETA</Label>
+                    <h3 style={{ margin: "12px 0 6px" }}>
+                      Usa tu mismo NEXUS en Windows.
+                    </h3>
+                  </div>
+                  <Badge active={desktopAccess?.enabled === true}>
+                    {desktopAccess?.enabled ? "DESKTOP READY" : "SETUP REQUIRED"}
+                  </Badge>
+                </div>
+                <p>
+                  Vincula una contraseña de escritorio a tu cuenta Firebase
+                  actual. No crea otro usuario ni otro workspace: el Companion
+                  entra con el mismo UID y sincroniza exactamente tus datos.
+                </p>
+                <p className="form-note">
+                  La contraseña se gestiona directamente con Firebase
+                  Authentication y NEXUS no la guarda en Firestore ni en tu
+                  workspace.
+                </p>
+                <form
+                  className="stack"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    setDesktopError("");
+                    if (desktopPassword !== desktopPasswordConfirm) {
+                      setDesktopError("Las contraseñas no coinciden.");
+                      return;
+                    }
+                    setDesktopBusy(true);
+                    void n
+                      .setDesktopPassword(desktopPassword)
+                      .then((status) => {
+                        setDesktopAccess(status);
+                        setDesktopPassword("");
+                        setDesktopPasswordConfirm("");
+                      })
+                      .catch((error) =>
+                        setDesktopError(
+                          error instanceof Error
+                            ? error.message
+                            : "No se pudo preparar el acceso de escritorio.",
+                        ),
+                      )
+                      .finally(() => setDesktopBusy(false));
+                  }}
+                >
+                  <label className="field">
+                    Correo del Companion
+                    <input
+                      value={desktopAccess?.email || n.session?.email || ""}
+                      readOnly
+                    />
+                  </label>
+                  <label className="field">
+                    {desktopAccess?.enabled
+                      ? "Nueva contraseña de escritorio"
+                      : "Contraseña de escritorio"}
+                    <input
+                      type="password"
+                      minLength={8}
+                      autoComplete="new-password"
+                      required
+                      value={desktopPassword}
+                      onChange={(event) =>
+                        setDesktopPassword(event.target.value)
+                      }
+                    />
+                  </label>
+                  <label className="field">
+                    Confirmar contraseña
+                    <input
+                      type="password"
+                      minLength={8}
+                      autoComplete="new-password"
+                      required
+                      value={desktopPasswordConfirm}
+                      onChange={(event) =>
+                        setDesktopPasswordConfirm(event.target.value)
+                      }
+                    />
+                  </label>
+                  {desktopError && (
+                    <p className="accent" role="alert">
+                      {desktopError}
+                    </p>
+                  )}
+                  <Button type="submit" disabled={desktopBusy}>
+                    {desktopBusy
+                      ? "Preparando Companion…"
+                      : desktopAccess?.enabled
+                        ? "Actualizar acceso de escritorio"
+                        : "Activar acceso de escritorio"}
+                  </Button>
+                </form>
+              </div>
             </>
           )}
           {section === "appearance" && (
