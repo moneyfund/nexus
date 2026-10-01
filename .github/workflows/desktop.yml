@@ -12,6 +12,17 @@ on:
       - "package.json"
       - "next.config.ts"
       - ".github/workflows/desktop.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "src-tauri/**"
+      - "src/lib/device-bridge.ts"
+      - "src/components/modules/device.tsx"
+      - "src/app/device/**"
+      - "src/config/navigation.ts"
+      - "package.json"
+      - "next.config.ts"
+      - ".github/workflows/desktop.yml"
   workflow_dispatch:
 
 permissions:
