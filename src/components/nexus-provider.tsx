@@ -432,6 +432,14 @@ function useSystem() {
     notify("Cuenta creada y NEXUS sincronizado.");
   };
 
+  const desktopPasswordStatus = () => firebaseClient.desktopPasswordStatus();
+
+  const setDesktopPassword = async (password: string) => {
+    const result = await firebaseClient.setDesktopPassword(password);
+    notify("Acceso de NEXUS Companion actualizado.");
+    return result;
+  };
+
   const connectGoogleWorkspace = async () => {
     const grant = await firebaseClient.connectGoogleWorkspace();
     saveGoogleWorkspaceGrant(grant);
@@ -519,6 +527,8 @@ function useSystem() {
     signInWithGoogle,
     signIn,
     signUp,
+    desktopPasswordStatus,
+    setDesktopPassword,
     signOut,
     captureOpen,
     setCaptureOpen,
