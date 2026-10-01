@@ -11,6 +11,7 @@ import {
   Library,
   BrainCircuit,
   Settings2,
+  MonitorCog,
 } from "lucide-react";
 export const navigation = [
   { href: "/", label: "Today", icon: Orbit, group: "workspace" },
@@ -39,5 +40,6 @@ export const navigation = [
     group: "intelligence",
   },
   { href: "/ai", label: "Nexus AI", icon: BrainCircuit, group: "intelligence" },
+  { href: "/device", label: "Device", icon: MonitorCog, group: "system" },
   { href: "/settings", label: "System", icon: Settings2, group: "system" },
 ];
