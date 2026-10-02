@@ -648,6 +648,79 @@ test("multi-currency account balances follow captured movements", () => {
   );
 });
 
+test("permanent finance cleanup removes a false movement and restores its account balance", () => {
+  const { store, actions } = setup();
+  store.update((w) => {
+    w.financialAccounts = [
+      {
+        ...w.user,
+        id: "cash-cleanup",
+        userId: w.user.id,
+        name: "Efectivo",
+        kind: "cash",
+        currency: "NIO",
+        balance: 2500,
+      },
+    ];
+  });
+
+  const expenseId = actions.capture({
+    type: "expense",
+    content: "Movimiento falso",
+    amount: 700,
+    currency: "NIO",
+    accountId: "cash-cleanup",
+  });
+  actions.updateMoneyRecord("expense", expenseId, { category: "Prueba" });
+
+  assert.equal(store.getSnapshot().financialAccounts[0].balance, 1800);
+  assert.ok(
+    store
+      .getSnapshot()
+      .activity.some((item) => item.metadata?.referenceId === expenseId),
+  );
+  assert.ok(
+    store.getSnapshot().inbox.some((item) => item.targetId === expenseId),
+  );
+
+  actions.purgeMoneyRecord("expense", expenseId);
+
+  const snapshot = store.getSnapshot();
+  assert.equal(snapshot.financialAccounts[0].balance, 2500);
+  assert.equal(snapshot.expenses.some((item) => item.id === expenseId), false);
+  assert.equal(
+    snapshot.activity.some((item) => item.metadata?.referenceId === expenseId),
+    false,
+  );
+  assert.equal(snapshot.inbox.some((item) => item.targetId === expenseId), false);
+});
+
+test("finance audit history lines can be removed without changing the live movement", () => {
+  const { store, actions } = setup();
+  const expenseId = actions.capture({
+    type: "expense",
+    content: "Registro real",
+    amount: 100,
+    currency: "NIO",
+  });
+  actions.updateMoneyRecord("expense", expenseId, { category: "Personal" });
+
+  const audit = store
+    .getSnapshot()
+    .activity.find(
+      (item) =>
+        item.metadata?.financeType === "expense_updated" &&
+        item.metadata?.referenceId === expenseId,
+    )!;
+  assert.ok(audit);
+
+  actions.deleteFinanceHistoryEvent(audit.id);
+
+  const snapshot = store.getSnapshot();
+  assert.ok(snapshot.expenses.some((item) => item.id === expenseId));
+  assert.equal(snapshot.activity.some((item) => item.id === audit.id), false);
+});
+
 test("assigning an existing untracked expense to cash debits the account exactly once", () => {
   const { store, actions } = setup();
   store.update((w) => {
