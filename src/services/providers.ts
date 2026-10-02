@@ -247,6 +247,12 @@ export interface NexusContext {
   currency: "USD";
   conversationId?: string;
   focusProjectId?: string;
+  device?: {
+    connected: boolean;
+    runtime: "web" | "native";
+    platform: string;
+    capabilities: string[];
+  };
   projects: Array<{
     id: string;
     name: string;
@@ -610,6 +616,10 @@ export class NexusToolRegistry {
     { id: "memory.write", label: "Guardar memoria", access: "confirm" },
     { id: "memory.update", label: "Editar memoria", access: "confirm" },
     { id: "memory.delete", label: "Eliminar memoria", access: "confirm" },
+    { id: "device.open_app", label: "Abrir aplicación del dispositivo", access: "confirm" },
+    { id: "device.audio", label: "Controlar volumen del dispositivo", access: "confirm" },
+    { id: "device.screenshot", label: "Capturar pantalla", access: "confirm" },
+    { id: "device.lock", label: "Bloquear dispositivo", access: "confirm" },
     { id: "project.update", label: "Actualizar proyecto", access: "confirm" },
     { id: "project.activity", label: "Registrar avance", access: "confirm" },
   ];

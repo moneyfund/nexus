@@ -46,6 +46,12 @@ const ACTION_TYPES = [
   "add_memory",
   "update_memory",
   "delete_memory",
+  "device_open_app",
+  "device_set_volume",
+  "device_adjust_volume",
+  "device_toggle_mute",
+  "device_take_screenshot",
+  "device_lock",
   "none",
 ];
 
@@ -111,6 +117,11 @@ const responseSchema = {
           notes: { type: ["string", "null"] },
           area: { type: ["string", "null"] },
           client: { type: ["string", "null"] },
+          deviceApp: {
+            type: ["string", "null"],
+            enum: ["notepad", "calculator", "files", "settings", null],
+          },
+          deviceValue: { type: ["number", "null"] },
           reason: { type: "string" },
         },
         required: [
@@ -142,6 +153,8 @@ const responseSchema = {
           "notes",
           "area",
           "client",
+          "deviceApp",
+          "deviceValue",
           "reason",
         ],
         additionalProperties: false,
@@ -397,6 +410,7 @@ export const nexusAI = onCall(
           "Usa create_event, update_event o delete_event para agenda. Interpreta fechas relativas usando now y timezone del contexto y devuelve timestamps ISO en start/end. Los eventos confirmados por el usuario se sincronizan con Google Calendar cuando la integración está conectada. " +
           "knowledge puede contener texto indexado desde Google Drive. Úsalo como contexto documental cuando sea relevante y distingue el contenido disponible de cualquier detalle que no aparezca en el contexto. " +
           "Usa create_idea, update_idea o delete_idea para ideas; itemCategory representa la categoría de la idea y dueDate puede representar su fecha de revisión. Usa add_memory, update_memory o delete_memory solo para contexto estable que el usuario quiera conservar. " +
+          "Si context.device.connected es true, puedes proponer herramientas del dispositivo cuando el usuario las pida explícitamente: device_open_app abre solo notepad, calculator, files o settings; nunca terminal. device_set_volume usa deviceValue entre 0 y 100. device_adjust_volume usa deviceValue positivo o negativo. device_toggle_mute alterna silencio. device_take_screenshot guarda una captura local y device_lock bloquea Windows. Todas estas acciones requieren confirmación del usuario en la interfaz y no debes fingir que ya se ejecutaron. Si context.device.connected es false o no existe, explica que hace falta NEXUS Companion Desktop y no propongas la acción. " +
           "Las acciones destructivas delete_* requieren intención explícita del usuario; nunca las infieras de frases ambiguas. " +
           "Los campos que no cambian deben devolverse como null. " +
           "Si hay ambigüedad entre proyectos, tareas, movimientos, eventos, ideas, memorias, fechas u horarios, pregunta antes de proponer la acción. " +

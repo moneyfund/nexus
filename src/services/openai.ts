@@ -34,7 +34,13 @@ export interface NexusAIAction {
     | "delete_idea"
     | "add_memory"
     | "update_memory"
-    | "delete_memory";
+    | "delete_memory"
+    | "device_open_app"
+    | "device_set_volume"
+    | "device_adjust_volume"
+    | "device_toggle_mute"
+    | "device_take_screenshot"
+    | "device_lock";
   targetId: string | null;
   projectId: string | null;
   taskId: string | null;
@@ -70,6 +76,8 @@ export interface NexusAIAction {
   notes: string | null;
   area: string | null;
   client: string | null;
+  deviceApp: "notepad" | "calculator" | "files" | "settings" | null;
+  deviceValue: number | null;
   reason: string;
 }
 
