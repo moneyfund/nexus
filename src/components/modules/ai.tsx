@@ -20,6 +20,7 @@ import { ModuleFrame, Badge, Label, Button } from "../ui/primitives";
 import { entity } from "@/domain/seed";
 import { NexusToolRegistry } from "@/services/providers";
 import type { NexusAIAction } from "@/services/openai";
+import { deviceBridge } from "@/lib/device-bridge";
 import { AIConversationNav } from "../ai-conversation-nav";
 const prompts = [
   "¿Qué debería priorizar mañana?",
@@ -32,6 +33,141 @@ const contextOptions = [
   { id: "finance", label: "Finanzas", icon: Wallet },
   { id: "knowledge", label: "Conocimiento", icon: Library },
 ] as const;
+const deviceActionTypes = new Set<NexusAIAction["type"]>([
+  "device_open_app",
+  "device_set_volume",
+  "device_adjust_volume",
+  "device_toggle_mute",
+  "device_take_screenshot",
+  "device_lock",
+]);
+
+function isDeviceAction(action: NexusAIAction) {
+  return deviceActionTypes.has(action.type);
+}
+
+function makeDeviceAction(
+  type: Extract<
+    NexusAIAction["type"],
+    | "device_open_app"
+    | "device_set_volume"
+    | "device_adjust_volume"
+    | "device_toggle_mute"
+    | "device_take_screenshot"
+    | "device_lock"
+  >,
+  options?: {
+    deviceApp?: NexusAIAction["deviceApp"];
+    deviceValue?: number;
+    reason?: string;
+  },
+): NexusAIAction {
+  return {
+    type,
+    targetId: null,
+    projectId: null,
+    taskId: null,
+    transactionKind: null,
+    currency: null,
+    accountId: null,
+    debtId: null,
+    creditor: null,
+    title: null,
+    milestone: null,
+    amount: null,
+    balance: null,
+    value: null,
+    status: null,
+    priority: null,
+    estimatedMinutes: null,
+    date: null,
+    dueDate: null,
+    start: null,
+    end: null,
+    category: null,
+    itemCategory: null,
+    description: null,
+    content: null,
+    notes: null,
+    area: null,
+    client: null,
+    deviceApp: options?.deviceApp ?? null,
+    deviceValue: options?.deviceValue ?? null,
+    reason: options?.reason ?? "Acción solicitada para este dispositivo.",
+  };
+}
+
+function parseLocalDeviceIntent(text: string): NexusAIAction | null {
+  const normalized = text
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+
+  if (/^(abre|abrir|inicia|iniciar|ejecuta|lanza)\b/.test(normalized)) {
+    if (/calculadora/.test(normalized))
+      return makeDeviceAction("device_open_app", {
+        deviceApp: "calculator",
+        reason: "Abrir Calculadora de Windows.",
+      });
+    if (/(explorador|archivos|carpetas)/.test(normalized))
+      return makeDeviceAction("device_open_app", {
+        deviceApp: "files",
+        reason: "Abrir el Explorador de archivos de Windows.",
+      });
+    if (/(bloc de notas|notepad)/.test(normalized))
+      return makeDeviceAction("device_open_app", {
+        deviceApp: "notepad",
+        reason: "Abrir Bloc de notas.",
+      });
+    if (/(configuracion|ajustes de windows)/.test(normalized))
+      return makeDeviceAction("device_open_app", {
+        deviceApp: "settings",
+        reason: "Abrir Configuración de Windows.",
+      });
+  }
+
+  const volumeTarget = normalized.match(
+    /^(?:pon|ajusta|coloca|deja)\s+(?:el\s+)?volumen(?:\s+(?:a|en|al))?\s+(\d{1,3})\s*%?/,
+  );
+  if (volumeTarget) {
+    const value = Math.max(0, Math.min(100, Number(volumeTarget[1])));
+    return makeDeviceAction("device_set_volume", {
+      deviceValue: value,
+      reason: "Ajustar el volumen de Windows a " + value + "%.",
+    });
+  }
+
+  if (/^(sube|aumenta)\s+(?:el\s+)?volumen/.test(normalized))
+    return makeDeviceAction("device_adjust_volume", {
+      deviceValue: 10,
+      reason: "Subir el volumen de Windows un 10%.",
+    });
+
+  if (/^(baja|reduce|disminuye)\s+(?:el\s+)?volumen/.test(normalized))
+    return makeDeviceAction("device_adjust_volume", {
+      deviceValue: -10,
+      reason: "Bajar el volumen de Windows un 10%.",
+    });
+
+  if (/^(silencia|mutea|quita el sonido|activa mute)\b/.test(normalized))
+    return makeDeviceAction("device_toggle_mute", {
+      reason: "Alternar el estado de silencio de Windows.",
+    });
+
+  if (/^(toma|haz|realiza|captura)\b.*(?:captura|pantalla|screenshot)/.test(normalized))
+    return makeDeviceAction("device_take_screenshot", {
+      reason: "Guardar una captura local de la pantalla actual.",
+    });
+
+  if (/^(bloquea|bloquear)\b.*(?:pc|computadora|ordenador|equipo|windows)?/.test(normalized))
+    return makeDeviceAction("device_lock", {
+      reason: "Bloquear la sesión actual de Windows.",
+    });
+
+  return null;
+}
+
 export function AIView() {
   const n = useNexus();
   const [prompt, setPrompt] = useState("");
@@ -133,6 +269,13 @@ export function AIView() {
     return action.type.startsWith("delete_");
   }
 
+  function isSensitive(action: NexusAIAction) {
+    return (
+      action.type === "device_lock" ||
+      action.type === "device_take_screenshot"
+    );
+  }
+
   function actionLabel(action: NexusAIAction) {
     const project = n.projects.find((item) => item.id === action.projectId);
     const projectName = project?.name ?? "Proyecto";
@@ -228,10 +371,91 @@ export function AIView() {
         return "Editar memoria · " + (memory?.content ?? action.content ?? "Contexto");
       case "delete_memory":
         return "Eliminar memoria · " + (memory?.content ?? "Contexto");
+      case "device_open_app":
+        return "Dispositivo · abrir " + (action.deviceApp ?? "aplicación");
+      case "device_set_volume":
+        return "Dispositivo · volumen → " + (action.deviceValue ?? 0) + "%";
+      case "device_adjust_volume":
+        return (
+          "Dispositivo · volumen " +
+          ((action.deviceValue ?? 0) > 0 ? "+" : "") +
+          (action.deviceValue ?? 0) +
+          "%"
+        );
+      case "device_toggle_mute":
+        return "Dispositivo · alternar silencio";
+      case "device_take_screenshot":
+        return "Dispositivo · capturar pantalla";
+      case "device_lock":
+        return "Dispositivo · bloquear Windows";
     }
   }
 
   async function applyAction(id: string, action: NexusAIAction) {
+    if (isDeviceAction(action)) {
+      try {
+        if (!deviceBridge.isNativeRuntime())
+          throw new Error(
+            "Esta acción requiere NEXUS Companion Desktop en el dispositivo.",
+          );
+
+        let successMessage = "Acción aplicada en este dispositivo.";
+
+        switch (action.type) {
+          case "device_open_app":
+            if (!action.deviceApp)
+              throw new Error("NEXUS no identificó una aplicación autorizada.");
+            await deviceBridge.openApp(action.deviceApp);
+            successMessage = "Aplicación abierta por NEXUS Device.";
+            break;
+          case "device_set_volume":
+            if (action.deviceValue == null)
+              throw new Error("NEXUS no indicó el nivel de volumen.");
+            await deviceBridge.setVolume(action.deviceValue);
+            successMessage =
+              "Volumen ajustado a " +
+              Math.max(0, Math.min(100, Math.round(action.deviceValue))) +
+              "%.";
+            break;
+          case "device_adjust_volume":
+            if (!action.deviceValue)
+              throw new Error("NEXUS no indicó cuánto cambiar el volumen.");
+            await deviceBridge.adjustVolume(action.deviceValue);
+            successMessage = "Volumen de Windows ajustado.";
+            break;
+          case "device_toggle_mute":
+            await deviceBridge.toggleMute();
+            successMessage = "Estado de silencio alternado.";
+            break;
+          case "device_take_screenshot": {
+            const screenshotPath = await deviceBridge.takeScreenshot();
+            successMessage = "Captura guardada en " + screenshotPath;
+            break;
+          }
+          case "device_lock":
+            if (
+              typeof window !== "undefined" &&
+              !window.confirm("¿Bloquear este equipo ahora?")
+            )
+              return;
+            await deviceBridge.lockDevice();
+            successMessage = "Windows bloqueado.";
+            break;
+        }
+
+        n.notify(successMessage);
+        setPendingActions((items) => items.filter((item) => item.id !== id));
+      } catch (error) {
+        n.notify(
+          error instanceof Error
+            ? error.message
+            : "NEXUS Device no pudo ejecutar la acción.",
+          true,
+        );
+      }
+      return;
+    }
+
     if (
       action.type === "create_event" ||
       action.type === "update_event" ||
@@ -757,6 +981,15 @@ export function AIView() {
         conversationId,
         projectId: conversation.projectId,
       });
+      const runtimeStatus = await deviceBridge.status().catch(() => null);
+      if (runtimeStatus) {
+        scopedContext.device = {
+          connected: runtimeStatus.connected,
+          runtime: runtimeStatus.runtime,
+          platform: runtimeStatus.platform,
+          capabilities: runtimeStatus.capabilities,
+        };
+      }
       const message = {
         ...entity(crypto.randomUUID(), "user", snapshot.user.id),
         conversationId,
@@ -768,6 +1001,33 @@ export function AIView() {
 
       n.actions.appendAIMessage(conversationId, message);
       setPrompt("");
+
+      const localDeviceAction = parseLocalDeviceIntent(text);
+      if (localDeviceAction) {
+        const nativeReady = deviceBridge.isNativeRuntime();
+        n.actions.appendAIMessage(conversationId, {
+          ...entity(crypto.randomUUID(), "user", snapshot.user.id),
+          conversationId,
+          role: "assistant",
+          content: nativeReady
+            ? "Puedo hacerlo desde NEXUS Companion. Confirma la acción preparada."
+            : "Esa acción necesita NEXUS Companion Desktop abierto en este dispositivo.",
+          contextIds: [],
+          simulated: true,
+        });
+        if (nativeReady)
+          setPendingActions((items) => [
+            ...items,
+            { id: crypto.randomUUID(), action: localDeviceAction },
+          ]);
+        requestAnimationFrame(() =>
+          endRef.current?.scrollIntoView({
+            behavior: n.reduceMotion ? "instant" : "smooth",
+            block: "nearest",
+          }),
+        );
+        return;
+      }
 
       const result = await n.services.ai.respondDetailed(text, scopedContext);
       n.actions.appendAIMessage(conversationId, {
@@ -937,6 +1197,8 @@ export function AIView() {
                     <div className="row wrap">
                       <strong>{actionLabel(action)}</strong>
                       {isDestructive(action) && <Badge>ELIMINACIÓN</Badge>}
+                      {isDeviceAction(action) && <Badge>DEVICE</Badge>}
+                      {isSensitive(action) && <Badge>SENSIBLE</Badge>}
                     </div>
                     <p>{action.reason}</p>
                   </div>
@@ -952,11 +1214,19 @@ export function AIView() {
                       Descartar
                     </Button>
                     <Button
-                      variant={isDestructive(action) ? "danger" : "primary"}
+                      variant={
+                        isDestructive(action) || action.type === "device_lock"
+                          ? "danger"
+                          : "primary"
+                      }
                       onClick={() => void applyAction(id, action)}
                     >
                       <Check size={14} />
-                      {isDestructive(action) ? "Eliminar" : "Aplicar"}
+                      {isDestructive(action)
+                        ? "Eliminar"
+                        : isDeviceAction(action)
+                          ? "Ejecutar"
+                          : "Aplicar"}
                     </Button>
                   </div>
                 </div>
