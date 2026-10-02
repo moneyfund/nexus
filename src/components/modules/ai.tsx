@@ -104,7 +104,11 @@ function parseLocalDeviceIntent(text: string): NexusAIAction | null {
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "");
 
-  if (/^(abre|abrir|inicia|iniciar|ejecuta|lanza)\b/.test(normalized)) {
+  if (
+    /^(?:nexus[, ]+)?(?:por favor[, ]+)?(?:puedes\s+|podrias\s+|quiero\s+que\s+|necesito\s+que\s+)?(?:abre|habre|abrir|habrir|abreme|habreme|inicia|iniciar|ejecuta|lanza)\b/.test(
+      normalized,
+    )
+  ) {
     if (/calculadora/.test(normalized))
       return makeDeviceAction("device_open_app", {
         deviceApp: "calculator",
@@ -128,7 +132,7 @@ function parseLocalDeviceIntent(text: string): NexusAIAction | null {
   }
 
   const volumeTarget = normalized.match(
-    /^(?:pon|ajusta|coloca|deja)\s+(?:el\s+)?volumen(?:\s+(?:a|en|al))?\s+(\d{1,3})\s*%?/,
+    /^(?:nexus[, ]+)?(?:por favor[, ]+)?(?:puedes\s+|podrias\s+)?(?:pon|ajusta|coloca|deja|sube|aumenta|baja|reduce|disminuye)\s+(?:el\s+)?volumen(?:\s+(?:a|en|al|hasta))?\s+(\d{1,3})\s*%?/,
   );
   if (volumeTarget) {
     const value = Math.max(0, Math.min(100, Number(volumeTarget[1])));
