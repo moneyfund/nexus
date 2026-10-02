@@ -2,19 +2,28 @@
 
 import { useEffect, useState } from "react";
 import {
+  BatteryMedium,
   Calculator,
+  Camera,
   FolderOpen,
   Laptop,
   LockKeyhole,
+  Minus,
   MonitorCog,
+  Plus,
   Settings,
   SquareTerminal,
   StickyNote,
+  Volume2,
+  VolumeX,
+  Wifi,
+  WifiOff,
 } from "lucide-react";
 import { Badge, Button, Label, ModuleFrame } from "../ui/primitives";
 import {
   deviceBridge,
   type DeviceStatus,
+  type DeviceSystemSnapshot,
   type KnownDesktopApp,
 } from "@/lib/device-bridge";
 
@@ -32,13 +41,18 @@ const apps: Array<{
 
 export function DeviceView() {
   const [status, setStatus] = useState<DeviceStatus | null>(null);
+  const [snapshot, setSnapshot] = useState<DeviceSystemSnapshot | null>(null);
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
+  const [lastScreenshot, setLastScreenshot] = useState("");
 
   async function refresh() {
     setError("");
     try {
-      setStatus(await deviceBridge.status());
+      const nextStatus = await deviceBridge.status();
+      setStatus(nextStatus);
+      if (nextStatus.connected)
+        setSnapshot(await deviceBridge.systemSnapshot());
     } catch (cause) {
       setError(
         cause instanceof Error
@@ -52,8 +66,13 @@ export function DeviceView() {
     let active = true;
     void deviceBridge
       .status()
-      .then((next) => {
-        if (active) setStatus(next);
+      .then(async (next) => {
+        if (!active) return;
+        setStatus(next);
+        if (next.connected) {
+          const metrics = await deviceBridge.systemSnapshot();
+          if (active) setSnapshot(metrics);
+        }
       })
       .catch((cause) => {
         if (!active) return;
@@ -72,11 +91,12 @@ export function DeviceView() {
     setBusy(label);
     setError("");
     try {
-      await action();
+      return await action();
     } catch (cause) {
       setError(
         cause instanceof Error ? cause.message : "No se pudo ejecutar la acción.",
       );
+      return undefined;
     } finally {
       setBusy("");
     }
@@ -86,9 +106,9 @@ export function DeviceView() {
 
   return (
     <ModuleFrame
-      eyebrow="Device bridge / Stage 01"
+      eyebrow="Device bridge / Stage 02"
       title="NEXUS Device"
-      description="La capa que conecta tu inteligencia personal con el sistema operativo."
+      description="Herramientas nativas concretas para que NEXUS pueda actuar en Windows sin entregar acceso libre al sistema."
       action={
         <Badge active={native}>
           {native ? "COMPANION CONNECTED" : "PWA MODE"}
@@ -120,10 +140,6 @@ export function DeviceView() {
             <strong>{status?.platform ?? "—"}</strong>
           </div>
           <div className="integration-row">
-            <span>Arquitectura</span>
-            <strong>{status?.arch ?? "—"}</strong>
-          </div>
-          <div className="integration-row">
             <span>Runtime</span>
             <strong>{status?.appVersion ?? "—"}</strong>
           </div>
@@ -133,27 +149,38 @@ export function DeviceView() {
         </section>
 
         <section className="surface device-status-card">
-          <Label>PERMISSION MODEL</Label>
-          <h2>Acceso explícito, no terminal libre.</h2>
-          <p>
-            NEXUS solo recibe herramientas concretas. La IA no obtiene un
-            PowerShell ilimitado ni permisos administrativos generales.
-          </p>
-          <div className="device-capability-list">
+          <Label>SYSTEM SNAPSHOT</Label>
+          <h2>Estado local del equipo.</h2>
+          <div className="integration-row">
             <span>
-              <i /> Abrir aplicaciones aprobadas
+              <BatteryMedium size={17} /> Batería
             </span>
+            <strong>
+              {snapshot?.batteryPercent == null
+                ? "No reportada"
+                : snapshot.batteryPercent + "%"}
+            </strong>
+          </div>
+          <div className="integration-row">
             <span>
-              <i /> Consultar identidad del dispositivo
+              {snapshot?.networkConnected ? (
+                <Wifi size={17} />
+              ) : (
+                <WifiOff size={17} />
+              )}{" "}
+              Red
             </span>
-            <span>
-              <i /> Bloquear el equipo con confirmación
-            </span>
+            <strong>
+              {snapshot == null
+                ? "Comprobando…"
+                : snapshot.networkConnected
+                  ? "Conectada"
+                  : "Sin conexión detectada"}
+            </strong>
           </div>
           <p className="form-note">
-            Próxima etapa: archivos autorizados, audio del sistema,
-            notificaciones, captura de pantalla y automatización con niveles de
-            riesgo.
+            Estos datos permanecen locales salvo que una función futura pida
+            utilizarlos como contexto de NEXUS AI.
           </p>
         </section>
       </div>
@@ -162,7 +189,7 @@ export function DeviceView() {
         <div className="row between wrap">
           <div>
             <Label>NATIVE TOOLS / WINDOWS</Label>
-            <h2>Primeras acciones del Companion.</h2>
+            <h2>Aplicaciones autorizadas.</h2>
           </div>
           <Badge active={native}>{native ? "READY" : "INSTALL REQUIRED"}</Badge>
         </div>
@@ -182,12 +209,101 @@ export function DeviceView() {
             </Button>
           ))}
         </div>
+      </section>
+
+      <section className="surface device-actions-section">
+        <div className="row between wrap">
+          <div>
+            <Label>AUDIO / WINDOWS</Label>
+            <h2>Control de volumen.</h2>
+          </div>
+          <Volume2 size={20} />
+        </div>
+
+        <div className="device-action-grid">
+          <Button
+            variant="secondary"
+            disabled={!native || !!busy}
+            onClick={() =>
+              void run("volume-down", () => deviceBridge.adjustVolume(-10))
+            }
+          >
+            <Minus size={16} /> 10%
+          </Button>
+          <Button
+            variant="secondary"
+            disabled={!native || !!busy}
+            onClick={() =>
+              void run("volume-up", () => deviceBridge.adjustVolume(10))
+            }
+          >
+            <Plus size={16} /> 10%
+          </Button>
+          {[25, 50, 75, 100].map((value) => (
+            <Button
+              key={value}
+              variant="secondary"
+              disabled={!native || !!busy}
+              onClick={() =>
+                void run("volume-" + value, () => deviceBridge.setVolume(value))
+              }
+            >
+              {value}%
+            </Button>
+          ))}
+          <Button
+            variant="secondary"
+            disabled={!native || !!busy}
+            onClick={() => void run("mute", () => deviceBridge.toggleMute())}
+          >
+            <VolumeX size={16} /> Mute
+          </Button>
+        </div>
+        <p className="form-note">
+          En esta beta el ajuste usa los controles multimedia nativos de Windows,
+          por lo que el nivel puede quedar cuantizado en pasos pequeños.
+        </p>
+      </section>
+
+      <section className="surface device-actions-section">
+        <div className="row between wrap">
+          <div>
+            <Label>SCREEN / EXPLICIT ACCESS</Label>
+            <h2>Captura autorizada de pantalla.</h2>
+          </div>
+          <Badge>CONFIRMABLE</Badge>
+        </div>
+
+        <div className="device-danger-row">
+          <div>
+            <strong>Guardar captura local</strong>
+            <span>
+              La imagen se guarda en Imágenes/NEXUS. NEXUS AI no la recibe
+              automáticamente.
+            </span>
+            {lastScreenshot && <small>{lastScreenshot}</small>}
+          </div>
+          <Button
+            variant="secondary"
+            disabled={!native || !!busy}
+            onClick={() => {
+              if (!window.confirm("¿Capturar la pantalla visible ahora?")) return;
+              void run("screenshot", async () => {
+                const path = await deviceBridge.takeScreenshot();
+                setLastScreenshot(path);
+              });
+            }}
+          >
+            <Camera size={16} />
+            Capturar
+          </Button>
+        </div>
 
         <div className="device-danger-row">
           <div>
             <strong>Bloquear Windows</strong>
             <span>
-              Acción sensible. NEXUS exige una confirmación explícita antes de
+              Acción sensible. NEXUS exige confirmación explícita antes de
               ejecutarla.
             </span>
           </div>
@@ -206,9 +322,9 @@ export function DeviceView() {
 
         {!native && (
           <div className="system-alert">
-            La PWA seguirá siendo el centro visual. Para estas funciones
-            instalaremos NEXUS Companion Desktop en Windows; usará la misma
-            cuenta y el mismo workspace.
+            Estas herramientas solo funcionan dentro de NEXUS Companion. La PWA
+            conserva la misma cuenta y el mismo workspace, pero no recibe
+            permisos del sistema operativo.
           </div>
         )}
         {error && (
