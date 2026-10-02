@@ -65,6 +65,7 @@ type FinanceStreamItem = {
   projectId?: string;
   detail?: string;
   record?: EditableRecord;
+  auditId?: string;
 };
 
 function activityString(
@@ -196,6 +197,11 @@ function TransactionEditor({
         Categoría
         <input value={category} onChange={(e) => setCategory(e.target.value)} />
       </label>
+      <p className="form-note">
+        Eliminar del historial borra el movimiento y sus registros de auditoría
+        asociados. Si estaba vinculado a una cuenta, el saldo se corrige
+        automáticamente.
+      </p>
       <div className="row between">
         <Button type="submit">Guardar movimiento</Button>
         <Button
@@ -207,14 +213,14 @@ function TransactionEditor({
               return;
             }
             n.run(
-              () => n.actions.deleteMoneyRecord(record.kind, record.id),
-              "Movimiento eliminado.",
+              () => n.actions.purgeMoneyRecord(record.kind, record.id),
+              "Movimiento eliminado del historial.",
             );
             close();
           }}
         >
           <Trash2 size={14} />
-          {deleting ? "Confirmar eliminación" : "Eliminar"}
+          {deleting ? "Confirmar eliminación" : "Eliminar del historial"}
         </Button>
       </div>
     </form>
@@ -489,6 +495,7 @@ export function FinanceView() {
       const currency = activityString(item.metadata, "currency");
       return {
         id: "audit-" + item.id,
+        auditId: item.id,
         title: item.title,
         date:
           activityString(item.metadata, "date") ||
@@ -921,9 +928,10 @@ export function FinanceView() {
               action={<Badge>{movementStream.length} REGISTROS</Badge>}
             />
             <p className="form-note finance-ledger-note">
-              Aquí quedan ingresos, gastos, pagos, deudas, conciliaciones,
-              ediciones y eliminaciones. Las deudas registradas no reducen tu
-              disponible hasta que exista un pago desde una cuenta.
+              Aquí quedan ingresos, gastos, pagos, deudas, conciliaciones y
+              ediciones. Ahora puedes limpiar movimientos falsos o pruebas del
+              historial. Si eliminas un movimiento real vinculado a una cuenta,
+              NEXUS revierte automáticamente su impacto en el saldo.
             </p>
             {movementGroups.map(([month, items]) => (
               <div className="finance-movement-month" key={month}>
@@ -990,12 +998,59 @@ export function FinanceView() {
                           : "—"}
                       </strong>
                       {item.record ? (
+                        <div className="row">
+                          <button
+                            className="icon-button"
+                            aria-label={"Editar movimiento " + item.title}
+                            onClick={() => setEditingRecord(item.record!)}
+                          >
+                            <Pencil size={14} />
+                          </button>
+                          <button
+                            className="icon-button"
+                            aria-label={"Eliminar movimiento " + item.title}
+                            onClick={() => {
+                              if (
+                                !window.confirm(
+                                  "¿Eliminar este movimiento definitivamente del historial? " +
+                                    "Si afectó una cuenta, NEXUS revertirá automáticamente su importe.",
+                                )
+                              )
+                                return;
+                              n.run(
+                                () =>
+                                  n.actions.purgeMoneyRecord(
+                                    item.record!.kind,
+                                    item.record!.id,
+                                  ),
+                                "Movimiento eliminado del historial.",
+                              );
+                            }}
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      ) : item.auditId ? (
                         <button
                           className="icon-button"
-                          aria-label={"Editar movimiento " + item.title}
-                          onClick={() => setEditingRecord(item.record!)}
+                          aria-label={"Quitar registro del historial " + item.title}
+                          onClick={() => {
+                            if (
+                              !window.confirm(
+                                "¿Quitar esta línea del historial? Esto no modificará saldos, deudas ni movimientos actuales.",
+                              )
+                            )
+                              return;
+                            n.run(
+                              () =>
+                                n.actions.deleteFinanceHistoryEvent(
+                                  item.auditId!,
+                                ),
+                              "Registro quitado del historial.",
+                            );
+                          }}
                         >
-                          <Pencil size={14} />
+                          <Trash2 size={14} />
                         </button>
                       ) : (
                         <span className="transaction-audit-mark">AUDIT</span>
