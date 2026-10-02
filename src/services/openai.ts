@@ -108,7 +108,12 @@ interface APIResponse {
 
 const functions = getFunctions(firebaseApp, "us-east4");
 const callAI = httpsCallable<
-  { prompt: string; context: NexusContext; model?: string },
+  {
+    prompt: string;
+    context: NexusContext;
+    model?: string;
+    responseMode?: "text" | "voice";
+  },
   APIResponse
 >(functions, "nexusAI");
 export interface NexusAIQuota {
@@ -155,10 +160,11 @@ export class NexusOpenAIClient implements AIProvider {
     prompt: string,
     context: NexusContext,
     signal?: AbortSignal,
+    responseMode: "text" | "voice" = "text",
   ): Promise<NexusAIResponse> {
     if (signal?.aborted) throw new DOMException("Cancelado", "AbortError");
 
-    const response = await callAI({ prompt, context });
+    const response = await callAI({ prompt, context, responseMode });
     if (signal?.aborted) throw new DOMException("Cancelado", "AbortError");
 
     const body = response.data;
