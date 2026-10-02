@@ -2,14 +2,11 @@ name: NEXUS Desktop Release
 
 on:
   push:
-    branches: [release]
+    branches: [main]
     paths:
-      - "src-tauri/**"
-      - "src/**"
-      - "public/**"
-      - "scripts/**"
+      - "src-tauri/tauri.conf.json"
+      - "src-tauri/Cargo.toml"
       - "package.json"
-      - "next.config.ts"
       - ".github/workflows/desktop-release.yml"
   workflow_dispatch:
 
