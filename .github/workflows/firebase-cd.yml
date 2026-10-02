@@ -47,9 +47,9 @@ jobs:
             node --check "$file"
           done
 
-      - name: Deploy Firebase backend
+      - name: Deploy NEXUS AI backend
         run: >
           firebase deploy
-          --only functions,firestore:rules,storage
+          --only functions:nexusAI,functions:nexusAIStatus
           --project nexus-96795
           --non-interactive
