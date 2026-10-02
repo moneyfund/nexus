@@ -15,7 +15,7 @@ setGlobalOptions({
 
 const OPENAI_API_KEY = defineSecret("OPENAI_API_KEY");
 const DEFAULT_MODEL = "gpt-6-luna";
-const AI_BACKEND_REVISION = "2026-10-02-luna-actions-v2";
+const AI_BACKEND_REVISION = "2026-10-02-luna-actions-v3";
 const AI_HOURLY_LIMIT = 30;
 const AI_DAILY_LIMIT = 60;
 const AI_MONTHLY_LIMIT = 600;
