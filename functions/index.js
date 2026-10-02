@@ -15,6 +15,7 @@ setGlobalOptions({
 
 const OPENAI_API_KEY = defineSecret("OPENAI_API_KEY");
 const DEFAULT_MODEL = "gpt-6-luna";
+const AI_BACKEND_REVISION = "2026-10-02-luna-actions-v2";
 const AI_HOURLY_LIMIT = 30;
 const AI_DAILY_LIMIT = 60;
 const AI_MONTHLY_LIMIT = 600;
@@ -338,6 +339,7 @@ export const nexusAIStatus = onCall(
       model: DEFAULT_MODEL,
       provider: "openai",
       mode: "realtime-context",
+      backendRevision: AI_BACKEND_REVISION,
       quota,
     };
   },
@@ -469,6 +471,7 @@ export const nexusAI = onCall(
       result,
       model,
       provider: "openai",
+      backendRevision: AI_BACKEND_REVISION,
       usage,
       costUSD,
       quota: await getAiQuota(request.auth.uid),
