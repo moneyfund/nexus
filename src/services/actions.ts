@@ -703,6 +703,71 @@ export class NexusActions {
     });
 
 
+  purgeMoneyRecord = (kind: "income" | "expense", recordId: string) =>
+    this.store.update((w) => {
+      const collection = kind === "income" ? w.incomes : w.expenses;
+      const record = collection.find((item) => item.id === recordId);
+      if (!record) throw new Error("Movimiento no encontrado.");
+
+      const account = record.accountId
+        ? (w.financialAccounts ?? []).find(
+            (item) => item.id === record.accountId,
+          )
+        : undefined;
+
+      if (account) {
+        account.balance =
+          Math.round(
+            (account.balance + (kind === "income" ? -record.amount : record.amount)) *
+              100,
+          ) / 100;
+        account.updatedAt = Date.now();
+      }
+
+      const debtId =
+        typeof record.metadata?.debtId === "string"
+          ? record.metadata.debtId
+          : undefined;
+      if (kind === "expense" && debtId) {
+        const debt = (w.debts ?? []).find((item) => item.id === debtId);
+        if (debt) {
+          debt.balance =
+            Math.round(
+              Math.min(debt.originalAmount, debt.balance + record.amount) * 100,
+            ) / 100;
+          debt.status = debt.balance <= 0 ? "paid" : "pending";
+          debt.updatedAt = Date.now();
+        }
+      }
+
+      if (kind === "income")
+        w.incomes = w.incomes.filter((item) => item.id !== recordId);
+      else w.expenses = w.expenses.filter((item) => item.id !== recordId);
+
+      // A permanent history cleanup is intentionally different from the
+      // auditable deleteMoneyRecord path. It removes capture and finance
+      // audit traces tied to the same movement so false/test records disappear.
+      w.inbox = w.inbox.filter((item) => item.targetId !== recordId);
+      w.activity = w.activity.filter(
+        (item) =>
+          !(
+            item.metadata?.financeEvent === true &&
+            item.metadata?.referenceId === recordId
+          ),
+      );
+    });
+
+  deleteFinanceHistoryEvent = (activityId: string) =>
+    this.store.update((w) => {
+      const event = w.activity.find((item) => item.id === activityId);
+      if (!event || event.metadata?.financeEvent !== true)
+        throw new Error("Registro financiero de historial no encontrado.");
+      if (event.source !== "user")
+        throw new Error("Los registros de demostración no se pueden eliminar.");
+      w.activity = w.activity.filter((item) => item.id !== activityId);
+    });
+
+
   createDebt = (input: {
     creditor: string;
     title?: string;
