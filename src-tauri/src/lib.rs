@@ -1,6 +1,30 @@
 use serde::{Deserialize, Serialize};
 use std::{env, process::Command};
 
+#[cfg(target_os = "windows")]
+#[link(name = "user32")]
+extern "system" {
+    fn keybd_event(b_vk: u8, b_scan: u8, dw_flags: u32, dw_extra_info: usize);
+    fn LockWorkStation() -> i32;
+}
+
+#[cfg(target_os = "windows")]
+const KEYEVENTF_KEYUP: u32 = 0x0002;
+#[cfg(target_os = "windows")]
+const VK_VOLUME_MUTE: u8 = 0xAD;
+#[cfg(target_os = "windows")]
+const VK_VOLUME_DOWN: u8 = 0xAE;
+#[cfg(target_os = "windows")]
+const VK_VOLUME_UP: u8 = 0xAF;
+
+#[cfg(target_os = "windows")]
+fn press_media_key(vk: u8) {
+    unsafe {
+        keybd_event(vk, 0, 0, 0);
+        keybd_event(vk, 0, KEYEVENTF_KEYUP, 0);
+    }
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct DeviceStatus {
@@ -124,84 +148,74 @@ fn open_app(app: String) -> Result<(), String> {
     }
 }
 
-fn run_volume_script(body: &str) -> Result<(), String> {
+#[tauri::command]
+fn set_volume(value: u8) -> Result<u8, String> {
     #[cfg(target_os = "windows")]
     {
-        let script = format!(
-            r#"
-Add-Type @'
-using System;
-using System.Runtime.InteropServices;
-public static class NexusAudio {{
-  [DllImport("user32.dll")]
-  public static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
-  public static void Press(byte vk) {{
-    keybd_event(vk, 0, 0, UIntPtr.Zero);
-    keybd_event(vk, 0, 2, UIntPtr.Zero);
-  }}
-}}
-'@
-{}
-"#,
-            body
-        );
+        let target = value.min(100);
 
-        let status = Command::new("powershell.exe")
-            .args(["-NoProfile", "-WindowStyle", "Hidden", "-Command", &script])
-            .status()
-            .map_err(|error| format!("Windows no pudo controlar el audio: {error}"))?;
-
-        if status.success() {
-            Ok(())
-        } else {
-            Err("Windows rechazó el control de audio.".to_string())
+        // Windows' media keys usually move the master volume in ~2% steps.
+        // Driving user32 directly avoids starting PowerShell for every command.
+        for _ in 0..52 {
+            press_media_key(VK_VOLUME_DOWN);
         }
+
+        let up_presses = ((target as u16 + 1) / 2) as usize;
+        for _ in 0..up_presses {
+            press_media_key(VK_VOLUME_UP);
+        }
+
+        Ok(target)
     }
 
     #[cfg(not(target_os = "windows"))]
     {
-        let _ = body;
+        let _ = value;
         Err("El control de audio de esta beta está habilitado para Windows.".to_string())
     }
 }
 
 #[tauri::command]
-fn set_volume(value: u8) -> Result<u8, String> {
-    let target = value.min(100);
-    let up_presses = ((target as u16 + 1) / 2) as usize;
-    let body = format!(
-        "1..60 | ForEach-Object {{ [NexusAudio]::Press(0xAE) }}\n1..{} | ForEach-Object {{ [NexusAudio]::Press(0xAF) }}",
-        up_presses.max(1)
-    );
-
-    if target == 0 {
-        run_volume_script("1..60 | ForEach-Object { [NexusAudio]::Press(0xAE) }")?;
-    } else {
-        run_volume_script(&body)?;
-    }
-
-    Ok(target)
-}
-
-#[tauri::command]
 fn adjust_volume(delta: i8) -> Result<i8, String> {
-    if delta == 0 {
-        return Ok(0);
+    #[cfg(target_os = "windows")]
+    {
+        if delta == 0 {
+            return Ok(0);
+        }
+
+        let steps = ((delta.unsigned_abs() as u16 + 1) / 2).max(1);
+        let key = if delta > 0 {
+            VK_VOLUME_UP
+        } else {
+            VK_VOLUME_DOWN
+        };
+
+        for _ in 0..steps {
+            press_media_key(key);
+        }
+
+        Ok(delta)
     }
 
-    let steps = ((delta.unsigned_abs() as u16 + 1) / 2).max(1);
-    let vk = if delta > 0 { "0xAF" } else { "0xAE" };
-    let body = format!(
-        "1..{} | ForEach-Object {{ [NexusAudio]::Press({}) }}",
-        steps, vk
-    );
-    run_volume_script(&body)?;
-    Ok(delta)
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = delta;
+        Err("El control de audio de esta beta está habilitado para Windows.".to_string())
+    }
 }
 
 #[tauri::command]
 fn toggle_mute() -> Result<(), String> {
-    run_volume_script("[NexusAudio]::Press(0xAD)")
+    #[cfg(target_os = "windows")]
+    {
+        press_media_key(VK_VOLUME_MUTE);
+        Ok(())
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        Err("El control de audio de esta beta está habilitado para Windows.".to_string())
+    }
 }
 
 #[tauri::command]
@@ -254,11 +268,12 @@ try {
 fn lock_device() -> Result<(), String> {
     #[cfg(target_os = "windows")]
     {
-        Command::new("rundll32.exe")
-            .arg("user32.dll,LockWorkStation")
-            .spawn()
-            .map(|_| ())
-            .map_err(|error| format!("Windows no pudo bloquear el equipo: {error}"))
+        let result = unsafe { LockWorkStation() };
+        if result != 0 {
+            Ok(())
+        } else {
+            Err("Windows no pudo bloquear el equipo.".to_string())
+        }
     }
 
     #[cfg(not(target_os = "windows"))]
