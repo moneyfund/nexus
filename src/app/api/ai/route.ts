@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 export const runtime = "nodejs";
 
 const FIREBASE_API_KEY = "AIzaSyBJpy4DFBSaD4d4weknjHxfxwn_uMY5mS4";
-const DEFAULT_MODEL = "gpt-5.6-terra";
+const DEFAULT_MODEL = "gpt-6-luna";
 
 async function verifyFirebaseToken(token: string) {
   const response = await fetch(
