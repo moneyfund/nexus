@@ -64,6 +64,17 @@ jobs:
           npm run typecheck
           npm run lint
 
+      - name: Prepare signed updater configuration
+        shell: pwsh
+        run: |
+          $config = Get-Content "src-tauri/tauri.release.conf.json" -Raw | ConvertFrom-Json
+          $config | Add-Member -Force -MemberType NoteProperty -Name plugins -Value ([pscustomobject]@{
+            updater = [pscustomobject]@{
+              pubkey = $env:NEXUS_UPDATER_PUBKEY
+            }
+          })
+          $config | ConvertTo-Json -Depth 20 | Set-Content "src-tauri/tauri.release.generated.json" -Encoding UTF8
+
       - name: Build and publish signed NEXUS release
         uses: tauri-apps/tauri-action@v1
         env:
@@ -76,5 +87,5 @@ jobs:
           releaseName: "NEXUS v__VERSION__"
           releaseBody: "Actualización beta de NEXUS Companion. El cliente valida criptográficamente el paquete antes de instalarlo."
           releaseDraft: false
-          prerelease: true
-          args: "--config src-tauri/tauri.release.conf.json"
+          prerelease: false
+          args: "--config src-tauri/tauri.release.generated.json"
