@@ -956,9 +956,11 @@ export function AIView() {
   }
 
   async function send(text: string) {
-    if (!text.trim() || requestRef.current) return;
+    const cleanText = text.trim();
+    if (!cleanText || requestRef.current) return;
+    const localDeviceAction = parseLocalDeviceIntent(cleanText);
     requestRef.current = true;
-    setBusy(true);
+    setBusy(!localDeviceAction);
     try {
       let conversationId = currentConversationId;
       if (
@@ -977,24 +979,11 @@ export function AIView() {
       );
       if (!conversation) throw new Error("No se pudo abrir la conversación.");
 
-      const scopedContext = n.services.context.build(snapshot, {
-        conversationId,
-        projectId: conversation.projectId,
-      });
-      const runtimeStatus = await deviceBridge.status().catch(() => null);
-      if (runtimeStatus) {
-        scopedContext.device = {
-          connected: runtimeStatus.connected,
-          runtime: runtimeStatus.runtime,
-          platform: runtimeStatus.platform,
-          capabilities: runtimeStatus.capabilities,
-        };
-      }
       const message = {
         ...entity(crypto.randomUUID(), "user", snapshot.user.id),
         conversationId,
         role: "user" as const,
-        content: text.trim(),
+        content: cleanText,
         contextIds: [],
         simulated: false,
       };
@@ -1002,7 +991,6 @@ export function AIView() {
       n.actions.appendAIMessage(conversationId, message);
       setPrompt("");
 
-      const localDeviceAction = parseLocalDeviceIntent(text);
       if (localDeviceAction) {
         const nativeReady = deviceBridge.isNativeRuntime();
         n.actions.appendAIMessage(conversationId, {
@@ -1029,7 +1017,21 @@ export function AIView() {
         return;
       }
 
-      const result = await n.services.ai.respondDetailed(text, scopedContext);
+      const scopedContext = n.services.context.build(snapshot, {
+        conversationId,
+        projectId: conversation.projectId,
+      });
+      const runtimeStatus = await deviceBridge.status().catch(() => null);
+      if (runtimeStatus) {
+        scopedContext.device = {
+          connected: runtimeStatus.connected,
+          runtime: runtimeStatus.runtime,
+          platform: runtimeStatus.platform,
+          capabilities: runtimeStatus.capabilities,
+        };
+      }
+
+      const result = await n.services.ai.respondDetailed(cleanText, scopedContext);
       n.actions.appendAIMessage(conversationId, {
         ...result.message,
         conversationId,
